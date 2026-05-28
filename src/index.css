@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+  background: #0A0A0A;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.shine-text {
+  background: linear-gradient(90deg, #FFD700 0%, #fff7c2 50%, #FFD700 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 3s linear infinite;
+}
+
+/* --- Okapi Climb animations --- */
+.okapi-neon-gold {
+  color: #FFEC5C;
+  text-shadow:
+    0 0 6px rgba(255, 245, 130, 1),
+    0 0 14px rgba(255, 215, 0, 0.95),
+    0 0 28px rgba(255, 180, 30, 0.8),
+    0 0 60px rgba(255, 140, 0, 0.55);
+}
+
+@keyframes okapi-climbing {
+  0%   { transform: scale(1)    translateY(0); }
+  50%  { transform: scale(1.02) translateY(-8px); }
+  100% { transform: scale(1)    translateY(0); }
+}
+@keyframes okapi-crashed {
+  0%   { transform: translateX(0); }
+  25%  { transform: translateX(-10px); }
+  75%  { transform: translateX(10px); }
+  100% { transform: translateX(0); }
+}
+.okapi-climbing { animation: okapi-climbing 1.5s ease-in-out infinite; }
+.okapi-crashed  { animation: okapi-crashed 0.1s ease-in-out 5; }
+
+@keyframes okapiRun {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+.okapi-run { animation: okapiRun 0.3s ease-in-out infinite; }
+
+/* --- HomeScreen card animations --- */
+@keyframes pulse-red {
+  0%, 100% { text-shadow: 0 0 8px rgba(255,0,0,0.6), 0 2px 4px rgba(0,0,0,0.9); }
+  50%      { text-shadow: 0 0 20px rgba(255,0,0,1), 0 0 40px rgba(255,0,0,0.4), 0 2px 4px rgba(0,0,0,0.9); }
+}
+.pulse-red { animation: pulse-red 1.5s ease-in-out infinite; }
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-8px); }
+}
+.float-y { animation: float-y 3s ease-in-out infinite; }
+
+@keyframes shimmer-gold {
+  0%, 100% { filter: drop-shadow(0 0 16px rgba(255,215,0,0.7)); }
+  50%      { filter: drop-shadow(0 0 30px rgba(255,215,0,1)); }
+}
+.shimmer-gold { animation: shimmer-gold 2.5s ease-in-out infinite; }
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.02); }
+}
+.breathe { animation: breathe 4s ease-in-out infinite; }
+
+@keyframes flag-float {
+  0%, 100% { transform: translateY(0px) rotate(-3deg); }
+  50%      { transform: translateY(-6px) rotate(3deg); }
+}
