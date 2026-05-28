@@ -12,8 +12,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import { getSession, refreshBalance } from '../lib/auth';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import GainsModal from '../components/GainsModal';
+import CongoLotoComingSoon from './CongoLotoComingSoon';
 
 type State = 'idle' | 'pending' | 'success' | 'error';
 
@@ -70,6 +71,10 @@ export default function LotoScreen() {
   const [showGains, setShowGains] = useState(false);
   const [countdown, setCountdown] = useState<string>(() => getCountdownToKinshasa20h());
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
+  // `null` = still probing the feature flag; we render a neutral
+  // loading state during this brief window to avoid a flash of the
+  // real UI before swapping to the "coming soon" experience.
+  const [comingSoon, setComingSoon] = useState<boolean | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setCountdown(getCountdownToKinshasa20h()), 1000);
@@ -81,13 +86,31 @@ export default function LotoScreen() {
       .then((r) => {
         setTirage(r.tirage);
         setPotCdf(Number(r.pot_cdf || 0));
+        setComingSoon(false);
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (e instanceof ApiError && e.code === 'COMING_SOON') {
+          setComingSoon(true);
+        } else {
+          // Network or unrelated error — keep the regular UI rather
+          // than misleading the player with a "coming soon" page.
+          setComingSoon(false);
+        }
+      });
     if (session) {
       api.lotoMesTickets(session.id).then((r) => setTickets(r.tickets)).catch(() => {});
       refreshBalance(session.id).then(setBalance).catch(() => {});
     }
   }, []);
+
+  if (comingSoon === true) return <CongoLotoComingSoon />;
+  if (comingSoon === null) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-bg text-zinc-500 text-sm">
+        Chargement…
+      </div>
+    );
+  }
 
   const isFull = selected.length === 6;
 

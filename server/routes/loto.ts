@@ -1,8 +1,22 @@
-import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { LotoTicketBodySchema } from '../lib/validation.js';
+import { COMING_SOON_PAYLOAD, isCongoLotoEnabled } from '../lib/featureFlags.js';
+
+/**
+ * Soft-disable guard for Congo Loto. When the feature flag is off we
+ * return a 403 with `code: "COMING_SOON"` for every loto endpoint —
+ * the frontend uses this signal to swap the screen for the premium
+ * teaser. No DB rows are touched; flipping the env var brings the
+ * product back instantly.
+ */
+async function congoLotoGuard(_req: FastifyRequest, reply: FastifyReply) {
+  if (!isCongoLotoEnabled) {
+    return reply.code(403).send(COMING_SOON_PAYLOAD);
+  }
+}
 
 // provider_id sentinel used for internal (non-Unipesa) loto transactions
 const LOTO_PROVIDER_ID = 0;
@@ -227,6 +241,11 @@ export async function executerTirageLoto(): Promise<ExecuterTirageLotoResult> {
 }
 
 const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
+  // Soft-disable: every Congo Loto endpoint short-circuits with
+  // `COMING_SOON` when the feature flag is off. Placed as a single
+  // onRequest hook so we cannot accidentally miss a new route.
+  app.addHook('onRequest', congoLotoGuard);
+
   // GET latest tirage
   app.get('/api/loto/tirage/latest', async (_req, reply) => {
     const { data, error } = await supabaseAdmin

@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { executerTirageFlash } from './routes/flash.js';
 import { executerTirageLoto } from './routes/loto.js';
 import { acquireJobLock } from './lib/jobLock.js';
+import { isCongoLotoEnabled } from './lib/featureFlags.js';
 
 function getFlashSlotKey(): string {
   const now = new Date();
@@ -65,26 +66,32 @@ export function startCrons() {
   });
   console.log('[FLASH CRON] Planificateur démarré — tirage toutes les 30 minutes');
 
-  // Tirage Loto Congo — tous les jours à 20h00 pile à Kinshasa
-  cron.schedule(
-    '0 20 * * *',
-    async () => {
-      const slotKey = getLotoSlotKey();
-      const acquired = await acquireJobLock('loto_draw', slotKey);
-      if (!acquired) {
-        console.log('[LOTO CRON] Lock already acquired, skipping draw', slotKey);
-        return;
-      }
-      try {
-        const result = await executerTirageLoto();
-        console.log('[LOTO CRON] Tirage quotidien effectué', result);
-      } catch (err) {
-        console.error('[LOTO CRON] Erreur tirage:', err);
-      }
-    },
-    {
-      timezone: 'Africa/Kinshasa',
-    },
-  );
-  console.log('[LOTO CRON] Tirage quotidien planifié — 20h00 Africa/Kinshasa');
+  // Tirage Loto Congo — tous les jours à 20h00 pile à Kinshasa.
+  // Suspendu quand la feature flag est désactivée (les tickets ne
+  // peuvent plus être achetés ; lancer le tirage n'aurait pas de sens).
+  if (isCongoLotoEnabled) {
+    cron.schedule(
+      '0 20 * * *',
+      async () => {
+        const slotKey = getLotoSlotKey();
+        const acquired = await acquireJobLock('loto_draw', slotKey);
+        if (!acquired) {
+          console.log('[LOTO CRON] Lock already acquired, skipping draw', slotKey);
+          return;
+        }
+        try {
+          const result = await executerTirageLoto();
+          console.log('[LOTO CRON] Tirage quotidien effectué', result);
+        } catch (err) {
+          console.error('[LOTO CRON] Erreur tirage:', err);
+        }
+      },
+      {
+        timezone: 'Africa/Kinshasa',
+      },
+    );
+    console.log('[LOTO CRON] Tirage quotidien planifié — 20h00 Africa/Kinshasa');
+  } else {
+    console.log('[LOTO CRON] Désactivé (CONGO_LOTO_ENABLED=false)');
+  }
 }

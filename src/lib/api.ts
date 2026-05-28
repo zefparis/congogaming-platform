@@ -1,5 +1,15 @@
 const BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
@@ -8,10 +18,10 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const j = json as { error?: string; detail?: string };
-    const base = j?.error || `HTTP ${res.status}`;
+    const j = json as { error?: string; message?: string; detail?: string; code?: string };
+    const base = j?.error || j?.message || `HTTP ${res.status}`;
     const detail = j?.detail ? ` — ${String(j.detail).slice(0, 300)}` : '';
-    throw new Error(base + detail);
+    throw new ApiError(base + detail, res.status, j?.code);
   }
   return json as T;
 }

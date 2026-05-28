@@ -28,6 +28,12 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('604800'),
   VITE_API_URL: z.string().optional(),
   VITE_WS_URL: z.string().optional(),
+  // Feature flags. Defaults preserve the production behaviour; set the
+  // env var explicitly per environment to flip the flag.
+  CONGO_LOTO_ENABLED: z
+    .string()
+    .transform((val) => val.toLowerCase() === 'true')
+    .default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;
