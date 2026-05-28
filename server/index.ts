@@ -31,7 +31,12 @@ const app = Fastify({
 });
 
 await app.register(cors, {
-  origin: env.ALLOWED_ORIGINS?.split(',') || ['https://congogaming.com', 'https://www.congogaming.com', 'http://localhost:5173'],
+  origin: env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [
+    'https://congogaming.com',
+    'https://www.congogaming.com',
+    'https://congogaming-platform-staging.vercel.app',
+    'http://localhost:5173',
+  ],
   credentials: true,
 });
 
