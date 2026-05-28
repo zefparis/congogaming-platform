@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Phone, Lock } from 'lucide-react';
 import NumPad from '../components/NumPad';
-import { detectOperator, loginUser, validateCongoPhone, getSession } from '../lib/auth';
+import { AuthApiError, detectOperator, loginUser, validateCongoPhone, getSession } from '../lib/auth';
 
 export default function LoginScreen() {
   const nav = useNavigate();
@@ -42,6 +42,10 @@ export default function LoginScreen() {
       // on home; the KYC scan is triggered on the FIFA card tap.
       nav('/', { replace: true });
     } catch (e: any) {
+      if (e instanceof AuthApiError && e.code === 'PIN_RESET_REQUIRED') {
+        nav('/reset-pin', { state: { phone }, replace: true });
+        return;
+      }
       setErr(e.message || 'Erreur');
       setPin('');
     } finally {

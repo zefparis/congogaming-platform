@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import SplashScreen from './screens/SplashScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import ResetPinScreen from './screens/ResetPinScreen';
 import HomeScreen from './screens/HomeScreen';
 import GameScreen from './screens/GameScreen';
 import DepositScreen from './screens/DepositScreen';
@@ -107,6 +108,7 @@ function AppRoutes() {
           <Route path="/splash" element={<PageWrap><SplashScreen /></PageWrap>} />
           <Route path="/login" element={<PageWrap><LoginScreen /></PageWrap>} />
           <Route path="/register" element={<PageWrap><RegisterScreen /></PageWrap>} />
+          <Route path="/reset-pin" element={<PageWrap><ResetPinScreen /></PageWrap>} />
           <Route path="/" element={<Protected><PageWrap><HomeScreen /></PageWrap></Protected>} />
           <Route
             path="/jouer"

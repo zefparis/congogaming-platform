@@ -12,14 +12,26 @@ export type SessionUser = {
 
 let currentUser: SessionUser | null = null;
 
+export class AuthApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((json as { error?: string })?.error || `HTTP ${res.status}`);
+  const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+  if (!res.ok) {
+    throw new AuthApiError(json?.error || `HTTP ${res.status}`, res.status, json?.code);
+  }
   return json as T;
 }
 
@@ -65,6 +77,13 @@ export async function loginUser(phone: string, pin: string): Promise<SessionUser
   });
   currentUser = user;
   return user;
+}
+
+export async function resetPinByPhone(phone: string, newPin: string): Promise<void> {
+  await authRequest<{ ok: boolean; message: string }>('/api/auth/reset-pin', {
+    method: 'POST',
+    body: JSON.stringify({ phone, newPin }),
+  });
 }
 
 export async function refreshSession(): Promise<SessionUser | null> {

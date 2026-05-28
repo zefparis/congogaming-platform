@@ -49,7 +49,7 @@ export async function registerUser(input: { phone: string; pin: string }): Promi
 export async function loginUser(input: { phone: string; pin: string }): Promise<AuthUser> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, phone, balance_cdf, pin_hash, kyc_status, blocked, auth_failed_count, auth_locked_until')
+    .select('id, phone, balance_cdf, pin_hash, kyc_status, blocked, auth_failed_count, auth_locked_until, pin_must_reset')
     .eq('phone', input.phone)
     .maybeSingle();
 
@@ -57,10 +57,16 @@ export async function loginUser(input: { phone: string; pin: string }): Promise<
   if (!data) throw new Error('INVALID_CREDENTIALS');
   if (data.blocked) throw new Error('ACCOUNT_BLOCKED');
 
+  // Legacy SHA-256 hashes cannot be verified with Argon2; force the user
+  // through the reset-PIN flow before any login attempt.
+  const pinHash = String(data.pin_hash || '');
+  const isLegacyHash = /^[a-f0-9]{64}$/i.test(pinHash);
+  if (data.pin_must_reset || isLegacyHash) throw new Error('PIN_RESET_REQUIRED');
+
   const lockedUntil = data.auth_locked_until ? new Date(String(data.auth_locked_until)) : null;
   if (lockedUntil && lockedUntil.getTime() > Date.now()) throw new Error('ACCOUNT_TEMP_LOCKED');
 
-  const ok = await argon2.verify(String(data.pin_hash), input.pin).catch(() => false);
+  const ok = await argon2.verify(pinHash, input.pin).catch(() => false);
   if (!ok) {
     const failures = Number(data.auth_failed_count ?? 0) + 1;
     const patch: Record<string, unknown> = { auth_failed_count: failures };
@@ -77,6 +83,62 @@ export async function loginUser(input: { phone: string; pin: string }): Promise<
     .eq('id', data.id);
 
   return sanitizeUser(data);
+}
+
+/**
+ * Phone-based legacy PIN reset. Used by the frontend when login returns
+ * `PIN_RESET_REQUIRED`. Allows reset only when the account is in legacy
+ * state (`pin_must_reset = true` or pin_hash matches the SHA-256 64-hex
+ * pattern). Always uses Argon2id for the new hash.
+ */
+export async function resetPinByPhone(input: { phone: string; newPin: string }): Promise<void> {
+  if (!/^\d{4}$/.test(input.newPin)) throw new Error('INVALID_PIN_FORMAT');
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id, pin_hash, pin_must_reset')
+    .eq('phone', input.phone)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('USER_NOT_FOUND');
+
+  const isLegacyHash = /^[a-f0-9]{64}$/i.test(String(data.pin_hash || ''));
+  const mustReset = Boolean(data.pin_must_reset) || isLegacyHash;
+  if (!mustReset) throw new Error('PIN_RESET_NOT_REQUIRED');
+
+  await resetPin(String(data.id), input.newPin);
+}
+
+/**
+ * Replace the user's PIN with a fresh Argon2id hash and clear the
+ * `pin_must_reset` flag. Caller is responsible for verifying the user's
+ * identity (KYC selfie match, OTP, admin action, etc.) BEFORE calling this.
+ *
+ * Throws if the user does not exist.
+ */
+export async function resetPin(userId: string, newPin: string): Promise<void> {
+  const pinHash = await argon2.hash(newPin, {
+    type: argon2.argon2id,
+    memoryCost: 19_456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .update({
+      pin_hash: pinHash,
+      pin_must_reset: false,
+      auth_failed_count: 0,
+      auth_locked_until: null,
+    })
+    .eq('id', userId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('USER_NOT_FOUND');
 }
 
 export async function getUserById(userId: string): Promise<AuthUser | null> {
