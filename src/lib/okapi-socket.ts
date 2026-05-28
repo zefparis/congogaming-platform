@@ -32,6 +32,7 @@ export class GameSocket {
   private listeners = new Set<Listener>()
   private statusListeners = new Set<StatusListener>()
   private reconnectTimer: number | null = null
+  private reconnectAttempts = 0
   private _open = false
 
   get isOpen() {
@@ -49,6 +50,7 @@ export class GameSocket {
 
     this.ws.onopen = () => {
       this._open = true
+      this.reconnectAttempts = 0
       this.statusListeners.forEach((l) => l(true))
     }
     this.ws.onmessage = (ev) => {
@@ -80,10 +82,16 @@ export class GameSocket {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return
+    // Exponential backoff with jitter, capped. Server may reject due to
+    // CGNAT IP cap or transient outages; don't hammer it.
+    const attempt = this.reconnectAttempts++
+    const base = Math.min(1500 * 2 ** attempt, 15000)
+    const jitter = Math.floor(Math.random() * 500)
+    const delay = base + jitter
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null
       this.connect()
-    }, 1500)
+    }, delay)
   }
 
   on(listener: Listener) {

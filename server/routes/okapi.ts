@@ -17,13 +17,17 @@ type WSLike = {
 
 const sockets = new Set<WSLike>()
 const socketsByIp = new Map<string, number>()
-const MAX_SOCKETS_PER_IP = 5
-const HEARTBEAT_INTERVAL_MS = 30000
-const PONG_TIMEOUT_MS = 10000
+// DRC mobile carriers (Orange/Airtel/Africell) use CGNAT, so thousands of
+// users can share a single public IP. A small cap would lock out everyone
+// behind the same NAT after a few players. Keep this generous; abuse is
+// limited by the global rate limiter and per-user balance gating.
+const MAX_SOCKETS_PER_IP = 200
+const HEARTBEAT_INTERVAL_MS = 15000
 let broadcastWired = false
 let heartbeatInterval: NodeJS.Timeout | null = null
 
 function cleanupSocket(ws: WSLike) {
+  if (!sockets.has(ws)) return
   sockets.delete(ws)
   const ipCount = socketsByIp.get(ws.ip) ?? 0
   if (ipCount > 0) {
@@ -49,7 +53,13 @@ function startHeartbeat() {
 }
 
 const okapiRoutes: FastifyPluginAsync = async (app) => {
-  app.get('/ws', { websocket: true }, (socket, req) => {
+  app.get('/ws', {
+    websocket: true,
+    // CGNAT in DRC: hundreds of users can share an IP. Don't gate WS
+    // upgrades through the global IP rate limiter; the per-IP socket cap
+    // and heartbeat handle abuse.
+    config: { rateLimit: false },
+  } as any, (socket, req) => {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || (req.socket.remoteAddress || 'unknown')
     const ipCount = socketsByIp.get(ip) ?? 0
     if (ipCount >= MAX_SOCKETS_PER_IP) {
