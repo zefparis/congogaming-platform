@@ -32,6 +32,10 @@ export default function LoginScreen() {
     setPin((prev) => (prev.length < 4 ? prev + d : prev));
     setErr(null);
   };
+  const goToResetPin = () => {
+    nav('/reset-pin', { state: { phone }, replace: true });
+  };
+
   const handleLogin = async () => {
     if (pin.length !== 4 || loading) return;
     try {
@@ -42,8 +46,13 @@ export default function LoginScreen() {
       // on home; the KYC scan is triggered on the FIFA card tap.
       nav('/', { replace: true });
     } catch (e: any) {
-      if (e instanceof AuthApiError && e.code === 'PIN_RESET_REQUIRED') {
-        nav('/reset-pin', { state: { phone }, replace: true });
+      // Highest priority: legacy PIN reset flow. Trigger from either the
+      // explicit backend code OR a 409 response (defensive fallback in case
+      // an older backend revision is live and only returns the status).
+      const code = e instanceof AuthApiError ? e.code : undefined;
+      const status = e instanceof AuthApiError ? e.status : undefined;
+      if (code === 'PIN_RESET_REQUIRED' || (status === 409 && /pin/i.test(String(e.message || '')))) {
+        goToResetPin();
         return;
       }
       setErr(e.message || 'Erreur');
@@ -122,7 +131,18 @@ export default function LoginScreen() {
               </div>
             </div>
           </div>
-          {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
+          {err && (
+            <div className="mt-3">
+              <div className="text-red-400 text-sm">{err}</div>
+              <button
+                type="button"
+                onClick={goToResetPin}
+                className="mt-2 text-gold font-semibold text-sm underline underline-offset-4"
+              >
+                Changer mon PIN
+              </button>
+            </div>
+          )}
           {loading && <div className="mt-3 text-gold text-sm">Connexion…</div>}
           <div className="mt-5">
             <NumPad onDigit={onPinDigit} onDelete={onPinDelete} />
