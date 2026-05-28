@@ -10,6 +10,16 @@ const ResetPinSchema = z.object({
   newPin: z.string().regex(/^\d{4}$/, 'INVALID_PIN_FORMAT'),
 });
 
+// Key auth limiters by the phone number in the body (identity) rather
+// than by IP, since hundreds of legitimate users in DRC can share a
+// CGNAT IP. Falls back to IP when phone is missing/invalid.
+const phoneKeyGenerator = (req: any) => {
+  const phone = typeof req?.body?.phone === 'string' ? req.body.phone.replace(/\D/g, '') : '';
+  if (phone) return `phone:${phone}`;
+  const xff = (req.headers?.['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+  return `ip:${xff || req.ip}`;
+};
+
 function toAuthError(error: unknown): { status: number; code?: string; message: string } {
   const msg = error instanceof Error ? error.message : String(error);
   if (msg === 'PHONE_ALREADY_REGISTERED') return { status: 409, message: 'Numéro déjà inscrit' };
@@ -22,7 +32,7 @@ function toAuthError(error: unknown): { status: number; code?: string; message: 
 
 const authRoutes: FastifyPluginAsync = async (app) => {
   app.post('/api/auth/register', {
-    config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+    config: { rateLimit: { max: 5, timeWindow: '15 minutes', keyGenerator: phoneKeyGenerator } },
   }, async (req, reply) => {
     const parsed = RegisterSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
@@ -38,7 +48,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/api/auth/login', {
-    config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    config: { rateLimit: { max: 10, timeWindow: '15 minutes', keyGenerator: phoneKeyGenerator } },
   }, async (req, reply) => {
     const parsed = LoginSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
@@ -54,7 +64,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/api/auth/reset-pin', {
-    config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    config: { rateLimit: { max: 10, timeWindow: '15 minutes', keyGenerator: phoneKeyGenerator } },
   }, async (req, reply) => {
     const parsed = ResetPinSchema.safeParse(req.body);
     if (!parsed.success) {

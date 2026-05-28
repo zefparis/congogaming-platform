@@ -40,7 +40,6 @@ await app.register(cors, {
   credentials: true,
 });
 
-await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 await app.register(cookie, {
   secret: env.JWT_SECRET,
   hook: 'onRequest',
@@ -48,6 +47,22 @@ await app.register(cookie, {
     secure: isProduction,
     httpOnly: true,
     sameSite: isProduction ? 'none' : 'lax',
+  },
+});
+
+// CGNAT in DRC: many users share the same public IP. Key the limiter
+// by authenticated session cookie when available, otherwise fall back
+// to IP. Keeps abuse protection without punishing legitimate users
+// behind a shared NAT. Must be registered after @fastify/cookie so
+// that req.cookies is populated when keyGenerator runs.
+await app.register(rateLimit, {
+  max: 600,
+  timeWindow: '1 minute',
+  keyGenerator: (req: any) => {
+    const token = req.cookies?.['cg_access_token'];
+    if (token) return `tok:${token.slice(-32)}`;
+    const xff = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+    return `ip:${xff || req.ip}`;
   },
 });
 await app.register(authPlugin);
