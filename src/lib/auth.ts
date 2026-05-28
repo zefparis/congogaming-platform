@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
 export type KycStatus = 'pending' | 'approved' | 'denied' | 'verify_age';
 

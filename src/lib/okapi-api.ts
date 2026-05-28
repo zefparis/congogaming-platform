@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.congogaming.com'
 
 export interface BetResponse { bet_id: string; balance: number | null }
 export interface CashoutResponse { win_amount: number; multiplier: number; balance: number | null }

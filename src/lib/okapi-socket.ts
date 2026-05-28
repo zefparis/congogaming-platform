@@ -22,7 +22,7 @@ function resolveWsUrl(): string {
   if (api && api.length > 0) {
     return api.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')
   }
-  return 'ws://localhost:3001'
+  return 'wss://api.congogaming.com'
 }
 
 const WS_URL = resolveWsUrl()
