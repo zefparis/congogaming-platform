@@ -1,5 +1,9 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import AutoBetPanel, { type AutoConfig } from './AutoBetPanel'
+
+const fmtCdf = (n: number) =>
+  Math.max(0, Math.floor(n)).toLocaleString('fr-FR')
 
 type GameState = 'waiting' | 'playing' | 'crashed' | 'cashedout'
 type Mode = 'manual' | 'auto'
@@ -137,33 +141,18 @@ export default function BetPanel({
         )}
       </div>
 
-      {/* Right: CASH OUT — only shown in MANUEL mode (auto cashes out itself) */}
+      {/* Right: CASH OUT — only shown in MANUEL mode (auto cashes out itself).
+          Shows the live potential winnings (bet × multiplier) animating as
+          the okapi climbs, instead of the multiplier alone. */}
       {!isAuto && (
-      <button
-        disabled={!canCashout}
-        onClick={onCashout}
-        style={{
-          background: canCashout
-            ? 'linear-gradient(135deg, #00A86B, #059669)'
-            : '#1a1a1a',
-          color: canCashout ? 'white' : '#444',
-          borderRadius: 8,
-          border: 'none',
-          fontSize: 14,
-          fontWeight: 900,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: canCashout ? 'pointer' : 'default',
-          letterSpacing: '0.08em',
-        }}
-      >
-        <span>CASH OUT</span>
-        <span style={{ fontSize: 24, marginTop: 4, letterSpacing: '0.04em' }}>
-          ×{multiplier.toFixed(2)}
-        </span>
-      </button>
+        <CashoutCard
+          canCashout={canCashout}
+          hasBet={hasBet}
+          state={state}
+          amount={amount}
+          multiplier={multiplier}
+          onCashout={onCashout}
+        />
       )}
     </div>
   )
@@ -266,5 +255,162 @@ function ManualBet({ amount, setAmount, canBet, onPlaceBet }: ManualBetProps) {
         MISER
       </button>
     </>
+  )
+}
+
+// ----------------- Cashout card -----------------
+
+interface CashoutCardProps {
+  canCashout: boolean
+  hasBet: boolean
+  state: GameState
+  amount: number
+  multiplier: number
+  onCashout: () => void
+}
+
+function CashoutCard({ canCashout, hasBet, state, amount, multiplier, onCashout }: CashoutCardProps) {
+  // Live winnings if the user cashes out RIGHT NOW.
+  const win = amount * multiplier
+
+  // Idle state: no live bet running. Show a calm "CASH OUT" placeholder.
+  if (!canCashout) {
+    return (
+      <div
+        style={{
+          background: '#1a1a1a',
+          borderRadius: 12,
+          border: '1px solid #2a2a2a',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '14px 10px',
+          color: '#555',
+          minHeight: 96,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            letterSpacing: '0.18em',
+            fontWeight: 800,
+            color: '#666',
+          }}
+        >
+          CASH OUT
+        </span>
+        <span
+          style={{
+            fontSize: 22,
+            marginTop: 6,
+            fontWeight: 900,
+            color: '#444',
+          }}
+        >
+          {hasBet ? `${fmtCdf(amount)} CDF` : '—'}
+        </span>
+        {hasBet && state === 'waiting' && (
+          <span style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
+            En attente du tour
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // Active state: bet placed + game playing → tap to lock in the win.
+  return (
+    <motion.button
+      onClick={onCashout}
+      whileTap={{ scale: 0.96 }}
+      animate={{
+        boxShadow: [
+          '0 0 0 0 rgba(0, 200, 117, 0.45)',
+          '0 0 0 12px rgba(0, 200, 117, 0)',
+        ],
+      }}
+      transition={{ duration: 1.4, repeat: Infinity, ease: 'easeOut' }}
+      style={{
+        position: 'relative',
+        background:
+          'linear-gradient(135deg, #00C875 0%, #059669 60%, #047857 100%)',
+        borderRadius: 12,
+        border: '1px solid rgba(255, 215, 0, 0.35)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '12px 10px',
+        cursor: 'pointer',
+        overflow: 'hidden',
+        minHeight: 96,
+      }}
+    >
+      {/* Subtle shimmer overlay */}
+      <motion.div
+        aria-hidden
+        animate={{ x: ['-120%', '120%'] }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '60%',
+          height: '100%',
+          background:
+            'linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <span
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          fontWeight: 800,
+          color: 'rgba(255, 255, 255, 0.85)',
+        }}
+      >
+        ENCAISSER
+      </span>
+
+      <motion.div
+        // Re-animate scale on every multiplier tick for a heartbeat effect.
+        key={Math.floor(multiplier * 10)}
+        initial={{ scale: 0.96 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        style={{
+          marginTop: 4,
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 4,
+          color: '#FFFFFF',
+          fontWeight: 900,
+          letterSpacing: '0.02em',
+          textShadow: '0 1px 4px rgba(0,0,0,0.35)',
+          lineHeight: 1,
+        }}
+      >
+        <span style={{ fontSize: 26 }}>{fmtCdf(win)}</span>
+        <span style={{ fontSize: 12, opacity: 0.85 }}>CDF</span>
+      </motion.div>
+
+      <span
+        style={{
+          marginTop: 6,
+          fontSize: 12,
+          fontWeight: 800,
+          color: '#FFD700',
+          background: 'rgba(0, 0, 0, 0.25)',
+          padding: '2px 8px',
+          borderRadius: 999,
+          letterSpacing: '0.04em',
+        }}
+      >
+        ×{multiplier.toFixed(2)}
+      </span>
+    </motion.button>
   )
 }
