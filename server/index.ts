@@ -47,7 +47,7 @@ await app.register(cookie, {
   parseOptions: {
     secure: isProduction,
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
   },
 });
 await app.register(authPlugin);

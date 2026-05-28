@@ -57,10 +57,11 @@ export function verifyAccessToken(token: string): JwtUserPayload {
 export const authCookieName = 'cg_access_token';
 
 export function authCookieOptions() {
+  const isProduction = env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
     maxAge: ACCESS_TOKEN_TTL_SECONDS,
   };
