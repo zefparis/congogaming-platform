@@ -7,7 +7,7 @@ export interface BalanceResponse { balance: number }
 export interface AutoStartParams { user_id?: string; bet_amount_cdf: number; target_multiplier: number; max_rounds: number | null; stop_on_profit_cdf?: number | null; stop_on_loss_cdf?: number | null }
 export interface AutoStartResponse { session_id: string }
 export interface AutoProgressResponse { rounds_played: number; total_pnl_cdf: number; status: 'active' | 'completed' | 'aborted'; finished: boolean }
-export interface AutoActiveSession { id: string; bet_amount_cdf: number; target_multiplier: number; max_rounds: number | null; stop_on_profit_cdf: number | null; stop_on_loss_cdf: number | null; rounds_played: number; total_pnl_cdf: number; status: 'active'; created_at: string }
+export interface AutoActiveSession { id: string; bet_amount_cdf: number; target_multiplier: number; max_rounds: number | null; stop_on_profit_cdf: number | null; stop_on_loss_cdf: number | null; rounds_played: number; total_pnl_cdf: number; status: 'active'; started_at: string }
 export interface AutoActiveResponse { session: AutoActiveSession | null }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

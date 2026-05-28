@@ -151,11 +151,11 @@ const okapiAutoRoutes: FastifyPluginAsync = async (app) => {
       const { data, error } = await sb
         .from('okapi_auto_sessions')
         .select(
-          'id,bet_amount_cdf,target_multiplier,max_rounds,stop_on_profit_cdf,stop_on_loss_cdf,rounds_played,total_pnl_cdf,status,created_at',
+          'id,bet_amount_cdf,target_multiplier,max_rounds,stop_on_profit_cdf,stop_on_loss_cdf,rounds_played,total_pnl_cdf,status,started_at',
         )
         .eq('user_id', user_id)
         .eq('status', 'active')
-        .order('created_at', { ascending: false })
+        .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 

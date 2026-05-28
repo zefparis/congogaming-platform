@@ -25,7 +25,17 @@ function resolveWsUrl(): string {
   return 'wss://api.congogaming.com'
 }
 
-const WS_URL = resolveWsUrl()
+// Normalize the base so the final URL is always `<host>/ws` regardless of
+// whether the env var was configured with or without a trailing `/ws` or
+// trailing slash. Avoids `wss://host/ws/ws` (404) when ops set
+// `VITE_WS_URL=wss://api.congogaming.com/ws`.
+function normalizeWsBase(raw: string): string {
+  let base = raw.trim().replace(/\/+$/, '') // strip trailing slashes
+  if (/\/ws$/i.test(base)) base = base.replace(/\/ws$/i, '')
+  return base
+}
+
+const WS_URL = normalizeWsBase(resolveWsUrl())
 
 export class GameSocket {
   private ws: WebSocket | null = null
