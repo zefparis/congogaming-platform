@@ -1,11 +1,19 @@
 import { z } from 'zod';
+import { tryNormalizeDrcPhone } from './phone.js';
 
 export const ProviderIdSchema = z.union([z.literal(10), z.literal(17), z.literal(19)]);
 
 export const PhoneSchema = z
   .string()
   .trim()
-  .regex(/^0(8[4-9]|9[0-9])\d{7}$|^243(8[4-9]|9[0-9])\d{7}$/, 'Téléphone RDC invalide');
+  .transform((value, ctx) => {
+    const normalized = tryNormalizeDrcPhone(value);
+    if (!normalized) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Téléphone RDC invalide' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 export const DepositBodySchema = z.object({
   amount: z.number().int().min(100).max(5_000_000),

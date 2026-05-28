@@ -1,9 +1,17 @@
 import { z } from 'zod';
+import { tryNormalizeDrcPhone } from '../../lib/phone.js';
 
 export const CongoPhoneSchema = z
   .string()
   .trim()
-  .regex(/^0(8[4-9]|9[0-9])\d{7}$/, 'Numéro RDC invalide');
+  .transform((value, ctx) => {
+    const normalized = tryNormalizeDrcPhone(value);
+    if (!normalized) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Numéro RDC invalide' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 export const PinSchema = z
   .string()

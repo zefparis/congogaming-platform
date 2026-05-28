@@ -3,21 +3,7 @@ import { newOrderId, paymentB2C } from '../lib/unipesa.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { WithdrawBodySchema } from '../lib/validation.js';
-
-function normalizePhone(phone: string, provider_id: number): string {
-  phone = phone.replace(/\s/g, '');
-  if (provider_id === 17) {
-    if (phone.startsWith('243')) phone = phone.slice(3);
-    if (phone.startsWith('0')) phone = phone.slice(1);
-    return phone;
-  }
-  if (provider_id === 10 || provider_id === 19) {
-    if (phone.startsWith('243')) phone = '0' + phone.slice(3);
-    if (!phone.startsWith('0')) phone = '0' + phone;
-    return phone;
-  }
-  return phone;
-}
+import { normalizePhoneForProvider, phoneMatchesProvider } from '../lib/phone.js';
 
 export default async function withdrawRoutes(app: FastifyInstance) {
   app.post('/api/withdraw', { preHandler: app.requireAuth }, async (req, reply) => {
@@ -26,6 +12,11 @@ export default async function withdrawRoutes(app: FastifyInstance) {
 
     const user_id = req.user.id;
     const { amount, provider_id, phone } = parsed.data;
+
+    if (!phoneMatchesProvider(phone, provider_id)) {
+      return reply.code(400).send({ error: 'Ce numéro ne correspond pas à l\'opérateur sélectionné' });
+    }
+
     const order_id = newOrderId();
 
     let newBalance: number;
@@ -71,7 +62,7 @@ export default async function withdrawRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: 'DB insert failed' });
     }
 
-    const normalizedPhone = normalizePhone(phone, provider_id);
+    const normalizedPhone = normalizePhoneForProvider(phone, provider_id);
     app.log.info({ order_id, provider_id }, 'unipesa b2c requested');
 
     try {

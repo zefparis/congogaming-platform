@@ -2,21 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { newOrderId, paymentC2B } from '../lib/unipesa.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { DepositBodySchema } from '../lib/validation.js';
-
-function normalizePhone(phone: string, provider_id: number): string {
-  phone = phone.replace(/\s/g, '');
-  if (provider_id === 17) {
-    if (phone.startsWith('243')) phone = phone.slice(3);
-    if (phone.startsWith('0')) phone = phone.slice(1);
-    return phone;
-  }
-  if (provider_id === 10 || provider_id === 19) {
-    if (phone.startsWith('243')) phone = '0' + phone.slice(3);
-    if (!phone.startsWith('0')) phone = '0' + phone;
-    return phone;
-  }
-  return phone;
-}
+import { normalizePhoneForProvider, phoneMatchesProvider } from '../lib/phone.js';
 
 const MIN_AMOUNTS: Record<number, number> = { 10: 100, 17: 100, 19: 2250 };
 
@@ -29,6 +15,10 @@ export default async function depositRoutes(app: FastifyInstance) {
     const { amount, provider_id, phone } = parsed.data;
     const minAmount = MIN_AMOUNTS[provider_id] ?? 100;
     if (amount < minAmount) return reply.code(400).send({ error: `Montant minimum ${minAmount} CDF pour cet opérateur` });
+
+    if (!phoneMatchesProvider(phone, provider_id)) {
+      return reply.code(400).send({ error: 'Ce numéro ne correspond pas à l\'opérateur sélectionné' });
+    }
 
     const order_id = newOrderId();
     const { error: insertErr } = await supabaseAdmin.from('transactions').insert({
@@ -45,7 +35,7 @@ export default async function depositRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: 'DB insert failed' });
     }
 
-    const normalizedPhone = normalizePhone(phone, provider_id);
+    const normalizedPhone = normalizePhoneForProvider(phone, provider_id);
     app.log.info({ order_id, provider_id }, 'unipesa c2b requested');
 
     try {
