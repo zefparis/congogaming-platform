@@ -304,6 +304,82 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       return reply.code(500).send({ error: e?.message || 'Tirage failed' });
     }
   });
+
+  /**
+   * Admin-only: refund every pending Flash ticket and mark them as
+   * cancelled. Used to clean up tickets that got stuck because a
+   * scheduled draw never fired. Each refund goes through the same
+   * idempotent ledger helper used elsewhere, so re-running the call is
+   * safe (already-cancelled tickets are skipped, and the ledger
+   * `idempotency_key` blocks any double credit).
+   *
+   * The ticket's contribution to the jackpot pot is also rolled back
+   * so the pot does not stay artificially inflated by cancelled
+   * tickets.
+   */
+  app.post('/api/flash/purge-pending', async (req, reply) => {
+    const adminSecret = process.env.FLASH_ADMIN_SECRET || '';
+    const provided = req.headers['x-admin-secret'];
+    if (!adminSecret || provided !== adminSecret) {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+    try {
+      // Atomic claim: flip every pending ticket to 'cancelled' and get
+      // the rows back. Any concurrent draw will then see zero pending
+      // tickets and become a no-op.
+      const { data: claimed, error: claimErr } = await supabaseAdmin
+        .from('flash_tickets')
+        .update({ status: 'cancelled', gains_cdf: 0, jackpot_en_attente: false })
+        .eq('status', 'pending')
+        .select('id, user_id, prix_cdf');
+      if (claimErr) return reply.code(500).send({ error: claimErr.message });
+
+      const tickets = claimed ?? [];
+      let refunded = 0;
+      let totalRefundedCdf = 0;
+      let potRollbackCdf = 0;
+      const failures: Array<{ ticket_id: string; error: string }> = [];
+
+      for (const t of tickets) {
+        const price = Number(t.prix_cdf || 0);
+        if (price <= 0) continue;
+        try {
+          const result = await recordLedgerEntry({
+            user_id: String(t.user_id),
+            direction: 'credit',
+            amount: price,
+            currency: 'CDF',
+            reason: 'flash_ticket_cancel_refund',
+            reference_type: 'flash_ticket',
+            reference_id: String(t.id),
+            idempotency_key: `flash:ticket:${t.id}:cancel:refund`,
+          });
+          if (result.applied || result.duplicate) {
+            refunded += 1;
+            totalRefundedCdf += price;
+            // Roll back this ticket's jackpot contribution (50% of price).
+            const contribution = Math.trunc(price / 2);
+            if (contribution > 0) {
+              await supabaseAdmin.rpc('increment_flash_jackpot', { delta: -contribution });
+              potRollbackCdf += contribution;
+            }
+          }
+        } catch (err: any) {
+          failures.push({ ticket_id: String(t.id), error: err?.message || 'refund failed' });
+        }
+      }
+
+      return reply.send({
+        scanned: tickets.length,
+        refunded,
+        total_refunded_cdf: totalRefundedCdf,
+        pot_rollback_cdf: potRollbackCdf,
+        failures,
+      });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message || 'Purge failed' });
+    }
+  });
 };
 
 export default flashRoutes;
