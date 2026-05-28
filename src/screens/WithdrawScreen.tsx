@@ -30,11 +30,10 @@ export default function WithdrawScreen() {
   const nav = useNavigate();
   const session = getSession();
   const [amount, setAmount] = useState('');
-  const [providerId, setProviderId] = useState<number>(10);
+  const initialDetected = detectProvider(session?.phone || '');
+  const [providerId, setProviderId] = useState<number>(initialDetected?.id ?? 10);
   const [phone, setPhone] = useState(session?.phone || '');
-  const [detectedOperator, setDetectedOperator] = useState<DetectedOperator | null>(
-    () => detectProvider(session?.phone || ''),
-  );
+  const [detectedOperator, setDetectedOperator] = useState<DetectedOperator | null>(initialDetected);
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
   const [state, setState] = useState<State>('idle');
   const [msg, setMsg] = useState<string>('');
