@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import SplashScreen from './screens/SplashScreen';
@@ -18,7 +19,7 @@ import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
 import BottomNav from './components/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
-import { clearSession, getSession } from './lib/auth';
+import { clearSession, getSession, refreshSession } from './lib/auth';
 
 function PageWrap({ children, fullscreen = false }: { children: React.ReactNode; fullscreen?: boolean }) {
   if (fullscreen) {
@@ -168,6 +169,39 @@ function AppShell() {
   );
 }
 
+/**
+ * Auth bootstrap: the in-memory session is wiped on every page refresh,
+ * but the httpOnly cookie `cg_access_token` survives. We must call
+ * `/api/auth/me` once on boot to rehydrate the session before letting
+ * `Protected` decide where to route — otherwise refreshing any page
+ * kicks the user back to /splash even though they are still
+ * authenticated server-side.
+ */
+function AuthBootstrap({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    refreshSession().finally(() => {
+      if (!cancelled) setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (!ready) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-bg text-zinc-500 text-sm">
+        Chargement…
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
-  return <AppShell />;
+  return (
+    <AuthBootstrap>
+      <AppShell />
+    </AuthBootstrap>
+  );
 }

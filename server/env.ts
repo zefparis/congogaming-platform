@@ -23,7 +23,9 @@ const envSchema = z.object({
   FLASH_MIN_TICKETS: z.string().transform((val) => Number(val)).pipe(z.number().int().nonnegative()).optional(),
   AUTH_MAX_FAILURES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('5'),
   AUTH_LOCKOUT_MINUTES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('15'),
-  ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('900'),
+  // Mobile gaming app: long-lived sessions reduce friction. Defaults to
+  // 7 days; can be overridden per-environment via the env var.
+  ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('604800'),
   VITE_API_URL: z.string().optional(),
   VITE_WS_URL: z.string().optional(),
 });
