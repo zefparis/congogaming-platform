@@ -139,26 +139,57 @@ export default function ClimbCurve({ state, startTime }: Props) {
         ctx.translate(dx, dy)
         ctx.globalAlpha = fadeAlphaRef.current
 
-        // Aviator-style filled area under the curve: clean yellow/orange
-        // gradient — no grid texture, no mesh, just a soft glow that fades
-        // to transparent. Keeps the background fully readable.
+        // Build the area path once (reused for fill + grid clip).
+        const buildAreaPath = () => {
+          ctx.beginPath()
+          ctx.moveTo(pts[0].x, h)
+          for (const p of pts) ctx.lineTo(p.x, p.y)
+          ctx.lineTo(pts[pts.length - 1].x, h)
+          ctx.closePath()
+        }
+
+        // Aviator-style fill: STRONG yellow at the top (just under the line)
+        // → vibrant orange in the middle → fades to dark/transparent at the
+        // bottom so it blends with the volcano scene without hiding it.
         const grad = ctx.createLinearGradient(0, 0, 0, h)
         if (isCrashed) {
-          grad.addColorStop(0, 'rgba(255,80,80,0.55)')
-          grad.addColorStop(0.6, 'rgba(220,40,40,0.20)')
-          grad.addColorStop(1, 'rgba(0,0,0,0)')
+          grad.addColorStop(0, 'rgba(255,90,90,0.95)')
+          grad.addColorStop(0.45, 'rgba(220,40,40,0.55)')
+          grad.addColorStop(1, 'rgba(60,0,0,0)')
         } else {
-          grad.addColorStop(0, 'rgba(255,210,60,0.55)')
-          grad.addColorStop(0.6, 'rgba(255,150,30,0.20)')
-          grad.addColorStop(1, 'rgba(0,0,0,0)')
+          grad.addColorStop(0, 'rgba(255,215,70,0.95)')
+          grad.addColorStop(0.45, 'rgba(255,140,30,0.55)')
+          grad.addColorStop(1, 'rgba(80,30,0,0)')
         }
-        ctx.beginPath()
-        ctx.moveTo(pts[0].x, h)
-        for (const p of pts) ctx.lineTo(p.x, p.y)
-        ctx.lineTo(pts[pts.length - 1].x, h)
-        ctx.closePath()
+        buildAreaPath()
         ctx.fillStyle = grad
         ctx.fill()
+
+        // Subtle "stairs" grid clipped to the area for the Aviator texture
+        // feel, but discreet — only 0.18 alpha so it never dominates.
+        ctx.save()
+        buildAreaPath()
+        ctx.clip()
+        ctx.globalAlpha = fadeAlphaRef.current * 0.18
+        ctx.lineWidth = 1
+        ctx.strokeStyle = isCrashed
+          ? 'rgba(255,200,200,1)'
+          : 'rgba(255,235,140,1)'
+        const x0 = Math.floor(pts[0].x)
+        const x1 = Math.ceil(pts[pts.length - 1].x)
+        for (let gx = x0; gx <= x1; gx += 26) {
+          ctx.beginPath()
+          ctx.moveTo(gx, 0)
+          ctx.lineTo(gx, h)
+          ctx.stroke()
+        }
+        for (let gy = h; gy >= 0; gy -= 26) {
+          ctx.beginPath()
+          ctx.moveTo(0, gy)
+          ctx.lineTo(w, gy)
+          ctx.stroke()
+        }
+        ctx.restore()
 
         ctx.beginPath()
         ctx.moveTo(pts[0].x, pts[0].y)
