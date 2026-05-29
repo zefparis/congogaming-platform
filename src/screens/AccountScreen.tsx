@@ -465,25 +465,27 @@ export default function AccountScreen() {
             <h2 className="font-display text-base text-zinc-300 tracking-wider">PARRAINAGE</h2>
           </div>
           <div className="text-xs text-zinc-400 mb-2">Partagez votre code et invitez vos amis</div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-xl bg-zinc-950 border border-gold/40 px-4 py-3 font-display text-2xl tracking-[0.3em] text-gold text-center">
+          <div className="flex flex-col sm:flex-row items-center gap-2">
+            <div className="w-full sm:flex-1 rounded-xl bg-zinc-950 border border-gold/40 px-3 py-3 font-display text-lg tracking-[0.15em] text-gold text-center">
               {referral.code}
             </div>
-            <button
-              type="button"
-              onClick={copyReferralCode}
-              className="h-12 w-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center"
-              aria-label="Copier"
-            >
-              {copiedCode ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-zinc-300" />}
-            </button>
-            <button
-              type="button"
-              onClick={shareReferralCode}
-              className="h-12 px-3 rounded-xl bg-gold text-black font-bold flex items-center gap-1.5 text-sm"
-            >
-              <Share2 className="w-4 h-4" /> PARTAGER
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={copyReferralCode}
+                className="h-12 w-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center shrink-0"
+                aria-label="Copier"
+              >
+                {copiedCode ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-zinc-300" />}
+              </button>
+              <button
+                type="button"
+                onClick={shareReferralCode}
+                className="h-12 px-3 rounded-xl bg-gold text-black font-bold flex items-center gap-1.5 text-xs shrink-0"
+              >
+                <Share2 className="w-4 h-4" /> PARTAGER
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
             <div className="rounded-xl bg-zinc-950/60 border border-zinc-800 p-3 flex items-center gap-2">
