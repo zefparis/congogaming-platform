@@ -104,6 +104,13 @@ export async function resetPinByPhone(phone: string, newPin: string): Promise<vo
   });
 }
 
+export async function changePin(currentPin: string, newPin: string): Promise<void> {
+  await authRequest<{ ok: boolean; message: string }>('/api/auth/me/change-pin', {
+    method: 'POST',
+    body: JSON.stringify({ currentPin, newPin }),
+  });
+}
+
 export async function updateDisplayName(displayName: string | null): Promise<SessionUser> {
   const { user } = await authRequest<{ user: SessionUser }>('/api/auth/me/profile', {
     method: 'PATCH',

@@ -40,6 +40,12 @@ export const api = {
   status: (order_id: string) => req<{ status: number }>(`/api/status/${order_id}`),
   transactions: () =>
     req<{ items: Array<{ id: string; order_id: string; type: 'deposit' | 'withdrawal'; amount: number; status: number; created_at: string }> }>('/api/transactions/me'),
+  myStats: () =>
+    req<{
+      totals: { deposit_cdf: number; withdrawal_cdf: number; bet_cdf: number; win_cdf: number; net_cdf: number };
+      counts: { bets: number; wins: number; pending_deposits: number; pending_withdrawals: number };
+      win_rate_percent: number;
+    }>('/api/me/stats'),
   lotoTicket: (_user_id: string, numeros: number[]) =>
     req<{ ticket_id: string; new_balance: number }>('/api/loto/ticket', { method: 'POST', body: JSON.stringify({ numeros }) }),
   lotoLatest: () =>

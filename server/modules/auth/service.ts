@@ -194,6 +194,29 @@ export async function resetPin(userId: string, newPin: string): Promise<void> {
   if (!data) throw new Error('USER_NOT_FOUND');
 }
 
+export async function changePin(input: { userId: string; currentPin: string; newPin: string }): Promise<void> {
+  if (!/^\d{4}$/.test(input.newPin)) throw new Error('INVALID_PIN_FORMAT');
+  if (input.currentPin === input.newPin) throw new Error('PIN_SAME_AS_CURRENT');
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id, pin_hash, pin_must_reset')
+    .eq('id', input.userId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('USER_NOT_FOUND');
+
+  const pinHash = String(data.pin_hash || '');
+  const isLegacyHash = /^[a-f0-9]{64}$/i.test(pinHash);
+  if (data.pin_must_reset || isLegacyHash) throw new Error('PIN_RESET_REQUIRED');
+
+  const ok = await argon2.verify(pinHash, input.currentPin).catch(() => false);
+  if (!ok) throw new Error('CURRENT_PIN_INVALID');
+
+  await resetPin(String(data.id), input.newPin);
+}
+
 export async function getUserById(userId: string): Promise<AuthUser | null> {
   const { data, error } = await supabaseAdmin
     .from('users')

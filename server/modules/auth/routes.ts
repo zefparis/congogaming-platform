@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { CongoPhoneSchema, LoginSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
-import { AuthLockedError, InvalidCredentialsError, getUserById, loginUser, registerUser, resetPinByPhone, updateDisplayName } from './service.js';
+import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, loginUser, registerUser, resetPinByPhone, updateDisplayName } from './service.js';
 
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
 
@@ -131,6 +131,38 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     const user = await getUserById(req.user.id);
     if (!user || user.blocked) return reply.code(401).send({ error: 'Unauthorized' });
     return reply.send({ user });
+  });
+
+  const ChangePinSchema = z.object({
+    currentPin: z.string().regex(/^\d{4}$/, 'INVALID_PIN_FORMAT'),
+    newPin: z.string().regex(/^\d{4}$/, 'INVALID_PIN_FORMAT'),
+  });
+
+  app.post('/api/auth/me/change-pin', {
+    preHandler: app.requireAuth,
+    config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+  }, async (req, reply) => {
+    const parsed = ChangePinSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'PIN invalide (4 chiffres)', code: 'INVALID_PIN_FORMAT' });
+    }
+    try {
+      await changePin({
+        userId: req.user.id,
+        currentPin: parsed.data.currentPin,
+        newPin: parsed.data.newPin,
+      });
+      return reply.send({ ok: true, message: 'PIN mis à jour avec succès' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg === 'CURRENT_PIN_INVALID') return reply.code(401).send({ error: 'PIN actuel incorrect', code: 'CURRENT_PIN_INVALID' });
+      if (msg === 'PIN_SAME_AS_CURRENT') return reply.code(400).send({ error: 'Le nouveau PIN doit être différent', code: 'PIN_SAME_AS_CURRENT' });
+      if (msg === 'INVALID_PIN_FORMAT') return reply.code(400).send({ error: 'Format PIN invalide', code: 'INVALID_PIN_FORMAT' });
+      if (msg === 'PIN_RESET_REQUIRED') return reply.code(409).send({ error: 'Réinitialisation requise', code: 'PIN_RESET_REQUIRED' });
+      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'Utilisateur introuvable', code: 'USER_NOT_FOUND' });
+      req.log.error({ err: msg }, 'change-pin failed');
+      return reply.code(500).send({ error: 'Erreur changement PIN' });
+    }
   });
 
   const ProfileSchema = z.object({
