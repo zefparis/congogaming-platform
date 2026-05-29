@@ -246,7 +246,8 @@ export default function AccountScreen() {
     const url = (typeof window !== 'undefined' ? window.location.origin : '') + '/register?ref=' + encodeURIComponent(referral.code);
     const text = `Rejoins-moi sur Congo Gaming avec mon code parrain ${referral.code} : ${url}`;
     if (navigator.share) {
-      navigator.share({ title: 'Congo Gaming', text, url }).catch(() => {});
+      // Pass `url` only; do NOT include it in `text` to avoid duplication on some platforms.
+      navigator.share({ title: 'Congo Gaming', text: `Rejoins-moi sur Congo Gaming avec mon code parrain ${referral.code}`, url }).catch(() => {});
     } else {
       const wa = `https://wa.me/?text=${encodeURIComponent(text)}`;
       window.open(wa, '_blank');
