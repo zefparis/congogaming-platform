@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { newOrderId, paymentB2C } from '../lib/unipesa.js';
+import { newOrderId, paymentB2CResilient } from '../lib/unipesa.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { WithdrawBodySchema } from '../lib/validation.js';
@@ -65,27 +65,42 @@ export default async function withdrawRoutes(app: FastifyInstance) {
     const normalizedPhone = normalizePhoneForProvider(phone, provider_id);
     app.log.info({ order_id, provider_id }, 'unipesa b2c requested');
 
-    try {
-      const r = await paymentB2C({ order_id, customer_id: normalizedPhone, amount, provider_id });
+    const result = await paymentB2CResilient(
+      { order_id, customer_id: normalizedPhone, amount, provider_id },
+      app.log,
+    );
+
+    if (result.ok) {
+      const r = result.data;
       const status = Number(r.status ?? 1);
-      await supabaseAdmin.from('transactions').update({ status, transaction_id: r.transaction_id || null }).eq('order_id', order_id);
+      await supabaseAdmin
+        .from('transactions')
+        .update({ status, transaction_id: r.transaction_id || null })
+        .eq('order_id', order_id);
       return reply.send({ order_id, status, balance: newBalance });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Payment provider error';
-      try {
-        await recordLedgerEntry({
-          user_id,
-          direction: 'credit',
-          amount,
-          currency: 'CDF',
-          reason: 'payment_withdrawal_provider_error_refund',
-          reference_type: 'transaction',
-          reference_id: order_id,
-          idempotency_key: `payment:withdrawal:${order_id}:provider-error-refund`,
-        });
-      } catch (refundErr) { app.log.error({ err: refundErr, user_id, amount, order_id }, 'refund failed'); }
-      await supabaseAdmin.from('transactions').update({ status: 3 }).eq('order_id', order_id);
-      return reply.code(502).send({ error: message, order_id });
     }
+
+    // Provider unreachable / timeout / breaker open. The user has
+    // already been debited (idempotent ledger entry above), so we do
+    // NOT refund here — that would race with a callback that may
+    // still arrive minutes later and would expose us to a double
+    // payout. Instead we keep the transaction PENDING (status 1)
+    // and let either:
+    //   - the Unipesa callback (status 3 → callback refunds), or
+    //   - the reconciliation job (poll /status, refund if FAILED)
+    // resolve the final state idempotently.
+    await supabaseAdmin
+      .from('transactions')
+      .update({ status: 1 })
+      .eq('order_id', order_id);
+
+    return reply.code(202).send({
+      order_id,
+      status: 1,
+      pending: true,
+      balance: newBalance,
+      code: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      message: 'Demande enregistrée — paiement en cours de traitement',
+    });
   });
 }

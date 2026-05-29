@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
+import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
 
 // ---- Token / auth ----
 //
@@ -229,6 +230,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       failed_count,
       failure_rate,
     });
+  });
+
+  // Read-only snapshot of the in-process Unipesa circuit breaker.
+  // Useful when the dashboard wants to surface "provider degraded"
+  // banners without having to wait for an actual failed call.
+  app.get('/api/admin/unipesa/circuit', async (_req, reply) => {
+    return reply.send(getUnipesaCircuitInfo());
   });
 
   app.get('/api/admin/avadapay-balance', async (_req, reply) => {

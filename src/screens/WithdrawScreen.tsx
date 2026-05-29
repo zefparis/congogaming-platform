@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, CheckCircle2, Loader2, Wallet, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Wallet, XCircle } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
@@ -37,9 +37,47 @@ export default function WithdrawScreen() {
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
   const [state, setState] = useState<State>('idle');
   const [msg, setMsg] = useState<string>('');
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<{
+    order_id: string;
+    amount: number;
+  } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Look for any withdrawal still in flight for this user. The server
+  // marks transactions as status=1 (PENDING) when Unipesa is slow or
+  // the circuit breaker is open. We use that to block a second
+  // withdrawal click — the user must wait for the callback or the
+  // reconciliation worker to resolve it.
+  const refreshPendingState = async () => {
+    if (!session) return;
+    try {
+      const [, txs] = await Promise.all([
+        refreshBalance(session.id).then(setBalance).catch(() => {}),
+        api.transactions(),
+      ]);
+      const stuck = (txs.items || []).find(
+        (t) => t.type === 'withdrawal' && (t.status === 0 || t.status === 1),
+      );
+      setPendingWithdrawal(stuck ? { order_id: stuck.order_id, amount: stuck.amount } : null);
+    } catch {
+      // Best-effort: if the call fails we fall back to the previous
+      // state, which is safe (we err on the side of blocking).
+    }
+  };
+
+  const onRefreshClick = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshPendingState();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
+    void refreshPendingState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onDigit = (d: string) => {
@@ -50,19 +88,33 @@ export default function WithdrawScreen() {
 
   const submit = async () => {
     if (!session) return;
+    if (pendingWithdrawal) {
+      setState('error');
+      setMsg('Retrait en cours de traitement. Ne relancez pas la demande.');
+      return;
+    }
     const amt = Number(amount);
     if (!amt || amt < 500) { setState('error'); setMsg('Minimum 500 CDF'); return; }
     if (amt > balance) { setState('error'); setMsg('Solde insuffisant'); return; }
     if (!/^0[89]\d{8}$/.test(phone)) { setState('error'); setMsg('Numéro invalide'); return; }
     setState('pending'); setMsg('Retrait en cours…');
     try {
-      await api.withdraw({ amount: amt, provider_id: providerId, phone });
-      setState('success'); setMsg('Demande de retrait envoyée');
-      const b = await refreshBalance(session.id); setBalance(b);
+      const r = await api.withdraw({ amount: amt, provider_id: providerId, phone });
+      if ((r as any)?.pending) {
+        setState('pending');
+        setMsg('Retrait en cours de traitement. Ne relancez pas la demande.');
+      } else {
+        setState('success');
+        setMsg('Demande de retrait envoyée');
+      }
+      await refreshPendingState();
     } catch (e: any) {
       setState('error'); setMsg(e.message || 'Erreur');
     }
   };
+
+  const submitDisabled =
+    state === 'pending' || pendingWithdrawal !== null || refreshing;
 
   return (
     <div className="min-h-screen p-4 pb-28">
@@ -88,6 +140,35 @@ export default function WithdrawScreen() {
           <div className="font-display text-3xl text-gold">{balance.toLocaleString('fr-FR')} <span className="text-xs text-zinc-400">CDF</span></div>
         </div>
       </div>
+
+      {pendingWithdrawal && (
+        <div className="mt-3 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 p-4">
+          <div className="flex items-start gap-2 text-yellow-300">
+            <Loader2 className="w-5 h-5 animate-spin shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-sm">
+                Retrait en cours de traitement
+              </div>
+              <div className="text-xs text-yellow-200/80 mt-1">
+                Ne relancez pas la demande. Le solde sera mis à jour
+                automatiquement dès que l'opérateur confirme.
+              </div>
+              <div className="text-[10px] text-yellow-200/60 mt-1 font-mono">
+                #{pendingWithdrawal.order_id.slice(0, 8)} —{' '}
+                {pendingWithdrawal.amount.toLocaleString('fr-FR')} CDF
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onRefreshClick}
+            disabled={refreshing}
+            className="mt-3 w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-yellow-500/20 border border-yellow-500/40 text-yellow-200 text-sm font-semibold disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Rafraîchir le statut
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
         <div className="text-xs text-zinc-500 uppercase tracking-widest">Numéro de réception</div>
@@ -187,7 +268,7 @@ export default function WithdrawScreen() {
       <motion.button
         whileTap={{ scale: 0.97 }}
         onClick={submit}
-        disabled={state === 'pending'}
+        disabled={submitDisabled}
         className="mt-4 w-full h-16 rounded-2xl bg-gold text-black font-display text-3xl tracking-widest disabled:opacity-60"
       >
         CONFIRMER

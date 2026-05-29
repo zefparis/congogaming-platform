@@ -64,7 +64,13 @@ export default function DepositScreen() {
     setMsg('Demande envoyée. Confirmez sur votre téléphone…');
     try {
       const r = await api.deposit({ amount: amt, provider_id: providerId, phone });
-      // Poll status briefly
+      if ((r as any)?.pending) {
+        // Provider was unreachable / breaker open. Server has the
+        // tx in PENDING and will reconcile asynchronously.
+        setMsg('Demande enregistrée. Vous recevrez la confirmation de l\'opérateur sous peu.');
+      }
+      // Poll status — extended to ~60s so we cover the reconciliation
+      // window when the provider is slow to confirm.
       let tries = 0;
       const poll = async () => {
         tries++;
@@ -77,7 +83,12 @@ export default function DepositScreen() {
           }
           if (s.status === 3) { setState('error'); setMsg('Transaction échouée'); return; }
         } catch {}
-        if (tries < 10) setTimeout(poll, 3000);
+        if (tries < 20) setTimeout(poll, 3000);
+        else {
+          setState('pending');
+          setMsg('Toujours en cours… Le solde sera mis à jour automatiquement dès la confirmation.');
+          await refreshBalance(session.id).catch(() => {});
+        }
       };
       setTimeout(poll, 3000);
     } catch (e: any) {

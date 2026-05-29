@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { newOrderId, paymentC2B } from '../lib/unipesa.js';
+import { newOrderId, paymentC2BResilient } from '../lib/unipesa.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { DepositBodySchema } from '../lib/validation.js';
 import { normalizePhoneForProvider, phoneMatchesProvider } from '../lib/phone.js';
@@ -38,17 +38,35 @@ export default async function depositRoutes(app: FastifyInstance) {
     const normalizedPhone = normalizePhoneForProvider(phone, provider_id);
     app.log.info({ order_id, provider_id }, 'unipesa c2b requested');
 
-    try {
-      const r = await paymentC2B({ order_id, customer_id: normalizedPhone, amount, provider_id });
+    const result = await paymentC2BResilient(
+      { order_id, customer_id: normalizedPhone, amount, provider_id },
+      app.log,
+    );
+
+    if (result.ok) {
+      const r = result.data;
       const status = Number(r.status ?? 1);
       const transaction_id = r.transaction_id || null;
       await supabaseAdmin.from('transactions').update({ status, transaction_id }).eq('order_id', order_id);
       return reply.send({ order_id, status, transaction_id });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Payment provider error';
-      app.log.error({ err: message, order_id }, 'unipesa c2b failed');
-      await supabaseAdmin.from('transactions').update({ status: 3 }).eq('order_id', order_id);
-      return reply.code(502).send({ error: message, order_id });
     }
+
+    // Provider unreachable / timeout / breaker open. Keep the
+    // transaction in PENDING (status 1) and respond fast — the
+    // Unipesa callback OR the reconciliation job will resolve it.
+    // Do NOT mark the transaction as failed here, otherwise a
+    // late-arriving callback would have nothing to update.
+    await supabaseAdmin
+      .from('transactions')
+      .update({ status: 1 })
+      .eq('order_id', order_id);
+
+    return reply.code(202).send({
+      order_id,
+      status: 1,
+      pending: true,
+      code: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      message: 'Demande enregistrée — confirmation en cours',
+    });
   });
 }

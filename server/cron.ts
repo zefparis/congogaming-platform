@@ -4,6 +4,7 @@ import { executerTirageLoto } from './routes/loto.js';
 import { acquireJobLock } from './lib/jobLock.js';
 import { isCongoLotoEnabled } from './lib/featureFlags.js';
 import { supabaseAdmin } from './lib/supabase.js';
+import { startReconciliationLoop } from './lib/unipesa-reconciliation.js';
 
 /**
  * Self-healing recovery for Loto Express (Flash) draws.
@@ -211,4 +212,11 @@ export function startCrons() {
   } else {
     console.log('[LOTO CRON] Désactivé (CONGO_LOTO_ENABLED=false)');
   }
+
+  // Unipesa reconciliation worker — resolves transactions left in
+  // PENDING (status 1) by the resilient flows when the provider was
+  // unreachable or the circuit breaker tripped. Idempotency keys on
+  // every ledger entry guarantee no double credit/debit even if a
+  // late callback and a reconciliation tick race each other.
+  startReconciliationLoop(60_000);
 }
