@@ -29,6 +29,10 @@ export default function ClimbCurve({ state, startTime }: Props) {
   const rafRef = useRef<number>(0)
   const fadeAlphaRef = useRef<number>(1)
   const startRef = useRef<number | null>(null)
+  // High-resolution start timestamp (performance.now / RAF time) used ONLY
+  // by the okapi sprite for analytic, jitter-free motion. Independent from
+  // `startRef` (Date.now epoch) which still drives the curve sampling.
+  const spriteStartRef = useRef<number | null>(null)
   const crashStartRef = useRef<number | null>(null)
   const crashAnchorRef = useRef<Point | null>(null)
 
@@ -64,6 +68,7 @@ export default function ClimbCurve({ state, startTime }: Props) {
       pointsRef.current = []
       fadeAlphaRef.current = 1
       startRef.current = null
+      spriteStartRef.current = null
       crashStartRef.current = null
       crashAnchorRef.current = null
       const w = W()
@@ -87,6 +92,9 @@ export default function ClimbCurve({ state, startTime }: Props) {
       // startTime is Date.now() epoch ms (server PLAYING msg or local fallback).
       // We diff it against Date.now() below.
       startRef.current = startTime ?? Date.now()
+      // Reset sprite high-res anchor: it will be captured on the first RAF
+      // tick below so the sprite's elapsed time uses the real frame clock.
+      spriteStartRef.current = null
       fadeAlphaRef.current = 1
       crashStartRef.current = null
       crashAnchorRef.current = null
@@ -99,7 +107,7 @@ export default function ClimbCurve({ state, startTime }: Props) {
       crashAnchorRef.current = pts.length ? { ...pts[pts.length - 1] } : null
     }
 
-    const draw = () => {
+    const draw = (now: number) => {
       const w = W()
       const h = H()
       ctx.clearRect(0, 0, w, h)
@@ -233,15 +241,57 @@ export default function ClimbCurve({ state, startTime }: Props) {
         if (okapiImg.complete && okapiImg.naturalWidth > 0) {
           const SIZE = 80
           const tip = pts[pts.length - 1]
-          const prev = pts[Math.max(0, pts.length - 6)]
 
           if (state === 'playing' || state === 'cashedout') {
-            // okapi-tip.png already faces right, matching the left-to-right
-            // climb direction. No extra +π rotation is needed (which was
-            // there to compensate the previous left-facing sprite).
-            const angle = Math.atan2(tip.y - prev.y, tip.x - prev.x)
+            // ANALYTIC position + rotation — fully decoupled from the per-RAF
+            // sampled `pointsRef` so the sprite no longer micro-stutters when
+            // the frame cadence is irregular.
+            //
+            // Same formula as the curve generator (see playing branch above):
+            //   x  = X_PAD + min(w - 2*X_PAD, (t / SWEEP_SEC) * (w - 2*X_PAD))
+            //   y  = h - Y_PAD - yNorm * (h - 2*Y_PAD)
+            //   m  = 1 + 0.06 t + (0.06 t)^2
+            //   yNorm = clamp01(log10(m) / log10(20))
+            //
+            // The high-res sprite clock is anchored on the FIRST RAF tick of
+            // the playing/cashedout phase, then each subsequent frame uses the
+            // RAF `now` argument — no Date.now() resolution loss.
+            if (spriteStartRef.current == null) spriteStartRef.current = now
+            const tSprite = Math.max(0, (now - spriteStartRef.current) / 1000)
+
+            const SWEEP_SEC = 20
+            const X_PAD = 20
+            const Y_PAD = 20
+            const sweepRange = w - X_PAD * 2
+            const heightRange = h - Y_PAD * 2
+
+            const xUncapped = (tSprite / SWEEP_SEC) * sweepRange
+            const xCapped = Math.min(sweepRange, xUncapped)
+            const xS = X_PAD + xCapped
+
+            const a = 0.06
+            const m = 1 + a * tSprite + (a * tSprite) * (a * tSprite)
+            const log20 = Math.log(20)
+            const yNormRaw = Math.log(m) / log20
+            const yNorm = Math.min(1, yNormRaw)
+            const yS = h - Y_PAD - yNorm * heightRange
+
+            // Analytic derivatives → smooth rotation (no atan2 noise).
+            //   dx/dt = sweepRange / SWEEP_SEC          (0 once x is capped)
+            //   dm/dt = a + 2 a^2 t
+            //   dyNorm/dt = (dm/dt) / (m * ln(20))      (0 once yNorm is capped)
+            //   dy/dt = -heightRange * dyNorm/dt        (canvas y grows downward)
+            const dxdt = xUncapped >= sweepRange ? 0 : sweepRange / SWEEP_SEC
+            const dmdt = a + 2 * a * a * tSprite
+            const dyNormDt = yNormRaw >= 1 ? 0 : dmdt / (m * log20)
+            const dydt = -heightRange * dyNormDt
+
+            // Fallback for the rare initial frame where both derivatives are
+            // ~0 (e.g. axes both capped); keep angle horizontal.
+            const angle = dxdt === 0 && dydt === 0 ? 0 : Math.atan2(dydt, dxdt)
+
             ctx.save()
-            ctx.translate(tip.x + dx, tip.y + dy)
+            ctx.translate(xS + dx, yS + dy)
             ctx.rotate(angle)
             ctx.drawImage(okapiImg, -SIZE / 2, -SIZE, SIZE, SIZE)
             ctx.restore()
