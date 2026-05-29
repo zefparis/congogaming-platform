@@ -104,7 +104,16 @@ export default function FlashScreen() {
         setTimeout(refresh, 4000);
       }
     }, 1000);
-    return () => clearInterval(id);
+
+    // Refresh balance every 30 seconds to catch admin adjustments
+    const balanceInterval = setInterval(() => {
+      if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
+    }, 30000);
+
+    return () => {
+      clearInterval(id);
+      clearInterval(balanceInterval);
+    };
   }, []);
 
   const isFull = selected.length === 5;

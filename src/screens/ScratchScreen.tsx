@@ -72,6 +72,13 @@ export default function ScratchScreen() {
   useEffect(() => {
     if (!userId) return;
     refreshBalance(userId).then(setBalance).catch(() => {});
+
+    // Refresh balance every 30 seconds to catch admin adjustments
+    const interval = setInterval(() => {
+      if (userId) refreshBalance(userId).then(setBalance).catch(() => {});
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [userId]);
 
   // Preload okapi image once. We bump `okapiReady` so the drawing effect

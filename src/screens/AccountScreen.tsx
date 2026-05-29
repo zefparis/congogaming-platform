@@ -80,6 +80,15 @@ export default function AccountScreen() {
     api.myStats().then(setStats).catch(() => {});
     api.myLimits().then((r) => setLimits(r.limits)).catch(() => {});
     api.myReferral().then(setReferral).catch(() => {});
+
+    // Refresh balance every 30 seconds to catch admin adjustments
+    const interval = setInterval(() => {
+      refreshSession().then((u) => {
+        if (u) setBalance(Number(u.balance_cdf || 0));
+      }).catch(() => {});
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const initials = computeInitials(session?.display_name, session?.phone);

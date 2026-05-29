@@ -101,6 +101,13 @@ export default function LotoScreen() {
       api.lotoMesTickets(session.id).then((r) => setTickets(r.tickets)).catch(() => {});
       refreshBalance(session.id).then(setBalance).catch(() => {});
     }
+
+    // Refresh balance every 30 seconds to catch admin adjustments
+    const interval = setInterval(() => {
+      if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   if (comingSoon === true) return <CongoLotoComingSoon />;

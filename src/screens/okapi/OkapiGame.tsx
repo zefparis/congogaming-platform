@@ -191,6 +191,13 @@ export default function OkapiGame() {
   // Pull authoritative balance from the backend on mount
   useEffect(() => {
     syncBalance()
+
+    // Refresh balance every 30 seconds to catch admin adjustments
+    const interval = setInterval(() => {
+      syncBalance()
+    }, 30000)
+
+    return () => clearInterval(interval)
   }, [syncBalance])
 
   // Restore an active auto-bet session if the user navigates back to /climb

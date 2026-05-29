@@ -957,19 +957,36 @@ export default async function adminRoutes(app: FastifyInstance) {
     '/api/admin/users/:id/balance',
     { preHandler: requireSuperAdmin },
     async (req, reply) => {
-      const id = req.params.id;
-      const delta = Number(req.body?.delta_cdf || 0);
-      const reason = String(req.body?.reason || '').slice(0, 500) || null;
-      if (!Number.isFinite(delta) || delta === 0) {
-        return reply.code(400).send({ error: 'delta_cdf required' });
+      try {
+        const id = req.params.id;
+        const delta = Number(req.body?.delta_cdf || 0);
+        const reason = String(req.body?.reason || '').slice(0, 500) || null;
+
+        req.log.info({ userId: id, delta, reason }, 'admin balance adjustment requested');
+
+        if (!Number.isFinite(delta) || delta === 0) {
+          return reply.code(400).send({ error: 'delta_cdf required' });
+        }
+
+        const { data, error } = await supabaseAdmin.rpc('adjust_balance', {
+          p_user_id: id,
+          p_delta: delta,
+        });
+
+        if (error) {
+          req.log.error({ userId: id, delta, error: error.message }, 'admin balance adjustment failed');
+          return reply.code(400).send({ error: error.message });
+        }
+
+        const newBalance = Number(data ?? 0);
+        req.log.info({ userId: id, delta, newBalance }, 'admin balance adjustment successful');
+
+        await audit(req, 'adjust_balance', id, delta, reason);
+        return reply.send({ new_balance_cdf: newBalance });
+      } catch (err: any) {
+        req.log.error({ err: err?.message || err, stack: err?.stack }, 'admin balance adjustment unexpected error');
+        return reply.code(500).send({ error: 'Internal error', details: err?.message });
       }
-      const { data, error } = await supabaseAdmin.rpc('adjust_balance', {
-        p_user_id: id,
-        p_delta: delta,
-      });
-      if (error) return reply.code(400).send({ error: error.message });
-      await audit(req, 'adjust_balance', id, delta, reason);
-      return reply.send({ new_balance_cdf: Number(data ?? 0) });
     },
   );
 

@@ -48,6 +48,13 @@ export default function HomeScreen() {
         setFlashData(r);
       })
       .catch(() => {});
+
+    // Refresh balance every 30 seconds to catch admin adjustments
+    const interval = setInterval(() => {
+      if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
