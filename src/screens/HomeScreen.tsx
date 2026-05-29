@@ -113,9 +113,27 @@ export default function HomeScreen() {
           rowGap: 8,
         }}
       >
-        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, letterSpacing: 2 }}>
-          SOLDE
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {session?.display_name && (
+            <span
+              style={{
+                color: '#FFD700',
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 180,
+              }}
+            >
+              Salut, {session.display_name} 👋
+            </span>
+          )}
+          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, letterSpacing: 2 }}>
+            SOLDE
+          </span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Wallet style={{ color: '#FFD700', width: 16, height: 16 }} />

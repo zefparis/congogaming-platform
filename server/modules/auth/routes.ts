@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { CongoPhoneSchema, LoginSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
-import { AuthLockedError, InvalidCredentialsError, getUserById, loginUser, registerUser, resetPinByPhone } from './service.js';
+import { AuthLockedError, InvalidCredentialsError, getUserById, loginUser, registerUser, resetPinByPhone, updateDisplayName } from './service.js';
 
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
 
@@ -131,6 +131,32 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     const user = await getUserById(req.user.id);
     if (!user || user.blocked) return reply.code(401).send({ error: 'Unauthorized' });
     return reply.send({ user });
+  });
+
+  const ProfileSchema = z.object({
+    display_name: z.union([z.string().min(2).max(24), z.null()]),
+  });
+
+  app.patch('/api/auth/me/profile', {
+    preHandler: app.requireAuth,
+    config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+  }, async (req, reply) => {
+    const parsed = ProfileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Pseudo invalide (2 à 24 caractères)', code: 'DISPLAY_NAME_INVALID' });
+    }
+    try {
+      const user = await updateDisplayName(req.user.id, parsed.data.display_name);
+      return reply.send({ user });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg === 'DISPLAY_NAME_TAKEN') return reply.code(409).send({ error: 'Ce pseudo est déjà utilisé', code: 'DISPLAY_NAME_TAKEN' });
+      if (msg === 'DISPLAY_NAME_INVALID_LENGTH') return reply.code(400).send({ error: 'Pseudo : 2 à 24 caractères', code: 'DISPLAY_NAME_INVALID' });
+      if (msg === 'DISPLAY_NAME_INVALID_CHARS') return reply.code(400).send({ error: 'Pseudo : lettres, chiffres, espaces, _ . - uniquement', code: 'DISPLAY_NAME_INVALID' });
+      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'Utilisateur introuvable', code: 'USER_NOT_FOUND' });
+      req.log.error({ err: msg }, 'update display_name failed');
+      return reply.code(500).send({ error: 'Erreur mise à jour profil' });
+    }
   });
 };
 

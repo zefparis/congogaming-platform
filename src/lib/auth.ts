@@ -5,6 +5,7 @@ export type KycStatus = 'pending' | 'approved' | 'denied' | 'verify_age';
 export type SessionUser = {
   id: string;
   phone: string;
+  display_name: string | null;
   balance_cdf: number;
   kyc_status: KycStatus;
   blocked: boolean;
@@ -101,6 +102,15 @@ export async function resetPinByPhone(phone: string, newPin: string): Promise<vo
     method: 'POST',
     body: JSON.stringify({ phone, newPin }),
   });
+}
+
+export async function updateDisplayName(displayName: string | null): Promise<SessionUser> {
+  const { user } = await authRequest<{ user: SessionUser }>('/api/auth/me/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ display_name: displayName }),
+  });
+  currentUser = user;
+  return user;
 }
 
 export async function refreshSession(): Promise<SessionUser | null> {

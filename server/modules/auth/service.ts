@@ -29,10 +29,42 @@ function sanitizeUser(row: Record<string, unknown>): AuthUser {
   return {
     id: String(row.id),
     phone: String(row.phone),
+    display_name: row.display_name ? String(row.display_name) : null,
     balance_cdf: Number(row.balance_cdf ?? 0),
     kyc_status: (row.kyc_status as AuthUser['kyc_status']) || 'pending',
     blocked: Boolean(row.blocked),
   };
+}
+
+const DISPLAY_NAME_REGEX = /^[\p{L}\p{N}](?:[\p{L}\p{N} _.-]{0,22}[\p{L}\p{N}])?$/u;
+
+export function normalizeDisplayName(raw: string): string {
+  return raw.replace(/\s+/g, ' ').trim();
+}
+
+export async function updateDisplayName(userId: string, raw: string | null): Promise<AuthUser> {
+  let value: string | null = null;
+  if (raw !== null) {
+    const normalized = normalizeDisplayName(raw);
+    if (normalized.length < 2 || normalized.length > 24) throw new Error('DISPLAY_NAME_INVALID_LENGTH');
+    if (!DISPLAY_NAME_REGEX.test(normalized)) throw new Error('DISPLAY_NAME_INVALID_CHARS');
+    value = normalized;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .update({ display_name: value })
+    .eq('id', userId)
+    .select('id, phone, display_name, balance_cdf, kyc_status, blocked')
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '23505') throw new Error('DISPLAY_NAME_TAKEN');
+    if (error.code === '23514') throw new Error('DISPLAY_NAME_INVALID_LENGTH');
+    throw new Error(error.message);
+  }
+  if (!data) throw new Error('USER_NOT_FOUND');
+  return sanitizeUser(data);
 }
 
 export async function registerUser(input: { phone: string; pin: string }): Promise<AuthUser> {
@@ -54,7 +86,7 @@ export async function registerUser(input: { phone: string; pin: string }): Promi
       auth_failed_count: 0,
       auth_locked_until: null,
     })
-    .select('id, phone, balance_cdf, kyc_status, blocked')
+    .select('id, phone, display_name, balance_cdf, kyc_status, blocked')
     .single();
 
   if (error) {
@@ -67,7 +99,7 @@ export async function registerUser(input: { phone: string; pin: string }): Promi
 export async function loginUser(input: { phone: string; pin: string }): Promise<AuthUser> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, phone, balance_cdf, pin_hash, kyc_status, blocked, auth_failed_count, auth_locked_until, pin_must_reset')
+    .select('id, phone, display_name, balance_cdf, pin_hash, kyc_status, blocked, auth_failed_count, auth_locked_until, pin_must_reset')
     .eq('phone', input.phone)
     .maybeSingle();
 
@@ -165,7 +197,7 @@ export async function resetPin(userId: string, newPin: string): Promise<void> {
 export async function getUserById(userId: string): Promise<AuthUser | null> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, phone, balance_cdf, kyc_status, blocked')
+    .select('id, phone, display_name, balance_cdf, kyc_status, blocked')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw new Error(error.message);
