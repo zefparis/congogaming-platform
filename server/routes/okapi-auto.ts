@@ -73,13 +73,12 @@ const okapiAutoRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const parsed = OkapiAutoProgressBodySchema.safeParse(req.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Missing fields' });
-      const { session_id, delta_cdf } = parsed.data;
+      const { session_id, delta_cdf, expected_rounds_played } = parsed.data;
       const user_id = req.user.id;
       const sb = getSupabase();
       if (!sb) return reply.code(503).send({ error: 'Database not configured' });
 
-      // Read-modify-write. Safe enough here since a single user runs at most
-      // one auto session at a time and rounds are sequential.
+      // Read-modify-write with CAS protection against duplicate progress calls.
       const { data: row, error: readErr } = await sb
         .from('okapi_auto_sessions')
         .select('rounds_played,total_pnl_cdf,status,max_rounds,stop_on_profit_cdf,stop_on_loss_cdf')
@@ -94,7 +93,26 @@ const okapiAutoRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(409).send({ error: 'Session not active' });
       }
 
-      const rounds_played = (row.rounds_played ?? 0) + 1;
+      // CAS: if expected_rounds_played is provided, verify it matches current value
+      // to prevent duplicate progress calls from incrementing twice.
+      const current_rounds = row.rounds_played ?? 0;
+      if (expected_rounds_played !== undefined && expected_rounds_played !== current_rounds) {
+        app.log.warn({
+          session_id,
+          user_id,
+          expected: expected_rounds_played,
+          current: current_rounds,
+        }, 'okapi auto progress duplicate detected (CAS mismatch)');
+        // Return current state without incrementing (idempotent no-op)
+        return reply.send({
+          rounds_played: current_rounds,
+          total_pnl_cdf: row.total_pnl_cdf ?? 0,
+          status: row.status,
+          finished: row.status !== 'active',
+        });
+      }
+
+      const rounds_played = current_rounds + 1;
       const total_pnl_cdf = (row.total_pnl_cdf ?? 0) + Math.trunc(delta_cdf);
 
       // Auto-finalize if thresholds reached.

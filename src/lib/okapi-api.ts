@@ -29,7 +29,7 @@ export const okapiApi = {
   history: () => request<HistoryResponse>('/api/game/history'),
   getBalance: (_user_id?: string) => request<BalanceResponse>('/api/wallet/balance'),
   autoStart: (params: AutoStartParams) => request<AutoStartResponse>('/api/okapi/auto/start', { method: 'POST', body: JSON.stringify(params) }),
-  autoProgress: (session_id: string, _user_id: string, delta_cdf: number) => request<AutoProgressResponse>('/api/okapi/auto/progress', { method: 'POST', body: JSON.stringify({ session_id, delta_cdf }) }),
+  autoProgress: (session_id: string, _user_id: string, delta_cdf: number, expected_rounds_played?: number) => request<AutoProgressResponse>('/api/okapi/auto/progress', { method: 'POST', body: JSON.stringify({ session_id, delta_cdf, expected_rounds_played }) }),
   autoActive: (_user_id?: string) => request<AutoActiveResponse>('/api/okapi/auto/active'),
   autoStop: (session_id: string, _user_id: string, reason: 'completed' | 'stopped' | 'aborted' = 'stopped') => request<{ ok: boolean; status: string }>('/api/okapi/auto/stop', { method: 'POST', body: JSON.stringify({ session_id, reason }) }),
 }

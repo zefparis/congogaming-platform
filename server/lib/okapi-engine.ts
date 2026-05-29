@@ -68,6 +68,14 @@ export class GameEngine extends EventEmitter {
     this.crashPoint = generateCrashPoint()
     this.roundId = await this.createRound(this.crashPoint)
 
+    // If round creation failed, abort and retry after delay
+    if (!this.roundId) {
+      console.error('[okapi-engine] createRound failed, aborting cycle and retrying in 5s')
+      await sleep(5000)
+      this.cycle()
+      return
+    }
+
     let countdown = Math.ceil(WAIT_MS / 1000)
     this.emit('broadcast', { type: 'WAITING', countdown })
     const waitInterval = setInterval(() => {

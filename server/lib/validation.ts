@@ -51,6 +51,7 @@ export const OkapiAutoStartBodySchema = z.object({
 export const OkapiAutoProgressBodySchema = z.object({
   session_id: z.string().uuid(),
   delta_cdf: z.number().int(),
+  expected_rounds_played: z.number().int().nonnegative().optional(),
 });
 
 export const OkapiAutoStopBodySchema = z.object({

@@ -16,25 +16,12 @@ as $$
 declare
   v_bet public.okapi_bets%rowtype;
   v_ledger record;
-  v_balance integer;
 begin
   if p_win_amount is null or p_win_amount <= 0 then
     raise exception 'Invalid win amount';
   end if;
 
-  if exists (
-    select 1
-    from public.ledger_entries
-    where idempotency_key = p_idempotency_key
-  ) then
-    select balance_cdf into v_balance
-    from public.users
-    where id = p_user_id;
-
-    return query select false, coalesce(v_balance, 0);
-    return;
-  end if;
-
+  -- Lock the bet row FIRST to prevent concurrent cashouts
   select * into v_bet
   from public.okapi_bets
   where id = p_bet_id
@@ -49,6 +36,7 @@ begin
     raise exception 'Bet already cashed out';
   end if;
 
+  -- Update bet status BEFORE ledger to ensure consistency
   update public.okapi_bets
   set status = 'cashed_out',
       cashout_multiplier = p_cashout_multiplier,
@@ -57,6 +45,7 @@ begin
   where id = p_bet_id
     and user_id = p_user_id;
 
+  -- record_ledger_entry_atomic handles idempotency via ON CONFLICT
   select * into v_ledger
   from public.record_ledger_entry_atomic(
     p_user_id,

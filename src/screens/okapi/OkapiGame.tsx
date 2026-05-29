@@ -89,6 +89,8 @@ export default function OkapiGame() {
   const betIdRef = useRef<string | null>(null)
   const gotServerMsg = useRef(false)
   const crashedSafetyRef = useRef<number | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioPlayingRef = useRef(false)
 
   // ---------------- Auto-bet (Aviator-style) ----------------
   // Client-driven loop that reuses /api/game/bet and /api/game/cashout. The
@@ -130,6 +132,41 @@ export default function OkapiGame() {
   // over an old `state` value) can read the real current value.
   useEffect(() => {
     stateRef.current = state
+  }, [state])
+
+  // Initialize audio element once
+  useEffect(() => {
+    const audio = new Audio('/audio/pacman.mp3')
+    audio.volume = 0.3
+    audio.loop = true
+    audioRef.current = audio
+    return () => {
+      audio.pause()
+      audioRef.current = null
+    }
+  }, [])
+
+  // Play audio when state transitions to PLAYING, stop on CRASHED/CASHEDOUT
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (state === 'playing' && !audioPlayingRef.current) {
+      // Only play if we have user interaction (browser policy)
+      // The audio will play on first PLAYING after user has interacted
+      audio.play().catch(() => {
+        // Browser blocked autoplay - silent fail
+      })
+      audioPlayingRef.current = true
+    } else if (state === 'crashed' || state === 'cashedout') {
+      audio.pause()
+      audio.currentTime = 0
+      audioPlayingRef.current = false
+    } else if (state === 'waiting') {
+      audio.pause()
+      audio.currentTime = 0
+      audioPlayingRef.current = false
+    }
   }, [state])
 
   // Pull authoritative balance from the backend on mount
@@ -354,7 +391,7 @@ export default function OkapiGame() {
     function startPlaying() {
       const r = Math.random()
       // Local fallback also caps at 50 to match the server engine.
-      localCrash = r < 0.05 ? 1.0 : Math.min(50, Math.max(1.0, (1 / (1 - r)) * 0.95))
+      localCrash = r < 0.05 ? 1.0 : Math.min(50, Math.max(1.0, (1 / (1 - r)) * 0.92))
       // Use Date.now() (epoch ms) so MultiplierDisplay's tickerFn (which now
       // diffs against Date.now()) computes the correct elapsed value.
       const t0 = Date.now()
@@ -470,6 +507,17 @@ export default function OkapiGame() {
       })
       return false
     }
+    // Check local balance before attempting bet
+    if (balance < sess.cfg.amount) {
+      setAutoError('Solde insuffisant — session auto arrêtée')
+      autoStopRequestedRef.current = true
+      // Stop the session immediately
+      const sid = sess.id
+      okapiApi.autoStop(sid, userId, 'aborted').catch(() => {})
+      setAutoSession(null)
+      autoStopRequestedRef.current = false
+      return false
+    }
     autoBetInFlightRef.current = true
     autoCurrentBetAmountRef.current = sess.cfg.amount
     autoCurrentWinAmountRef.current = 0
@@ -506,7 +554,7 @@ export default function OkapiGame() {
     } finally {
       autoBetInFlightRef.current = false
     }
-  }, [userId, updateBalance])
+  }, [userId, updateBalance, balance])
 
   // Cash out on behalf of the auto loop. Idempotent.
   const autoCashout = useCallback(async () => {
@@ -577,7 +625,7 @@ export default function OkapiGame() {
     autoCurrentWinAmountRef.current = 0
     autoCashedOutThisRoundRef.current = false
     try {
-      const res = await okapiApi.autoProgress(sess.id, userId, delta)
+      const res = await okapiApi.autoProgress(sess.id, userId, delta, autoRoundsPlayed)
       setAutoRoundsPlayed(res.rounds_played)
       setAutoTotalPnl(res.total_pnl_cdf)
       if (res.finished) {
@@ -593,7 +641,7 @@ export default function OkapiGame() {
       setAutoRoundsPlayed((r) => r + 1)
       setAutoTotalPnl((p) => p + delta)
     }
-  }, [userId])
+  }, [userId, autoRoundsPlayed])
 
   // User clicked START AUTO.
   const handleAutoStart = useCallback(
