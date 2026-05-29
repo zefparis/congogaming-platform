@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Phone, Lock, Check } from 'lucide-react';
+import { Phone, Lock, Check, Gift } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { detectOperator, registerUser, validateCongoPhone, getSession } from '../lib/auth';
 
@@ -9,12 +9,19 @@ type Step = 'phone' | 'pin';
 
 export default function RegisterScreen() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [adult, setAdult] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) setReferralCode(ref.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12));
+  }, [searchParams]);
 
   const op = detectOperator(phone);
 
@@ -32,7 +39,7 @@ export default function RegisterScreen() {
     if (pin.length !== 4 || loading) return;
     try {
       setLoading(true);
-      const user = await registerUser(phone, pin);
+      const user = await registerUser(phone, pin, referralCode || null);
       // KYC is now scoped to PredictStreet (/jouer) only — see
       // `PredictStreetRoute` in App.tsx. Fresh accounts go straight to
       // home; the KYC scan is triggered the first time they tap the
@@ -105,6 +112,20 @@ export default function RegisterScreen() {
             </div>
             <span className="text-sm text-left">J'ai 18 ans ou plus</span>
           </button>
+
+          <div className="mt-3 bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex items-center gap-3">
+            <Gift className="w-5 h-5 text-gold" />
+            <div className="flex-1">
+              <div className="text-xs text-zinc-500">Code parrain (optionnel)</div>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
+                placeholder="ABCD1234"
+                className="w-full bg-transparent border-0 outline-none font-display text-lg tracking-[0.2em] text-white placeholder:text-zinc-700 mt-0.5"
+              />
+            </div>
+          </div>
 
           {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
 

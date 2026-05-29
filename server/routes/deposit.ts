@@ -20,6 +20,31 @@ export default async function depositRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Ce numéro ne correspond pas à l\'opérateur sélectionné' });
     }
 
+    // Responsible-gaming guard: self-exclusion + daily/weekly/monthly caps.
+    const { data: limitCheck, error: limitErr } = await supabaseAdmin.rpc('check_deposit_allowed', {
+      p_user_id: user_id,
+      p_amount: amount,
+    });
+    if (limitErr) {
+      app.log.error({ err: limitErr.message, user_id }, 'check_deposit_allowed RPC failed');
+      return reply.code(500).send({ error: 'Erreur vérification limites' });
+    }
+    const limitRow = Array.isArray(limitCheck) ? limitCheck[0] : limitCheck;
+    if (limitRow && limitRow.allowed === false) {
+      const reason = String(limitRow.reason || 'LIMIT_EXCEEDED');
+      const messages: Record<string, string> = {
+        SELF_EXCLUDED: 'Auto-exclusion active jusqu\'au ' + (limitRow.retry_after ? new Date(limitRow.retry_after).toLocaleString('fr-FR') : 'date à venir'),
+        DAILY_LIMIT_EXCEEDED: 'Limite de dépôt journalière atteinte',
+        WEEKLY_LIMIT_EXCEEDED: 'Limite de dépôt hebdomadaire atteinte',
+        MONTHLY_LIMIT_EXCEEDED: 'Limite de dépôt mensuelle atteinte',
+      };
+      return reply.code(403).send({
+        error: messages[reason] || 'Dépôt bloqué',
+        code: reason,
+        retry_after: limitRow.retry_after ?? null,
+      });
+    }
+
     const order_id = newOrderId();
     const { error: insertErr } = await supabaseAdmin.from('transactions').insert({
       user_id,

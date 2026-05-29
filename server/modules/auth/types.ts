@@ -7,6 +7,7 @@ export type AuthUser = {
   balance_cdf: number;
   kyc_status: KycStatus;
   blocked: boolean;
+  referral_code: string | null;
 };
 
 export type JwtUserPayload = {

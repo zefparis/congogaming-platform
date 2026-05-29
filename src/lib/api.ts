@@ -46,6 +46,29 @@ export const api = {
       counts: { bets: number; wins: number; pending_deposits: number; pending_withdrawals: number };
       win_rate_percent: number;
     }>('/api/me/stats'),
+  myLimits: () =>
+    req<{
+      limits: {
+        daily_deposit_cdf: number | null;
+        weekly_deposit_cdf: number | null;
+        monthly_deposit_cdf: number | null;
+        self_exclusion_until: string | null;
+        pending_raise: Record<string, number | null> | null;
+        pending_raise_effective_at: string | null;
+      };
+    }>('/api/me/limits'),
+  updateLimits: (body: { daily_deposit_cdf?: number | null; weekly_deposit_cdf?: number | null; monthly_deposit_cdf?: number | null }) =>
+    req<{ ok: boolean; applied_immediately: string[]; pending_raise: Record<string, number | null> | null; pending_raise_effective_at: string | null }>('/api/me/limits', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  selfExclusion: (duration: '24h' | '7d' | '30d' | 'permanent') =>
+    req<{ ok: boolean; self_exclusion_until: string }>('/api/me/self-exclusion', {
+      method: 'POST',
+      body: JSON.stringify({ duration }),
+    }),
+  myReferral: () =>
+    req<{ code: string | null; referred_count: number; total_credited_cdf: number; total_pending_cdf: number }>('/api/me/referral'),
   lotoTicket: (_user_id: string, numeros: number[]) =>
     req<{ ticket_id: string; new_balance: number }>('/api/loto/ticket', { method: 'POST', body: JSON.stringify({ numeros }) }),
   lotoLatest: () =>

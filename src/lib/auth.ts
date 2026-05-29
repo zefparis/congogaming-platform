@@ -9,6 +9,7 @@ export type SessionUser = {
   balance_cdf: number;
   kyc_status: KycStatus;
   blocked: boolean;
+  referral_code: string | null;
 };
 
 let currentUser: SessionUser | null = null;
@@ -79,10 +80,10 @@ export async function clearSession() {
   await authRequest<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }).catch(() => ({ ok: true }));
 }
 
-export async function registerUser(phone: string, pin: string): Promise<SessionUser> {
+export async function registerUser(phone: string, pin: string, referralCode?: string | null): Promise<SessionUser> {
   const { user } = await authRequest<{ user: SessionUser }>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ phone, pin, adult: true }),
+    body: JSON.stringify({ phone, pin, adult: true, referralCode: referralCode || undefined }),
   });
   currentUser = user;
   return user;

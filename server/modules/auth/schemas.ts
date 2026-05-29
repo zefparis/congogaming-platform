@@ -23,6 +23,13 @@ export const RegisterSchema = z.object({
   adult: z.literal(true, {
     errorMap: () => ({ message: 'Confirmation 18+ requise' }),
   }),
+  referralCode: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{6,12}$/, 'Code parrain invalide')
+    .optional()
+    .nullable(),
 });
 
 export const LoginSchema = z.object({

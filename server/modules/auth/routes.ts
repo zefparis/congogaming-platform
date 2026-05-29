@@ -69,7 +69,11 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     const parsed = RegisterSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
     try {
-      const user = await registerUser({ phone: parsed.data.phone, pin: parsed.data.pin });
+      const user = await registerUser({
+        phone: parsed.data.phone,
+        pin: parsed.data.pin,
+        referralCode: parsed.data.referralCode ?? null,
+      });
       const token = signAccessToken({ userId: user.id, phone: user.phone });
       reply.setCookie(authCookieName, token, authCookieOptions());
       return reply.code(201).send({ user });

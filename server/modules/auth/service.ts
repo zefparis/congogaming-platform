@@ -33,6 +33,7 @@ function sanitizeUser(row: Record<string, unknown>): AuthUser {
     balance_cdf: Number(row.balance_cdf ?? 0),
     kyc_status: (row.kyc_status as AuthUser['kyc_status']) || 'pending',
     blocked: Boolean(row.blocked),
+    referral_code: row.referral_code ? String(row.referral_code) : null,
   };
 }
 
@@ -55,7 +56,7 @@ export async function updateDisplayName(userId: string, raw: string | null): Pro
     .from('users')
     .update({ display_name: value })
     .eq('id', userId)
-    .select('id, phone, display_name, balance_cdf, kyc_status, blocked')
+    .select('id, phone, display_name, balance_cdf, kyc_status, blocked, referral_code')
     .maybeSingle();
 
   if (error) {
@@ -67,13 +68,30 @@ export async function updateDisplayName(userId: string, raw: string | null): Pro
   return sanitizeUser(data);
 }
 
-export async function registerUser(input: { phone: string; pin: string }): Promise<AuthUser> {
+export async function registerUser(input: { phone: string; pin: string; referralCode?: string | null }): Promise<AuthUser> {
   const pinHash = await argon2.hash(input.pin, {
     type: argon2.argon2id,
     memoryCost: 19_456,
     timeCost: 2,
     parallelism: 1,
   });
+
+  let referredBy: string | null = null;
+  const code = input.referralCode?.trim().toUpperCase();
+  if (code) {
+    const { data: refRow } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('referral_code', code)
+      .maybeSingle();
+    if (refRow?.id) referredBy = String(refRow.id);
+    // We silently ignore an invalid code rather than blocking registration.
+  }
+
+  // Generate a unique referral code for this new user (RPC handles uniqueness).
+  const { data: codeRow, error: codeErr } = await supabaseAdmin.rpc('generate_referral_code');
+  if (codeErr) throw new Error(codeErr.message);
+  const newReferralCode = String(codeRow);
 
   const { data, error } = await supabaseAdmin
     .from('users')
@@ -85,8 +103,10 @@ export async function registerUser(input: { phone: string; pin: string }): Promi
       blocked: false,
       auth_failed_count: 0,
       auth_locked_until: null,
+      referral_code: newReferralCode,
+      referred_by: referredBy,
     })
-    .select('id, phone, display_name, balance_cdf, kyc_status, blocked')
+    .select('id, phone, display_name, balance_cdf, kyc_status, blocked, referral_code')
     .single();
 
   if (error) {
@@ -99,7 +119,7 @@ export async function registerUser(input: { phone: string; pin: string }): Promi
 export async function loginUser(input: { phone: string; pin: string }): Promise<AuthUser> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, phone, display_name, balance_cdf, pin_hash, kyc_status, blocked, auth_failed_count, auth_locked_until, pin_must_reset')
+    .select('id, phone, display_name, balance_cdf, pin_hash, kyc_status, blocked, auth_failed_count, auth_locked_until, pin_must_reset, referral_code')
     .eq('phone', input.phone)
     .maybeSingle();
 
@@ -220,7 +240,7 @@ export async function changePin(input: { userId: string; currentPin: string; new
 export async function getUserById(userId: string): Promise<AuthUser | null> {
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, phone, display_name, balance_cdf, kyc_status, blocked')
+    .select('id, phone, display_name, balance_cdf, kyc_status, blocked, referral_code')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw new Error(error.message);
