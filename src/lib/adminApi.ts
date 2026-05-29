@@ -138,11 +138,13 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export const adminApi = {
-  authenticate: (secret: string) =>
-    request<{ token: string; expires_at: number }>('/api/admin/auth', {
+  authenticate: (secret: string, phone?: string) =>
+    request<{ token: string; expires_at: number; role?: 'admin' | 'super_admin' }>('/api/admin/auth', {
       method: 'POST',
-      body: JSON.stringify({ secret }),
+      body: JSON.stringify({ secret, phone: phone || undefined }),
     }),
+
+  me: () => request<{ user_id: string | null; role: 'admin' | 'super_admin' }>('/api/admin/me'),
 
   overview: () =>
     request<{

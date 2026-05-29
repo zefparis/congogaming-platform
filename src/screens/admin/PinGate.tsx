@@ -3,20 +3,29 @@ import { Lock } from 'lucide-react';
 import { adminApi, setAdminSecret, setAdminToken } from '../../lib/adminApi';
 
 export default function PinGate({ onAuthed }: { onAuthed: () => void }) {
+  const [phone, setPhone] = useState('');
   const [secret, setSecret] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!phone.trim()) {
+      setError('Téléphone admin requis');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const { token } = await adminApi.authenticate(secret);
+      const { token, role } = await adminApi.authenticate(secret, phone.trim());
       setAdminToken(token);
       // Persist the secret in sessionStorage so request() can silently
       // re-acquire a fresh token if the current one expires mid-session.
       setAdminSecret(secret);
+      // Cache role so the UI can hide sensitive blocks for non-super-admins.
+      try {
+        sessionStorage.setItem('cg_admin_role', role || 'admin');
+      } catch {}
       onAuthed();
     } catch (err: any) {
       setError(err?.message || 'Code invalide');
@@ -40,11 +49,24 @@ export default function PinGate({ onAuthed }: { onAuthed: () => void }) {
         </div>
 
         <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
+          Téléphone admin <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="tel"
+          required
+          autoFocus
+          autoComplete="username"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="mb-3 w-full rounded-lg border border-white/10 bg-black/50 px-4 py-3 font-mono text-white outline-none ring-gold/40 focus:border-gold/60 focus:ring-2"
+          placeholder="0997174834"
+        />
+
+        <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
           Code administrateur
         </label>
         <input
           type="password"
-          autoFocus
           autoComplete="current-password"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
@@ -60,7 +82,7 @@ export default function PinGate({ onAuthed }: { onAuthed: () => void }) {
 
         <button
           type="submit"
-          disabled={loading || !secret}
+          disabled={loading || !secret || !phone}
           className="mt-6 w-full rounded-lg bg-gold py-3 font-display text-lg tracking-wider text-black transition hover:brightness-110 disabled:opacity-50"
         >
           {loading ? 'Vérification…' : 'Entrer'}

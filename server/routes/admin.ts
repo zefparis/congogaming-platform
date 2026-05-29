@@ -3,6 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
+import { tryNormalizeDrcPhone } from '../lib/phone.js';
 
 // ---- Token / auth ----
 //
@@ -12,34 +13,57 @@ import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
+type AdminRole = 'admin' | 'super_admin';
+
+interface AdminTokenPayload {
+  userId: string | null;
+  phone: string | null;
+  role: AdminRole;
+}
+
 function adminSecret(): string {
   const s = process.env.LOTO_ADMIN_SECRET || '';
   if (!s) throw new Error('LOTO_ADMIN_SECRET not configured');
   return s;
 }
 
-function signToken(): string {
+function signToken(payload: AdminTokenPayload): string {
   const issued = Date.now().toString();
   const nonce = randomBytes(8).toString('hex');
-  const payload = `${issued}.${nonce}`;
-  const sig = createHmac('sha256', adminSecret()).update(payload).digest('hex');
-  return `${payload}.${sig}`;
+  const userId = payload.userId || '-';
+  const role = payload.role;
+  const body = `${issued}.${userId}.${role}.${nonce}`;
+  const sig = createHmac('sha256', adminSecret()).update(body).digest('hex');
+  return `${body}.${sig}`;
 }
 
-function verifyToken(token: string): boolean {
-  if (!token) return false;
+function verifyToken(token: string): AdminTokenPayload | null {
+  if (!token) return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return false;
-  const [issued, nonce, sig] = parts;
+  // Required format: issued.userId.role.nonce.sig (5 parts).
+  // Legacy 3-part tokens (no identity) are rejected — admins MUST authenticate
+  // with their phone so we always know who acted.
+  if (parts.length !== 5) return null;
+  const [issued, userId, role, nonce, sig] = parts;
   const issuedMs = Number(issued);
-  if (!Number.isFinite(issuedMs)) return false;
-  if (Date.now() - issuedMs > TOKEN_TTL_MS) return false;
-  const expected = createHmac('sha256', adminSecret()).update(`${issued}.${nonce}`).digest('hex');
+  if (!Number.isFinite(issuedMs)) return null;
+  if (Date.now() - issuedMs > TOKEN_TTL_MS) return null;
+  if (role !== 'admin' && role !== 'super_admin') return null;
+  if (!userId || userId === '-') return null;
+  const expected = createHmac('sha256', adminSecret())
+    .update(`${issued}.${userId}.${role}.${nonce}`)
+    .digest('hex');
   try {
-    return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
+    const ok = timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
+    if (!ok) return null;
   } catch {
-    return false;
+    return null;
   }
+  return {
+    userId,
+    phone: null,
+    role: role as AdminRole,
+  };
 }
 
 function constantTimeStringEqual(a: string, b: string): boolean {
@@ -49,11 +73,63 @@ function constantTimeStringEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
+// Decorate request with the decoded admin token so downstream handlers
+// can read actor identity for audit logs / role checks.
+declare module 'fastify' {
+  interface FastifyRequest {
+    admin?: AdminTokenPayload;
+  }
+}
+
 async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   const auth = String(req.headers['authorization'] || '');
   const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (!m || !verifyToken(m[1])) {
+  const payload = m ? verifyToken(m[1]) : null;
+  if (!payload) {
     return reply.code(401).send({ error: 'Unauthorized' });
+  }
+  req.admin = payload;
+}
+
+async function requireSuperAdmin(req: FastifyRequest, reply: FastifyReply) {
+  if (!req.admin) {
+    return reply.code(401).send({ error: 'Unauthorized' });
+  }
+  if (req.admin.role !== 'super_admin') {
+    req.log.warn(
+      { actor: req.admin.userId, role: req.admin.role, url: req.url },
+      'super_admin route refused for admin role',
+    );
+    return reply.code(403).send({ error: 'Super admin only' });
+  }
+}
+
+// Append a row to the admin audit log. Best-effort: failures are logged but
+// never block the underlying admin action.
+async function audit(
+  req: FastifyRequest,
+  action: string,
+  targetUserId: string | null,
+  amountCdf: number | null,
+  reason: string | null,
+  meta?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await supabaseAdmin.from('admin_audit_log').insert({
+      actor_user_id: req.admin?.userId || null,
+      actor_phone: req.admin?.phone || null,
+      action,
+      target_user_id: targetUserId,
+      amount_cdf: amountCdf,
+      reason,
+      meta: meta ?? null,
+    });
+    req.log.info(
+      { action, actor: req.admin?.userId, target: targetUserId, amountCdf, reason },
+      'admin sensitive action',
+    );
+  } catch (e) {
+    req.log.error({ err: e instanceof Error ? e.message : String(e) }, 'admin audit insert failed');
   }
 }
 
@@ -79,15 +155,54 @@ function daysAgoIso(days: number): string {
 
 export default async function adminRoutes(app: FastifyInstance) {
   // ---- Auth ----
-  app.post<{ Body: { secret?: string } }>('/api/admin/auth', async (req, reply) => {
-    const provided = String(req.body?.secret || '');
-    const expected = process.env.LOTO_ADMIN_SECRET || '';
-    if (!expected) return reply.code(500).send({ error: 'Admin not configured' });
-    if (!provided || !constantTimeStringEqual(provided, expected)) {
-      return reply.code(401).send({ error: 'Invalid secret' });
-    }
-    return reply.send({ token: signToken(), expires_at: Date.now() + TOKEN_TTL_MS });
-  });
+  // Both `secret` and `phone` are REQUIRED. The phone identifies the admin
+  // user account, and its `users.role` (admin / super_admin) is embedded in
+  // the token. There is no anonymous / legacy admin login.
+  app.post<{ Body: { secret?: string; phone?: string } }>(
+    '/api/admin/auth',
+    async (req, reply) => {
+      const provided = String(req.body?.secret || '');
+      const expected = process.env.LOTO_ADMIN_SECRET || '';
+      if (!expected) return reply.code(500).send({ error: 'Admin not configured' });
+      if (!provided || !constantTimeStringEqual(provided, expected)) {
+        return reply.code(401).send({ error: 'Invalid secret' });
+      }
+
+      const phoneRaw = String(req.body?.phone || '').trim();
+      if (!phoneRaw) {
+        return reply.code(400).send({ error: 'Téléphone admin requis' });
+      }
+      // Normalise to canonical 0XXXXXXXXX format used in users.phone.
+      const phone = tryNormalizeDrcPhone(phoneRaw) || phoneRaw;
+
+      const { data: user, error } = await supabaseAdmin
+        .from('users')
+        .select('id, role')
+        .eq('phone', phone)
+        .maybeSingle();
+      if (error) {
+        req.log.error({ err: error.message }, 'admin auth phone lookup failed');
+        return reply.code(500).send({ error: 'Lookup failed' });
+      }
+      if (!user) {
+        return reply.code(403).send({ error: 'Not authorized as admin' });
+      }
+      const userRole = String((user as any).role || 'user');
+      if (userRole !== 'admin' && userRole !== 'super_admin') {
+        req.log.warn({ phone, role: userRole }, 'admin auth refused: not an admin');
+        return reply.code(403).send({ error: 'Not authorized as admin' });
+      }
+
+      const userId: string = (user as any).id;
+      const role = userRole as AdminRole;
+
+      return reply.send({
+        token: signToken({ userId, phone, role }),
+        expires_at: Date.now() + TOKEN_TTL_MS,
+        role,
+      });
+    },
+  );
 
   // All routes below require admin auth
   app.addHook('onRequest', async (req, reply) => {
@@ -95,6 +210,15 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (!url.startsWith('/api/admin/')) return;
     if (url === '/api/admin/auth') return;
     return requireAdmin(req, reply);
+  });
+
+  // Return the current admin's identity + role so the frontend can hide
+  // sensitive blocks for non-super-admins.
+  app.get('/api/admin/me', async (req, reply) => {
+    return reply.send({
+      user_id: req.admin?.userId || null,
+      role: req.admin?.role || 'admin',
+    });
   });
 
   // ---- OVERVIEW ----
@@ -580,7 +704,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     daily_deposit_cdf?: number | null;
     weekly_deposit_cdf?: number | null;
     monthly_deposit_cdf?: number | null;
-  } }>('/api/admin/users/:id/limits', async (req, reply) => {
+  } }>('/api/admin/users/:id/limits', { preHandler: requireSuperAdmin }, async (req, reply) => {
     const id = req.params.id;
     const body = req.body || {};
     const update: Record<string, unknown> = {
@@ -597,12 +721,14 @@ export default async function adminRoutes(app: FastifyInstance) {
       .from('user_limits')
       .upsert(update, { onConflict: 'user_id' });
     if (error) return reply.code(500).send({ error: error.message });
+    await audit(req, 'set_limits', id, null, null, body as Record<string, unknown>);
     return reply.send({ ok: true });
   });
 
   // Set or clear self-exclusion. `until = null` clears it.
   app.post<{ Params: { id: string }; Body: { until?: string | null; duration?: '24h' | '7d' | '30d' | 'permanent' | null } }>(
     '/api/admin/users/:id/self-exclusion',
+    { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const id = req.params.id;
       let until: string | null = null;
@@ -632,7 +758,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           { onConflict: 'user_id' },
         );
       if (error) return reply.code(500).send({ error: error.message });
-      req.log.warn({ userId: id, until }, 'admin set self-exclusion');
+      await audit(req, 'self_exclusion', id, null, null, { until });
       return reply.send({ ok: true, self_exclusion_until: until });
     },
   );
@@ -641,6 +767,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   // Adjusts referrer balance and writes a `credited` row in referral_rewards.
   app.post<{ Params: { id: string }; Body: { referred_id: string; amount_cdf: number; trigger_event?: string } }>(
     '/api/admin/users/:id/referral-reward',
+    { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const referrerId = req.params.id;
       const { referred_id, amount_cdf, trigger_event } = req.body || ({} as any);
@@ -828,9 +955,11 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { id: string }; Body: { delta_cdf: number; reason?: string } }>(
     '/api/admin/users/:id/balance',
+    { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const id = req.params.id;
       const delta = Number(req.body?.delta_cdf || 0);
+      const reason = String(req.body?.reason || '').slice(0, 500) || null;
       if (!Number.isFinite(delta) || delta === 0) {
         return reply.code(400).send({ error: 'delta_cdf required' });
       }
@@ -839,12 +968,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         p_delta: delta,
       });
       if (error) return reply.code(400).send({ error: error.message });
+      await audit(req, 'adjust_balance', id, delta, reason);
       return reply.send({ new_balance_cdf: Number(data ?? 0) });
     },
   );
 
   app.post<{ Params: { id: string }; Body: { blocked?: boolean } }>(
     '/api/admin/users/:id/block',
+    { preHandler: requireSuperAdmin },
     async (req, reply) => {
       // The `blocked` column is created by the playguard-kyc migration
       // (2026-05-23-playguard-kyc.sql). If you see a column-missing error
@@ -861,29 +992,40 @@ export default async function adminRoutes(app: FastifyInstance) {
           hint: "Add 'blocked boolean default false' column on public.users to enable user blocking.",
         });
       }
+      await audit(req, blocked ? 'block_user' : 'unblock_user', id, null, null);
       return reply.send({ ok: true, blocked });
     },
   );
 
-  app.post<{ Params: { id: string } }>('/api/admin/users/:id/kyc-approve', async (req, reply) => {
-    const id = req.params.id;
-    const { error } = await supabaseAdmin
-      .from('users')
-      .update({ kyc_status: 'approved' })
-      .eq('id', id);
-    if (error) return reply.code(400).send({ error: error.message });
-    return reply.send({ ok: true, kyc_status: 'approved' });
-  });
+  app.post<{ Params: { id: string } }>(
+    '/api/admin/users/:id/kyc-approve',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const id = req.params.id;
+      const { error } = await supabaseAdmin
+        .from('users')
+        .update({ kyc_status: 'approved' })
+        .eq('id', id);
+      if (error) return reply.code(400).send({ error: error.message });
+      await audit(req, 'kyc_approve', id, null, null);
+      return reply.send({ ok: true, kyc_status: 'approved' });
+    },
+  );
 
-  app.post<{ Params: { id: string } }>('/api/admin/users/:id/kyc-deny', async (req, reply) => {
-    const id = req.params.id;
-    const { error } = await supabaseAdmin
-      .from('users')
-      .update({ kyc_status: 'denied', blocked: true })
-      .eq('id', id);
-    if (error) return reply.code(400).send({ error: error.message });
-    return reply.send({ ok: true, kyc_status: 'denied', blocked: true });
-  });
+  app.post<{ Params: { id: string } }>(
+    '/api/admin/users/:id/kyc-deny',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const id = req.params.id;
+      const { error } = await supabaseAdmin
+        .from('users')
+        .update({ kyc_status: 'denied', blocked: true })
+        .eq('id', id);
+      if (error) return reply.code(400).send({ error: error.message });
+      await audit(req, 'kyc_deny', id, null, null);
+      return reply.send({ ok: true, kyc_status: 'denied', blocked: true });
+    },
+  );
 
   // ---- JEUX ----
 

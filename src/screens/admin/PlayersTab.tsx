@@ -7,6 +7,15 @@ import KycBadge from './KycBadge';
 type UserRow = Awaited<ReturnType<typeof adminApi.users>>['items'][number];
 type UserDetail = Awaited<ReturnType<typeof adminApi.userDetail>>;
 
+function getCachedRole(): 'admin' | 'super_admin' {
+  try {
+    const r = sessionStorage.getItem('cg_admin_role');
+    return r === 'super_admin' ? 'super_admin' : 'admin';
+  } catch {
+    return 'admin';
+  }
+}
+
 function Drawer({
   userId,
   onClose,
@@ -20,6 +29,20 @@ function Drawer({
   const [delta, setDelta] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<'admin' | 'super_admin'>(getCachedRole);
+  const isSuper = role === 'super_admin';
+
+  // Re-confirm role from server (in case session was opened before role was cached).
+  useEffect(() => {
+    adminApi
+      .me()
+      .then((r) => {
+        const next = r.role === 'super_admin' ? 'super_admin' : 'admin';
+        setRole(next);
+        try { sessionStorage.setItem('cg_admin_role', next); } catch {}
+      })
+      .catch(() => {});
+  }, []);
 
   // Limits inputs
   const [limDaily, setLimDaily] = useState('');
@@ -269,6 +292,14 @@ function Drawer({
               </div>
             </div>
 
+            {!isSuper && (
+              <div className="mt-5 rounded-md border border-amber-500/30 bg-amber-500/[0.05] p-3 text-xs text-amber-200">
+                Mode lecture seule — les actions sensibles (solde, blocage, limites, parrainage) sont réservées aux super-admins.
+              </div>
+            )}
+
+            {isSuper && (
+            <>
             <div className="mt-5 rounded-xl border border-gold/30 bg-gold/[0.04] p-4">
               <h4 className="mb-3 font-display tracking-wider text-gold">Ajuster le solde</h4>
               <div className="flex flex-wrap gap-2">
@@ -461,8 +492,10 @@ function Drawer({
                 </div>
               )}
             </div>
+            </>
+            )}
 
-            {data.user.kyc_status === 'verify_age' && (
+            {isSuper && data.user.kyc_status === 'verify_age' && (
               <div
                 style={{
                   marginTop: 16,
