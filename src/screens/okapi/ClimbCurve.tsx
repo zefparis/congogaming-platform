@@ -139,23 +139,60 @@ export default function ClimbCurve({ state, startTime }: Props) {
         ctx.translate(dx, dy)
         ctx.globalAlpha = fadeAlphaRef.current
 
-        // Aviator-style filled area under the curve: stronger gradient with
-        // a mid-stop for a richer glow that still keeps the okapi readable.
-        const grad = ctx.createLinearGradient(0, 0, 0, h)
-        grad.addColorStop(0, isCrashed ? 'rgba(239,68,68,0.55)' : 'rgba(255,215,0,0.55)')
-        grad.addColorStop(0.55, isCrashed ? 'rgba(239,68,68,0.22)' : 'rgba(255,215,0,0.22)')
-        grad.addColorStop(1, 'rgba(0,0,0,0)')
-        ctx.beginPath()
-        ctx.moveTo(pts[0].x, h)
-        for (const p of pts) ctx.lineTo(p.x, p.y)
-        ctx.lineTo(pts[pts.length - 1].x, h)
-        ctx.closePath()
-        ctx.fillStyle = grad
-        // Subtle additive blend so the fill glows against the dark bg
-        // without washing out the okapi sprite.
+        // Build the path of the filled area under the curve once — we reuse
+        // it for both the gradient fill and the clipped grid pattern (the
+        // grid must NEVER spill outside the trajectory).
+        const buildAreaPath = () => {
+          ctx.beginPath()
+          ctx.moveTo(pts[0].x, h)
+          for (const p of pts) ctx.lineTo(p.x, p.y)
+          ctx.lineTo(pts[pts.length - 1].x, h)
+          ctx.closePath()
+        }
+
+        // Aviator-style filled area under the curve: vibrant orange→yellow
+        // gradient with a richer top stop, fading to transparent.
         ctx.save()
-        ctx.globalCompositeOperation = 'lighter'
+        ctx.globalAlpha = fadeAlphaRef.current
+        const grad = ctx.createLinearGradient(0, 0, 0, h)
+        if (isCrashed) {
+          grad.addColorStop(0, 'rgba(255,80,80,0.85)')
+          grad.addColorStop(0.5, 'rgba(220,40,40,0.45)')
+          grad.addColorStop(1, 'rgba(120,0,0,0)')
+        } else {
+          grad.addColorStop(0, 'rgba(255,210,60,0.85)')
+          grad.addColorStop(0.5, 'rgba(255,140,30,0.45)')
+          grad.addColorStop(1, 'rgba(120,40,0,0)')
+        }
+        buildAreaPath()
+        ctx.fillStyle = grad
         ctx.fill()
+        ctx.restore()
+
+        // Grid / mesh pattern clipped to the area, mimicking the Aviator
+        // "stairs" texture. Pure overlay, no blur on the background.
+        ctx.save()
+        buildAreaPath()
+        ctx.clip()
+        ctx.globalAlpha = fadeAlphaRef.current * 0.45
+        ctx.lineWidth = 1
+        ctx.strokeStyle = isCrashed
+          ? 'rgba(255,180,180,0.55)'
+          : 'rgba(255,230,120,0.55)'
+        // Vertical lines (~every 22px)
+        for (let gx = Math.floor(pts[0].x); gx <= pts[pts.length - 1].x; gx += 22) {
+          ctx.beginPath()
+          ctx.moveTo(gx, 0)
+          ctx.lineTo(gx, h)
+          ctx.stroke()
+        }
+        // Horizontal lines (~every 22px)
+        for (let gy = h; gy >= 0; gy -= 22) {
+          ctx.beginPath()
+          ctx.moveTo(0, gy)
+          ctx.lineTo(w, gy)
+          ctx.stroke()
+        }
         ctx.restore()
 
         ctx.beginPath()
