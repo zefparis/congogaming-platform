@@ -7,6 +7,24 @@ import { env } from '../../env.js';
 const MAX_LOGIN_FAILURES = env.AUTH_MAX_FAILURES;
 const LOCKOUT_MINUTES = env.AUTH_LOCKOUT_MINUTES;
 
+export class AuthLockedError extends Error {
+  lockedUntil: Date;
+  retryAfterSeconds: number;
+  constructor(lockedUntil: Date) {
+    super('ACCOUNT_TEMP_LOCKED');
+    this.lockedUntil = lockedUntil;
+    this.retryAfterSeconds = Math.max(1, Math.ceil((lockedUntil.getTime() - Date.now()) / 1000));
+  }
+}
+
+export class InvalidCredentialsError extends Error {
+  attemptsRemaining: number;
+  constructor(attemptsRemaining: number) {
+    super('INVALID_CREDENTIALS');
+    this.attemptsRemaining = attemptsRemaining;
+  }
+}
+
 function sanitizeUser(row: Record<string, unknown>): AuthUser {
   return {
     id: String(row.id),
@@ -64,17 +82,20 @@ export async function loginUser(input: { phone: string; pin: string }): Promise<
   if (data.pin_must_reset || isLegacyHash) throw new Error('PIN_RESET_REQUIRED');
 
   const lockedUntil = data.auth_locked_until ? new Date(String(data.auth_locked_until)) : null;
-  if (lockedUntil && lockedUntil.getTime() > Date.now()) throw new Error('ACCOUNT_TEMP_LOCKED');
+  if (lockedUntil && lockedUntil.getTime() > Date.now()) throw new AuthLockedError(lockedUntil);
 
   const ok = await argon2.verify(pinHash, input.pin).catch(() => false);
   if (!ok) {
     const failures = Number(data.auth_failed_count ?? 0) + 1;
     const patch: Record<string, unknown> = { auth_failed_count: failures };
+    let newLockedUntil: Date | null = null;
     if (failures >= MAX_LOGIN_FAILURES) {
-      patch.auth_locked_until = new Date(Date.now() + LOCKOUT_MINUTES * 60_000).toISOString();
+      newLockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000);
+      patch.auth_locked_until = newLockedUntil.toISOString();
     }
     await supabaseAdmin.from('users').update(patch).eq('id', data.id);
-    throw new Error(failures >= MAX_LOGIN_FAILURES ? 'ACCOUNT_TEMP_LOCKED' : 'INVALID_CREDENTIALS');
+    if (newLockedUntil) throw new AuthLockedError(newLockedUntil);
+    throw new InvalidCredentialsError(Math.max(0, MAX_LOGIN_FAILURES - failures));
   }
 
   await supabaseAdmin

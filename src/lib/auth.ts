@@ -15,10 +15,16 @@ let currentUser: SessionUser | null = null;
 export class AuthApiError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  lockedUntil?: string;
+  retryAfterSeconds?: number;
+  attemptsRemaining?: number;
+  constructor(message: string, status: number, extra?: { code?: string; lockedUntil?: string; retryAfterSeconds?: number; attemptsRemaining?: number }) {
     super(message);
     this.status = status;
-    this.code = code;
+    this.code = extra?.code;
+    this.lockedUntil = extra?.lockedUntil;
+    this.retryAfterSeconds = extra?.retryAfterSeconds;
+    this.attemptsRemaining = extra?.attemptsRemaining;
   }
 }
 
@@ -28,9 +34,20 @@ async function authRequest<T>(path: string, options: RequestInit = {}): Promise<
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
   });
-  const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+  const json = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    code?: string;
+    lockedUntil?: string;
+    retryAfterSeconds?: number;
+    attemptsRemaining?: number;
+  };
   if (!res.ok) {
-    throw new AuthApiError(json?.error || `HTTP ${res.status}`, res.status, json?.code);
+    throw new AuthApiError(json?.error || `HTTP ${res.status}`, res.status, {
+      code: json?.code,
+      lockedUntil: json?.lockedUntil,
+      retryAfterSeconds: json?.retryAfterSeconds,
+      attemptsRemaining: json?.attemptsRemaining,
+    });
   }
   return json as T;
 }

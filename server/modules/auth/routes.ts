@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { CongoPhoneSchema, LoginSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
-import { getUserById, loginUser, registerUser, resetPinByPhone } from './service.js';
+import { AuthLockedError, InvalidCredentialsError, getUserById, loginUser, registerUser, resetPinByPhone } from './service.js';
 
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
 
@@ -20,12 +20,44 @@ const phoneKeyGenerator = (req: any) => {
   return `ip:${xff || req.ip}`;
 };
 
-function toAuthError(error: unknown): { status: number; code?: string; message: string } {
+type AuthErrorPayload = {
+  status: number;
+  code?: string;
+  message: string;
+  lockedUntil?: string;
+  retryAfterSeconds?: number;
+  attemptsRemaining?: number;
+};
+
+function formatLockedMessage(retryAfterSeconds: number): string {
+  if (retryAfterSeconds >= 60) {
+    const minutes = Math.ceil(retryAfterSeconds / 60);
+    return `Compte temporairement verrouillé. Réessayez dans ${minutes} minute${minutes > 1 ? 's' : ''}.`;
+  }
+  return `Compte temporairement verrouillé. Réessayez dans ${retryAfterSeconds} seconde${retryAfterSeconds > 1 ? 's' : ''}.`;
+}
+
+function toAuthError(error: unknown): AuthErrorPayload {
+  if (error instanceof AuthLockedError) {
+    return {
+      status: 429,
+      code: 'ACCOUNT_TEMP_LOCKED',
+      message: formatLockedMessage(error.retryAfterSeconds),
+      lockedUntil: error.lockedUntil.toISOString(),
+      retryAfterSeconds: error.retryAfterSeconds,
+    };
+  }
+  if (error instanceof InvalidCredentialsError) {
+    const msg = error.attemptsRemaining > 0
+      ? `Identifiants invalides. ${error.attemptsRemaining} tentative${error.attemptsRemaining > 1 ? 's' : ''} restante${error.attemptsRemaining > 1 ? 's' : ''} avant verrouillage.`
+      : 'Identifiants invalides';
+    return { status: 401, code: 'INVALID_CREDENTIALS', message: msg, attemptsRemaining: error.attemptsRemaining };
+  }
   const msg = error instanceof Error ? error.message : String(error);
   if (msg === 'PHONE_ALREADY_REGISTERED') return { status: 409, message: 'Numéro déjà inscrit' };
   if (msg === 'INVALID_CREDENTIALS') return { status: 401, message: 'Identifiants invalides' };
   if (msg === 'ACCOUNT_BLOCKED') return { status: 403, message: 'Compte bloqué' };
-  if (msg === 'ACCOUNT_TEMP_LOCKED') return { status: 429, message: 'Compte temporairement verrouillé' };
+  if (msg === 'ACCOUNT_TEMP_LOCKED') return { status: 429, code: 'ACCOUNT_TEMP_LOCKED', message: 'Compte temporairement verrouillé' };
   if (msg === 'PIN_RESET_REQUIRED') return { status: 409, code: 'PIN_RESET_REQUIRED', message: 'Veuillez réinitialiser votre PIN.' };
   return { status: 500, message: 'Erreur auth' };
 }
@@ -59,7 +91,14 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ user });
     } catch (error) {
       const e = toAuthError(error);
-      return reply.code(e.status).send({ error: e.message, ...(e.code ? { code: e.code } : {}) });
+      if (e.retryAfterSeconds) reply.header('Retry-After', String(e.retryAfterSeconds));
+      return reply.code(e.status).send({
+        error: e.message,
+        ...(e.code ? { code: e.code } : {}),
+        ...(e.lockedUntil ? { lockedUntil: e.lockedUntil } : {}),
+        ...(e.retryAfterSeconds ? { retryAfterSeconds: e.retryAfterSeconds } : {}),
+        ...(typeof e.attemptsRemaining === 'number' ? { attemptsRemaining: e.attemptsRemaining } : {}),
+      });
     }
   });
 

@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Phone, Lock } from 'lucide-react';
+import { Phone, Lock, Clock } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { AuthApiError, detectOperator, loginUser, validateCongoPhone, getSession } from '../lib/auth';
+
+function formatRemaining(seconds: number): string {
+  if (seconds <= 0) return '0s';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
+}
 
 export default function LoginScreen() {
   const nav = useNavigate();
@@ -12,6 +20,24 @@ export default function LoginScreen() {
   const [step, setStep] = useState<'phone' | 'pin'>('phone');
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [lockedUntil]);
+
+  const remainingSeconds = lockedUntil ? Math.max(0, Math.ceil((lockedUntil - now) / 1000)) : 0;
+  const isLocked = remainingSeconds > 0;
+
+  useEffect(() => {
+    if (lockedUntil && remainingSeconds === 0) {
+      setLockedUntil(null);
+      setErr(null);
+    }
+  }, [remainingSeconds, lockedUntil]);
 
   const op = detectOperator(phone);
 
@@ -37,7 +63,7 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (pin.length !== 4 || loading) return;
+    if (pin.length !== 4 || loading || isLocked) return;
     try {
       setLoading(true);
       await loginUser(phone, pin);
@@ -54,6 +80,13 @@ export default function LoginScreen() {
       if (code === 'PIN_RESET_REQUIRED' || (status === 409 && /pin/i.test(String(e.message || '')))) {
         goToResetPin();
         return;
+      }
+      if (e instanceof AuthApiError && code === 'ACCOUNT_TEMP_LOCKED') {
+        const until = e.lockedUntil
+          ? new Date(e.lockedUntil).getTime()
+          : Date.now() + (e.retryAfterSeconds || 0) * 1000;
+        setLockedUntil(until);
+        setNow(Date.now());
       }
       setErr(e.message || 'Erreur');
       setPin('');
@@ -131,7 +164,21 @@ export default function LoginScreen() {
               </div>
             </div>
           </div>
-          {err && (
+          {isLocked && (
+            <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-3">
+              <Clock className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <div className="text-amber-300 font-semibold">Compte temporairement verrouillé</div>
+                <div className="text-amber-200/90 mt-0.5">
+                  Pour votre sécurité, votre compte est verrouillé après plusieurs tentatives.
+                </div>
+                <div className="mt-1 text-amber-100">
+                  Réessayez dans <span className="font-display tracking-wider">{formatRemaining(remainingSeconds)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {err && !isLocked && (
             <div className="mt-3">
               <div className="text-red-400 text-sm">{err}</div>
               <button
@@ -151,10 +198,10 @@ export default function LoginScreen() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || isLocked}
               className="w-full mt-6 py-5 bg-amber-600 text-white font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
             >
-              VALIDER
+              {isLocked ? `VERROUILLÉ • ${formatRemaining(remainingSeconds)}` : 'VALIDER'}
             </motion.button>
           )}
           <button onClick={() => { setStep('phone'); setPin(''); }} className="mt-4 text-zinc-400 text-sm">
