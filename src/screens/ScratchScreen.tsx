@@ -244,11 +244,14 @@ export default function ScratchScreen() {
       gradient.addColorStop(1, '#B8860B');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, top.width, top.height);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.font = 'bold 28px Arial';
+      // Premium idle splash — DOM overlay above the canvas carries the
+      // marketing copy (GRATTEZ & GAGNEZ + sub-line + jackpot badge), so we
+      // keep the canvas itself almost clean: just a faint inner sheen.
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.font = 'bold 22px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('ACHETER', top.width / 2, top.height / 2);
+      ctx.fillText('★ CONGO SCRATCH ★', top.width / 2, top.height / 2);
     });
     return () => cancelAnimationFrame(raf);
   }, [ticketId]);
@@ -463,18 +466,28 @@ export default function ScratchScreen() {
   const canBuy = balance >= bet && !busy && !ticketId;
 
   return (
-    <div style={{ overflowY: 'auto', height: '100vh', paddingBottom: 80 }}>
-      {/* Header */}
+    <div
+      style={{
+        overflowY: 'auto',
+        height: '100vh',
+        paddingBottom: 80,
+        background:
+          'radial-gradient(circle at 50% 22%, rgba(255,215,0,0.14), transparent 38%),' +
+          'radial-gradient(circle at 85% 80%, rgba(255,140,0,0.08), transparent 45%),' +
+          'linear-gradient(180deg, #050505 0%, #0b0b0f 55%, #000000 100%)',
+      }}
+    >
+      {/* Header — premium compact */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '14px 16px',
-          borderBottom: '1px solid rgba(255,215,0,0.2)',
-          background: 'rgba(255,255,255,0.04)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          padding: '12px 14px',
+          borderBottom: '1px solid rgba(255,215,0,0.18)',
+          background: 'rgba(10,10,15,0.55)',
+          backdropFilter: 'blur(14px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(14px) saturate(1.3)',
           position: 'sticky',
           top: 0,
           zIndex: 5,
@@ -490,7 +503,9 @@ export default function ScratchScreen() {
             display: 'flex',
             alignItems: 'center',
             gap: 6,
+            padding: 4,
           }}
+          aria-label="Retour"
         >
           <ArrowLeft size={18} />
           <span style={{ fontSize: 13 }}>Retour</span>
@@ -499,22 +514,36 @@ export default function ScratchScreen() {
           style={{
             fontFamily: 'Bebas Neue',
             color: '#FFD700',
-            fontSize: 20,
-            letterSpacing: 2,
+            fontSize: 22,
+            letterSpacing: 3,
             margin: 0,
+            textShadow: '0 0 14px rgba(255,215,0,0.35)',
           }}
         >
           SCRATCH CARD
         </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 10px',
+            borderRadius: 999,
+            background: 'rgba(255,215,0,0.08)',
+            border: '1px solid rgba(255,215,0,0.25)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+        >
           <Wallet style={{ color: '#FFD700', width: 14, height: 14 }} />
           <span
             style={{
               color: balanceFlash ? '#00C875' : '#FFD700',
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 800,
               transition: 'color 0.25s ease, text-shadow 0.25s ease',
               textShadow: balanceFlash ? '0 0 12px rgba(0,200,117,0.6)' : 'none',
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
             {balance.toLocaleString('fr-FR')}
@@ -539,55 +568,142 @@ export default function ScratchScreen() {
               key={b}
               onClick={() => !ticketId && setBet(b)}
               disabled={!!ticketId}
+              className="scratch-chip"
               style={{
-                height: 56,
+                height: 60,
                 padding: '0 6px',
-                background: selected ? '#FFD700' : 'rgba(255,255,255,0.05)',
+                background: selected
+                  ? 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)'
+                  : 'rgba(255,255,255,0.04)',
                 border: selected
-                  ? '1px solid #FFD700'
-                  : '1px solid rgba(255,255,255,0.1)',
-                color: selected ? '#000000' : 'rgba(255,255,255,0.7)',
-                borderRadius: 12,
+                  ? '1px solid rgba(255,215,0,0.9)'
+                  : '1px solid rgba(255,215,0,0.18)',
+                color: selected ? '#0a0500' : 'rgba(255,255,255,0.78)',
+                borderRadius: 18,
                 fontWeight: selected ? 900 : 700,
-                fontSize: 18,
+                fontSize: 17,
                 lineHeight: 1,
                 cursor: ticketId ? 'not-allowed' : 'pointer',
-                opacity: ticketId && !selected ? 0.5 : 1,
+                opacity: ticketId && !selected ? 0.45 : 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 2,
+                boxShadow: selected
+                  ? '0 6px 18px rgba(217,164,0,0.45), 0 0 0 1px rgba(255,255,255,0.18) inset'
+                  : 'none',
+                backdropFilter: selected ? 'none' : 'blur(8px)',
+                WebkitBackdropFilter: selected ? 'none' : 'blur(8px)',
+                transition: 'transform 200ms ease, box-shadow 200ms ease, background 200ms ease',
               }}
             >
-              <span>{b.toLocaleString('fr-FR')}</span>
-              <span style={{ fontSize: 10, opacity: 0.8 }}>CDF</span>
+              <span
+                style={{
+                  fontSize: 9,
+                  letterSpacing: 1.5,
+                  opacity: 0.75,
+                  fontWeight: 700,
+                }}
+              >
+                MISE
+              </span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {b.toLocaleString('fr-FR')}
+              </span>
+              <span style={{ fontSize: 9, opacity: 0.85, letterSpacing: 1 }}>CDF</span>
             </button>
           );
         })}
       </div>
 
-      {/* Scratch card */}
+      {/* Scratch card — premium ticket frame */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           padding: '0 18px',
-          marginTop: 20,
+          marginTop: 22,
         }}
       >
         <div
+          className="scratch-ticket"
           style={{
-            width: 300,
-            height: 300,
-            borderRadius: 18,
-            padding: 6,
-            background: 'linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FFD700 100%)',
-            boxShadow: '0 18px 40px -16px rgba(0,0,0,0.8)',
+            width: 320,
+            maxWidth: '100%',
+            borderRadius: 28,
+            padding: '14px 14px 16px',
+            background:
+              'linear-gradient(180deg, #FFE45C 0%, #D99A00 55%, #8A5A00 100%)',
+            boxShadow:
+              '0 22px 48px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.25) inset, 0 0 32px rgba(255,180,0,0.25)',
             position: 'relative',
+            overflow: 'hidden',
           }}
         >
+          {/* Decorative shine overlay */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              background:
+                'radial-gradient(circle at 20% 0%, rgba(255,255,255,0.35), transparent 45%),' +
+                'radial-gradient(circle at 100% 100%, rgba(0,0,0,0.25), transparent 45%)',
+            }}
+          />
+          {/* Top band */}
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 10,
+              padding: '0 4px',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: 'Bebas Neue',
+                fontSize: 14,
+                letterSpacing: 3,
+                color: '#3a2400',
+                fontWeight: 900,
+              }}
+            >
+              ★ CONGO SCRATCH
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 900,
+                letterSpacing: 1.2,
+                background: 'rgba(0,0,0,0.65)',
+                color: '#FFD700',
+                padding: '4px 8px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,215,0,0.6)',
+              }}
+            >
+              JUSQU'À ×50
+            </span>
+          </div>
+          {/* Inner canvas frame */}
+          <div
+            style={{
+              position: 'relative',
+              width: 288,
+              height: 288,
+              margin: '0 auto',
+              borderRadius: 14,
+              boxShadow:
+                '0 0 0 2px rgba(0,0,0,0.35), 0 0 0 3px rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.4) inset',
+            }}
+          >
           <canvas
             ref={baseRef}
             width={CANVAS}
@@ -595,11 +711,11 @@ export default function ScratchScreen() {
             style={{
               width: 288,
               height: 288,
-              borderRadius: 12,
+              borderRadius: 14,
               display: 'block',
               position: 'absolute',
-              top: 6,
-              left: 6,
+              top: 0,
+              left: 0,
               zIndex: 1,
               pointerEvents: 'none',
               touchAction: 'none',
@@ -613,17 +729,99 @@ export default function ScratchScreen() {
             style={{
               width: 288,
               height: 288,
-              borderRadius: 12,
+              borderRadius: 14,
               display: 'block',
               position: 'absolute',
-              top: 6,
-              left: 6,
+              top: 0,
+              left: 0,
               zIndex: 2,
               touchAction: 'none',
               userSelect: 'none',
               cursor: grid && !result ? 'crosshair' : 'default',
             }}
           />
+          {/* Pre-purchase marketing overlay — disappears once ticket is
+              issued so the canvas takes over for scratching. */}
+          {!ticketId && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 3,
+                pointerEvents: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                padding: 18,
+                color: '#1a0d00',
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'Bebas Neue',
+                  fontSize: 34,
+                  lineHeight: 1,
+                  letterSpacing: 2,
+                  textShadow: '0 2px 0 rgba(255,255,255,0.35), 0 0 16px rgba(255,255,255,0.4)',
+                  fontWeight: 900,
+                }}
+              >
+                GRATTEZ
+              </div>
+              <div
+                style={{
+                  fontFamily: 'Bebas Neue',
+                  fontSize: 34,
+                  lineHeight: 1,
+                  letterSpacing: 2,
+                  marginTop: 2,
+                  fontWeight: 900,
+                  textShadow: '0 2px 0 rgba(255,255,255,0.35), 0 0 16px rgba(255,255,255,0.4)',
+                }}
+              >
+                & GAGNEZ
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  marginTop: 10,
+                  opacity: 0.85,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                }}
+              >
+                Choisis ta mise puis achète ton ticket
+              </div>
+            </div>
+          )}
+          </div>
+          {/* Bottom decorative pastilles */}
+          <div
+            aria-hidden
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '10px 6px 0',
+            }}
+          >
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <span
+                key={i}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: 'rgba(0,0,0,0.4)',
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.25)',
+                }}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -631,21 +829,25 @@ export default function ScratchScreen() {
         <button
           onClick={buy}
           disabled={!canBuy}
+          className="scratch-buy-btn"
           style={{
             display: 'block',
             width: 'calc(100% - 36px)',
-            margin: '20px 18px 0',
-            padding: 16,
-            borderRadius: 14,
+            margin: '22px 18px 0',
+            padding: '16px 18px',
+            borderRadius: 18,
             border: 'none',
             cursor: canBuy ? 'pointer' : 'not-allowed',
             fontSize: 16,
-            fontWeight: '900',
-            letterSpacing: '0.04em',
-            color: '#000000',
-            background: 'linear-gradient(135deg, #FFD700 0%, #DAA520 100%)',
-            boxShadow: '0 10px 30px -10px rgba(255,215,0,0.6)',
-            opacity: canBuy ? 1 : 0.5,
+            fontWeight: 900,
+            letterSpacing: '0.05em',
+            color: '#0a0500',
+            background: 'linear-gradient(135deg, #FFE27A 0%, #FFC400 45%, #D9A400 100%)',
+            boxShadow: canBuy
+              ? '0 12px 32px -8px rgba(255,180,0,0.55), 0 0 0 1px rgba(255,255,255,0.25) inset'
+              : 'none',
+            opacity: canBuy ? 1 : 0.45,
+            transition: 'transform 200ms ease, box-shadow 200ms ease, filter 200ms ease',
           }}
         >
           {balance < bet ? 'SOLDE INSUFFISANT' : `ACHETER — ${bet.toLocaleString('fr-FR')} CDF`}

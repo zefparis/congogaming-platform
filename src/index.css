@@ -104,3 +104,14 @@ button {
   box-shadow: 0 0 14px rgba(255,215,0,0.25);
 }
 .wallet-btn-withdraw:active { transform: scale(0.97); }
+
+/* Scratch Card premium UI */
+.scratch-chip:not(:disabled):hover { filter: brightness(1.05); transform: translateY(-1px); }
+.scratch-chip:not(:disabled):active { transform: scale(0.97); }
+.scratch-buy-btn:not(:disabled):hover { filter: brightness(1.06); transform: translateY(-1px); }
+.scratch-buy-btn:not(:disabled):active { transform: scale(0.98); }
+.scratch-ticket { animation: scratch-ticket-shine 6s ease-in-out infinite; }
+@keyframes scratch-ticket-shine {
+  0%, 100% { box-shadow: 0 22px 48px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.25) inset, 0 0 32px rgba(255,180,0,0.25); }
+  50%      { box-shadow: 0 22px 48px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.35) inset, 0 0 44px rgba(255,200,0,0.4); }
+}
