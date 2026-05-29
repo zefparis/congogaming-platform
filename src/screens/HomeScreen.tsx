@@ -105,94 +105,154 @@ export default function HomeScreen() {
         />
       </div>
 
-      {/* Glassmorphism solde bar */}
-      <div
-        style={{
-          background: 'rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255,215,0,0.2)',
-          padding: '8px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          rowGap: 8,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          {session?.display_name && (
-            <span
+      {/* Premium glass wallet card */}
+      <div style={{ padding: '14px 14px 4px' }}>
+        <div
+          className="wallet-card-premium"
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 24,
+            padding: '18px 18px 16px',
+            background: 'rgba(10,15,25,0.55)',
+            backdropFilter: 'blur(14px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
+            border: '1px solid rgba(255,215,0,0.18)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.45)',
+          }}
+        >
+          {/* Premium glow — top-right gold + bottom-left soft white */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              background:
+                'radial-gradient(circle at 92% 8%, rgba(255,215,0,0.25), transparent 55%),' +
+                'radial-gradient(circle at 8% 100%, rgba(255,255,255,0.08), transparent 60%)',
+            }}
+          />
+
+          {/* Content */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {session?.display_name && (
+              <div
+                style={{
+                  color: '#FFD700',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  letterSpacing: 0.4,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                Salut, {session.display_name} 👋
+              </div>
+            )}
+            <div
               style={{
-                color: '#FFD700',
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: 0.5,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: 180,
+                color: 'rgba(255,255,255,0.45)',
+                fontSize: 10,
+                letterSpacing: 3,
+                marginTop: 4,
+                fontWeight: 600,
               }}
             >
-              Salut, {session.display_name} 👋
-            </span>
-          )}
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, letterSpacing: 2 }}>
-            SOLDE
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Wallet style={{ color: '#FFD700', width: 16, height: 16 }} />
-            <span style={{ color: '#FFD700', fontSize: 20, fontWeight: 800 }}>
-              {balance.toLocaleString('fr-FR')}
-            </span>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>CDF</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              type="button"
-              onClick={() => nav('/depot')}
+              SOLDE
+            </div>
+
+            {/* Balance — dominant */}
+            <div
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                background:
-                  'linear-gradient(180deg, #fff1a8 0%, #ffcf3a 30%, #e8a800 50%, #ffcf3a 70%, #fff1a8 100%)',
-                color: '#0a0500',
-                fontWeight: 700,
-                fontSize: 12,
-                letterSpacing: 1,
-                padding: '7px 14px',
-                borderRadius: 8,
-                border: 'none',
-                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 10,
+                marginTop: 6,
+                marginBottom: 16,
               }}
             >
-              <Plus style={{ width: 14, height: 14 }} />
-              DÉPÔT
-            </button>
-            <button
-              type="button"
-              onClick={() => nav('/retrait')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                background: 'transparent',
-                color: '#f0c000',
-                fontWeight: 700,
-                fontSize: 12,
-                letterSpacing: 1,
-                padding: '7px 14px',
-                borderRadius: 8,
-                border: '1px solid rgba(240,160,0,0.6)',
-                cursor: 'pointer',
-              }}
-            >
-              <ArrowDownToLine style={{ width: 14, height: 14 }} />
-              RETRAIT
-            </button>
+              <Wallet style={{ color: '#FFD54A', width: 22, height: 22, alignSelf: 'center' }} />
+              <span
+                style={{
+                  color: '#FFD54A',
+                  fontSize: 'clamp(28px, 8.5vw, 38px)',
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  letterSpacing: 0.3,
+                  textShadow: '0 0 18px rgba(255,215,0,0.25)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {balance.toLocaleString('fr-FR')}
+              </span>
+              <span
+                style={{
+                  color: 'rgba(255,213,74,0.6)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                }}
+              >
+                CDF
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => nav('/depot')}
+                className="wallet-btn-deposit"
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
+                  color: '#0a0500',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                  padding: '11px 14px',
+                  borderRadius: 12,
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(217,164,0,0.35)',
+                  transition: 'transform 200ms ease, box-shadow 200ms ease, filter 200ms ease',
+                }}
+              >
+                <Plus style={{ width: 16, height: 16 }} />
+                DÉPÔT
+              </button>
+              <button
+                type="button"
+                onClick={() => nav('/retrait')}
+                className="wallet-btn-withdraw"
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: 'rgba(255,255,255,0.04)',
+                  color: '#FFD54A',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                  padding: '11px 14px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,215,0,0.45)',
+                  cursor: 'pointer',
+                  transition: 'transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
+                }}
+              >
+                <ArrowDownToLine style={{ width: 16, height: 16 }} />
+                RETRAIT
+              </button>
+            </div>
           </div>
         </div>
       </div>
