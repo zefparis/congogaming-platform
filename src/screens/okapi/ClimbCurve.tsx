@@ -139,8 +139,11 @@ export default function ClimbCurve({ state, startTime }: Props) {
         ctx.translate(dx, dy)
         ctx.globalAlpha = fadeAlphaRef.current
 
+        // Aviator-style filled area under the curve: stronger gradient with
+        // a mid-stop for a richer glow that still keeps the okapi readable.
         const grad = ctx.createLinearGradient(0, 0, 0, h)
-        grad.addColorStop(0, isCrashed ? 'rgba(239,68,68,0.25)' : 'rgba(255,215,0,0.25)')
+        grad.addColorStop(0, isCrashed ? 'rgba(239,68,68,0.55)' : 'rgba(255,215,0,0.55)')
+        grad.addColorStop(0.55, isCrashed ? 'rgba(239,68,68,0.22)' : 'rgba(255,215,0,0.22)')
         grad.addColorStop(1, 'rgba(0,0,0,0)')
         ctx.beginPath()
         ctx.moveTo(pts[0].x, h)
@@ -148,7 +151,12 @@ export default function ClimbCurve({ state, startTime }: Props) {
         ctx.lineTo(pts[pts.length - 1].x, h)
         ctx.closePath()
         ctx.fillStyle = grad
+        // Subtle additive blend so the fill glows against the dark bg
+        // without washing out the okapi sprite.
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
         ctx.fill()
+        ctx.restore()
 
         ctx.beginPath()
         ctx.moveTo(pts[0].x, pts[0].y)
