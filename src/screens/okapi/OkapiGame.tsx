@@ -930,28 +930,6 @@ export default function OkapiGame() {
           }}
         />
 
-        {/* Glassmorphism frame — discrete inner panel around the gameplay
-            zone (Aviator-feel). Pointer-events disabled so it never blocks
-            the okapi sprite, players list, bet panel, or any touch input. */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 10,
-            left: 10,
-            right: 10,
-            bottom: 10,
-            pointerEvents: 'none',
-            zIndex: 11,
-            borderRadius: 18,
-            background: 'rgba(10,10,30,0.18)',
-            backdropFilter: 'blur(6px) saturate(1.1)',
-            WebkitBackdropFilter: 'blur(6px) saturate(1.1)',
-            border: '1px solid rgba(255,215,0,0.12)',
-            boxShadow:
-              'inset 0 0 40px rgba(255,215,0,0.06), 0 0 24px rgba(255,215,0,0.05)',
-          }}
-        />
-
         <ClimbCurve state={state} startTime={startTime} />
 
         {/* PlayersList renders its own absolute-positioned pill button +
