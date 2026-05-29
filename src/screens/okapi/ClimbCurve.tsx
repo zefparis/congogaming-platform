@@ -29,10 +29,11 @@ export default function ClimbCurve({ state, startTime }: Props) {
   const rafRef = useRef<number>(0)
   const fadeAlphaRef = useRef<number>(1)
   const startRef = useRef<number | null>(null)
-  // High-resolution start timestamp (performance.now / RAF time) used ONLY
-  // by the okapi sprite for analytic, jitter-free motion. Independent from
-  // `startRef` (Date.now epoch) which still drives the curve sampling.
-  const spriteStartRef = useRef<number | null>(null)
+  // Smoothed sprite anchors — exponential easing toward the real tip and the
+  // raw tangent angle, so the okapi stays glued to the curve tip but stops
+  // micro-jittering when RAF cadence is irregular.
+  const smoothTipRef = useRef<Point | null>(null)
+  const smoothAngleRef = useRef<number | null>(null)
   const crashStartRef = useRef<number | null>(null)
   const crashAnchorRef = useRef<Point | null>(null)
 
@@ -68,7 +69,8 @@ export default function ClimbCurve({ state, startTime }: Props) {
       pointsRef.current = []
       fadeAlphaRef.current = 1
       startRef.current = null
-      spriteStartRef.current = null
+      smoothTipRef.current = null
+      smoothAngleRef.current = null
       crashStartRef.current = null
       crashAnchorRef.current = null
       const w = W()
@@ -92,9 +94,11 @@ export default function ClimbCurve({ state, startTime }: Props) {
       // startTime is Date.now() epoch ms (server PLAYING msg or local fallback).
       // We diff it against Date.now() below.
       startRef.current = startTime ?? Date.now()
-      // Reset sprite high-res anchor: it will be captured on the first RAF
-      // tick below so the sprite's elapsed time uses the real frame clock.
-      spriteStartRef.current = null
+      // Reset sprite smoothing anchors: the first frame after entering
+      // playing will snap them to the freshly sampled tip / angle, then
+      // subsequent frames will ease toward the real tip.
+      smoothTipRef.current = null
+      smoothAngleRef.current = null
       fadeAlphaRef.current = 1
       crashStartRef.current = null
       crashAnchorRef.current = null
@@ -107,7 +111,7 @@ export default function ClimbCurve({ state, startTime }: Props) {
       crashAnchorRef.current = pts.length ? { ...pts[pts.length - 1] } : null
     }
 
-    const draw = (now: number) => {
+    const draw = () => {
       const w = W()
       const h = H()
       ctx.clearRect(0, 0, w, h)
@@ -241,58 +245,39 @@ export default function ClimbCurve({ state, startTime }: Props) {
         if (okapiImg.complete && okapiImg.naturalWidth > 0) {
           const SIZE = 80
           const tip = pts[pts.length - 1]
+          const prev = pts[Math.max(0, pts.length - 6)]
 
           if (state === 'playing' || state === 'cashedout') {
-            // ANALYTIC position + rotation — fully decoupled from the per-RAF
-            // sampled `pointsRef` so the sprite no longer micro-stutters when
-            // the frame cadence is irregular.
-            //
-            // Same formula as the curve generator (see playing branch above):
-            //   x  = X_PAD + min(w - 2*X_PAD, (t / SWEEP_SEC) * (w - 2*X_PAD))
-            //   y  = h - Y_PAD - yNorm * (h - 2*Y_PAD)
-            //   m  = 1 + 0.06 t + (0.06 t)^2
-            //   yNorm = clamp01(log10(m) / log10(20))
-            //
-            // The high-res sprite clock is anchored on the FIRST RAF tick of
-            // the playing/cashedout phase, then each subsequent frame uses the
-            // RAF `now` argument — no Date.now() resolution loss.
-            if (spriteStartRef.current == null) spriteStartRef.current = now
-            const tSprite = Math.max(0, (now - spriteStartRef.current) / 1000)
+            // Sprite stays glued to the REAL curve tip, but its position and
+            // rotation are eased through a low-pass filter so per-frame RAF
+            // jitter / atan2 noise is no longer visible.
+            const rawAngle = Math.atan2(tip.y - prev.y, tip.x - prev.x)
 
-            const SWEEP_SEC = 20
-            const X_PAD = 20
-            const Y_PAD = 20
-            const sweepRange = w - X_PAD * 2
-            const heightRange = h - Y_PAD * 2
+            if (smoothTipRef.current == null) {
+              smoothTipRef.current = { x: tip.x, y: tip.y }
+            } else {
+              const s = smoothTipRef.current
+              s.x += (tip.x - s.x) * 0.22
+              s.y += (tip.y - s.y) * 0.22
+            }
 
-            const xUncapped = (tSprite / SWEEP_SEC) * sweepRange
-            const xCapped = Math.min(sweepRange, xUncapped)
-            const xS = X_PAD + xCapped
+            if (smoothAngleRef.current == null) {
+              smoothAngleRef.current = rawAngle
+            } else {
+              // Wrap diff into [-π, π] so the easing never takes the long way
+              // around the circle (avoids 360° spins on sign flips).
+              let diff = rawAngle - smoothAngleRef.current
+              while (diff > Math.PI) diff -= Math.PI * 2
+              while (diff < -Math.PI) diff += Math.PI * 2
+              smoothAngleRef.current += diff * 0.22
+            }
 
-            const a = 0.06
-            const m = 1 + a * tSprite + (a * tSprite) * (a * tSprite)
-            const log20 = Math.log(20)
-            const yNormRaw = Math.log(m) / log20
-            const yNorm = Math.min(1, yNormRaw)
-            const yS = h - Y_PAD - yNorm * heightRange
-
-            // Analytic derivatives → smooth rotation (no atan2 noise).
-            //   dx/dt = sweepRange / SWEEP_SEC          (0 once x is capped)
-            //   dm/dt = a + 2 a^2 t
-            //   dyNorm/dt = (dm/dt) / (m * ln(20))      (0 once yNorm is capped)
-            //   dy/dt = -heightRange * dyNorm/dt        (canvas y grows downward)
-            const dxdt = xUncapped >= sweepRange ? 0 : sweepRange / SWEEP_SEC
-            const dmdt = a + 2 * a * a * tSprite
-            const dyNormDt = yNormRaw >= 1 ? 0 : dmdt / (m * log20)
-            const dydt = -heightRange * dyNormDt
-
-            // Fallback for the rare initial frame where both derivatives are
-            // ~0 (e.g. axes both capped); keep angle horizontal.
-            const angle = dxdt === 0 && dydt === 0 ? 0 : Math.atan2(dydt, dxdt)
+            const sTip = smoothTipRef.current
+            const sAngle = smoothAngleRef.current
 
             ctx.save()
-            ctx.translate(xS + dx, yS + dy)
-            ctx.rotate(angle)
+            ctx.translate(sTip.x + dx, sTip.y + dy)
+            ctx.rotate(sAngle)
             ctx.drawImage(okapiImg, -SIZE / 2, -SIZE, SIZE, SIZE)
             ctx.restore()
           } else if (state === 'crashed') {
