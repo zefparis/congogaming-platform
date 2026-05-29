@@ -91,6 +91,10 @@ export default function OkapiGame() {
   const crashedSafetyRef = useRef<number | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioPlayingRef = useRef(false)
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    const saved = localStorage.getItem('okapi_sound_muted')
+    return saved === 'true'
+  })
 
   // ---------------- Auto-bet (Aviator-style) ----------------
   // Client-driven loop that reuses /api/game/bet and /api/game/cashout. The
@@ -139,6 +143,7 @@ export default function OkapiGame() {
     const audio = new Audio('/audio/pacman.mp3')
     audio.volume = 0.3
     audio.loop = true
+    audio.muted = isMuted
     audioRef.current = audio
     return () => {
       audio.pause()
@@ -146,12 +151,26 @@ export default function OkapiGame() {
     }
   }, [])
 
+  // Update audio muted state when isMuted changes
+  useEffect(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.muted = isMuted
+      if (isMuted) {
+        audio.pause()
+        audio.currentTime = 0
+        audioPlayingRef.current = false
+      }
+    }
+    localStorage.setItem('okapi_sound_muted', isMuted.toString())
+  }, [isMuted])
+
   // Play audio when state transitions to PLAYING, stop on CRASHED/CASHEDOUT
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
 
-    if (state === 'playing' && !audioPlayingRef.current) {
+    if (state === 'playing' && !audioPlayingRef.current && !isMuted) {
       // Only play if we have user interaction (browser policy)
       // The audio will play on first PLAYING after user has interacted
       audio.play().catch(() => {
@@ -167,7 +186,7 @@ export default function OkapiGame() {
       audio.currentTime = 0
       audioPlayingRef.current = false
     }
-  }, [state])
+  }, [state, isMuted])
 
   // Pull authoritative balance from the backend on mount
   useEffect(() => {
@@ -823,6 +842,25 @@ export default function OkapiGame() {
         >
           {balance.toLocaleString()} CDF
         </div>
+        <button
+          onClick={() => setIsMuted(!isMuted)}
+          style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            fontSize: 11,
+            fontWeight: 600,
+            borderRadius: 6,
+            padding: '4px 8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
+        >
+          {isMuted ? '🔇 Muet' : '🔊 Son'}
+        </button>
       </div>
 
       {/* HISTORY BAR */}
