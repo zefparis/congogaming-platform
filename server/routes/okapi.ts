@@ -5,6 +5,7 @@ import { engine } from '../lib/okapi-engine.js'
 import { recordLedgerEntry } from '../lib/ledger.js'
 import { getSupabase } from '../lib/supabase.js'
 import { OkapiBetBodySchema, OkapiCashoutBodySchema } from '../lib/validation.js'
+import { onWagerPlaced } from '../lib/referral.js'
 
 type WSLike = {
   send: (data: string) => void
@@ -176,6 +177,10 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
       app.log.error({ err: error, user_id, bet_id }, 'failed to register bet')
       return reply.code(500).send({ error: 'Bet persistence failed' })
     }
+
+    // Best-effort referral tier check; bet_id ensures idempotency.
+    await onWagerPlaced(app.log, user_id, amount_cdf, 'okapi', bet_id)
+
     return reply.send({ bet_id, balance })
   })
 

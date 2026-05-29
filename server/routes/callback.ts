@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { verifyCallbackSignature } from '../lib/unipesa.js';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { onDepositSucceeded } from '../lib/referral.js';
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -99,6 +100,9 @@ export default async function callbackRoutes(app: FastifyInstance) {
         reference_id: order_id,
         idempotency_key: `payment:deposit:${order_id}:success`,
       });
+
+      // Best-effort referral welcome bonus. Never throws.
+      await onDepositSucceeded(app.log, String(tx.user_id), Number(tx.amount));
     }
 
     // WITHDRAWAL refund when the provider ultimately fails (status 3).

@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { FlashTicketBodySchema } from '../lib/validation.js';
+import { onWagerPlaced } from '../lib/referral.js';
 
 const PRIX_FLASH = 1000;
 const JACKPOT_CONTRIBUTION = 500; // 50% du ticket
@@ -283,6 +284,9 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     }
 
     await supabaseAdmin.rpc('increment_flash_jackpot', { delta: JACKPOT_CONTRIBUTION });
+
+    // Best-effort referral tier check; ticket id ensures idempotency.
+    await onWagerPlaced(app.log, user_id, PRIX_FLASH, 'flash', ticket.id);
 
     return reply.send({
       ticket_id: ticket.id,

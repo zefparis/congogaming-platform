@@ -145,15 +145,18 @@ export default async function meRoutes(app: FastifyInstance) {
         .eq('referred_by', req.user.id),
       supabaseAdmin
         .from('referral_rewards')
-        .select('amount_cdf, status')
+        .select('amount_cdf, status, trigger_event')
         .eq('referrer_id', req.user.id),
     ]);
 
     if (userRes.error) return reply.code(500).send({ error: userRes.error.message });
 
+    // Welcome bonuses are paid to the FILLEUL (not the referrer) — exclude
+    // them from the referrer's earnings totals to avoid misleading stats.
     let totalCredited = 0;
     let totalPending = 0;
     for (const r of rewardsRes.data || []) {
+      if (r.trigger_event === 'welcome_bonus') continue;
       const amt = Number(r.amount_cdf || 0);
       if (r.status === 'credited') totalCredited += amt;
       else if (r.status === 'pending') totalPending += amt;

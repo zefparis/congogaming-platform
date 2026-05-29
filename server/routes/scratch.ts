@@ -4,6 +4,7 @@ import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { generateGrid } from '../lib/scratchEngine.js';
 import { ScratchBuyBodySchema, ScratchClaimBodySchema } from '../lib/validation.js';
+import { onWagerPlaced } from '../lib/referral.js';
 
 const ALLOWED_BETS = new Set([500, 1000, 2000, 5000]);
 
@@ -66,6 +67,9 @@ export default async function scratchRoutes(app: FastifyInstance) {
           }
           return reply.code(500).send({ error: insErr?.message || 'ticket_insert_failed' });
         }
+
+        // Best-effort referral tier check; ticket id ensures idempotency.
+        await onWagerPlaced(req.log, user_id, Number(bet), 'scratch', String(ticket.id));
 
         return reply.send({
           ticket_id: ticket.id,

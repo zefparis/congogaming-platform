@@ -676,7 +676,7 @@ export default async function adminRoutes(app: FastifyInstance) {
             trigger_event: trigger_event || 'admin_manual',
             credited_at: new Date().toISOString(),
           },
-          { onConflict: 'referrer_id,referred_id' },
+          { onConflict: 'referrer_id,referred_id,trigger_event' },
         );
       if (rewErr) return reply.code(500).send({ error: rewErr.message });
 
@@ -744,6 +744,23 @@ export default async function adminRoutes(app: FastifyInstance) {
         self_exclusion_until: r.self_exclusion_until,
         set_at: r.updated_at,
       })),
+    });
+  });
+
+  // Lightweight program status (kill switch + key constants).
+  app.get('/api/admin/referrals/status', async (_req, reply) => {
+    const enabled = String(process.env.REFERRAL_PROGRAM_ENABLED ?? 'true').toLowerCase() !== 'false';
+    return reply.send({
+      enabled,
+      welcome_bonus_percent: 10,
+      welcome_bonus_cap_cdf: 5000,
+      min_qualifying_deposit_cdf: 5000,
+      tiers: [
+        { tier: 'wager_5k', threshold_cdf: 5000, reward_cdf: 2000 },
+        { tier: 'wager_25k', threshold_cdf: 25000, reward_cdf: 1000 },
+        { tier: 'wager_100k', threshold_cdf: 100000, reward_cdf: 5000 },
+      ],
+      annual_cap_cdf: 50000,
     });
   });
 

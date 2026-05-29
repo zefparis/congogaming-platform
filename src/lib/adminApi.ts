@@ -327,6 +327,16 @@ export const adminApi = {
       }>;
     }>('/api/admin/responsible-gaming/excluded'),
 
+  referralsStatus: () =>
+    request<{
+      enabled: boolean;
+      welcome_bonus_percent: number;
+      welcome_bonus_cap_cdf: number;
+      min_qualifying_deposit_cdf: number;
+      tiers: Array<{ tier: string; threshold_cdf: number; reward_cdf: number }>;
+      annual_cap_cdf: number;
+    }>('/api/admin/referrals/status'),
+
   referralsLeaderboard: (limit = 20) =>
     request<{
       items: Array<{

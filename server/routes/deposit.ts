@@ -3,6 +3,7 @@ import { newOrderId, paymentC2BResilient } from '../lib/unipesa.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { DepositBodySchema } from '../lib/validation.js';
 import { normalizePhoneForProvider, phoneMatchesProvider } from '../lib/phone.js';
+import { onDepositSucceeded } from '../lib/referral.js';
 
 const MIN_AMOUNTS: Record<number, number> = { 10: 100, 17: 100, 19: 2250 };
 
@@ -73,6 +74,13 @@ export default async function depositRoutes(app: FastifyInstance) {
       const status = Number(r.status ?? 1);
       const transaction_id = r.transaction_id || null;
       await supabaseAdmin.from('transactions').update({ status, transaction_id }).eq('order_id', order_id);
+      // Best-effort referral welcome bonus when the deposit confirms synchronously.
+      // The callback path also fires this; the underlying RPC is idempotent
+      // (only credits on the FIRST qualifying deposit + composite unique on the
+      // referral_rewards row).
+      if (status === 2) {
+        await onDepositSucceeded(app.log, user_id, amount);
+      }
       return reply.send({ order_id, status, transaction_id });
     }
 

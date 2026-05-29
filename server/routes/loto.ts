@@ -4,6 +4,7 @@ import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { LotoTicketBodySchema } from '../lib/validation.js';
 import { COMING_SOON_PAYLOAD, isCongoLotoEnabled } from '../lib/featureFlags.js';
+import { onWagerPlaced } from '../lib/referral.js';
 
 /**
  * Soft-disable guard for Congo Loto. When the feature flag is off we
@@ -361,6 +362,11 @@ const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       amount: TICKET_PRICE_CDF,
       reference: ticket.id,
     });
+
+    // Best-effort referral tier check. The wager_id is the ticket id —
+    // stable and unique, so retries / double-submits are deduplicated
+    // server-side via the `referral_wager_events` table.
+    await onWagerPlaced(app.log, user_id, TICKET_PRICE_CDF, 'loto', ticket.id);
 
     return reply.send({
       ticket_id: ticket.id,
