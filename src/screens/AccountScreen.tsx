@@ -480,7 +480,7 @@ export default function AccountScreen() {
             <button
               type="button"
               onClick={shareReferralCode}
-              className="h-12 px-4 rounded-xl bg-gold text-black font-bold flex items-center gap-2"
+              className="h-12 px-3 rounded-xl bg-gold text-black font-bold flex items-center gap-1.5 text-sm"
             >
               <Share2 className="w-4 h-4" /> PARTAGER
             </button>
