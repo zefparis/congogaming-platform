@@ -200,30 +200,6 @@ export default function ClimbCurve({ state, startTime }: Props) {
         ctx.fillRect(0, 0, w, h)
         ctx.globalCompositeOperation = 'source-over'
 
-        // 3) Visible Aviator grid inside filled area
-        ctx.globalAlpha = fadeAlphaRef.current * 0.32
-        ctx.lineWidth = 1
-        ctx.strokeStyle = isCrashed
-          ? 'rgba(255, 170, 170, 0.75)'
-          : 'rgba(255, 220, 80, 0.72)'
-
-        const x0 = Math.floor(pts[0].x)
-        const x1 = Math.ceil(pts[pts.length - 1].x)
-
-        for (let gx = x0; gx <= x1; gx += 34) {
-          ctx.beginPath()
-          ctx.moveTo(gx, 0)
-          ctx.lineTo(gx, h)
-          ctx.stroke()
-        }
-
-        for (let gy = h; gy >= 0; gy -= 34) {
-          ctx.beginPath()
-          ctx.moveTo(0, gy)
-          ctx.lineTo(w, gy)
-          ctx.stroke()
-        }
-
         ctx.restore()
 
         // --- Bright Aviator line stroke ---
