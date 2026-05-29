@@ -61,9 +61,13 @@ export default function AccountScreen() {
   const [exclusionModalOpen, setExclusionModalOpen] = useState(false);
   const [exclusionSaving, setExclusionSaving] = useState(false);
 
-  // Referral
-  const [referral, setReferral] = useState<{ code: string | null; referred_count: number; total_credited_cdf: number; total_pending_cdf: number } | null>(null);
+  // Referral — full payload from /api/me/referral. We rely on the
+  // server-provided `rules` so the UI always reflects the current
+  // program, and on `as_referee` to reassure freshly-referred users
+  // that their welcome bonus is on its way.
+  const [referral, setReferral] = useState<Awaited<ReturnType<typeof api.myReferral>> | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   useEffect(() => {
     refreshSession().then((u) => {
@@ -417,7 +421,43 @@ export default function AccountScreen() {
         </div>
       )}
 
-      {/* Referral */}
+      {/* As-referee callout — shown only if the player was themselves
+          referred. Tells them WHO brought them, WHAT they get, and
+          WHEN. Removes the "I entered a code, now what?" anxiety. */}
+      {referral?.as_referee?.has_referrer && (
+        <div className="mt-3 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-700/5 border border-emerald-500/30 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Gift className="w-5 h-5 text-emerald-400" />
+            <h2 className="font-display text-base text-zinc-200 tracking-wider">TU AS ÉTÉ PARRAINÉ</h2>
+          </div>
+          {referral.as_referee.referrer_display && (
+            <div className="text-xs text-zinc-400 mb-2">
+              Parrainé par <b className="text-zinc-200">{referral.as_referee.referrer_display}</b>
+            </div>
+          )}
+          {referral.as_referee.welcome_bonus_status === 'credited' ? (
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400" />
+                <div className="text-sm text-emerald-200">
+                  Bonus de bienvenue de <b>+{fmt(referral.as_referee.welcome_bonus_cdf || 0)} CDF</b> crédité ✓
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-zinc-950/60 border border-zinc-800 px-4 py-3">
+              <div className="text-sm text-zinc-200 leading-relaxed">
+                Effectue ton <b>1<sup>er</sup> dépôt de {fmt(referral.rules.welcome_min_deposit_cdf)} CDF</b> ou plus pour recevoir <b>{referral.rules.welcome_bonus_pct}%</b> en bonus (jusqu'à <b>{fmt(referral.rules.welcome_bonus_cap_cdf)} CDF</b>).
+              </div>
+              <div className="text-[11px] text-zinc-500 mt-2">
+                Le crédit est automatique dès la confirmation du dépôt.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Referral — as referrer */}
       {referral?.code && (
         <div className="mt-3 rounded-2xl bg-gradient-to-br from-gold/10 to-amber-500/5 border border-gold/30 p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -458,6 +498,59 @@ export default function AccountScreen() {
               <div className="font-display text-lg text-emerald-400">+{fmt(referral.total_credited_cdf)}</div>
             </div>
           </div>
+
+          {/* Annual cap progress — only shown if the player has earned
+              at least once, otherwise it's just noise. */}
+          {referral.annual_credited_cdf > 0 && (
+            <div className="mt-3 rounded-xl bg-zinc-950/60 border border-zinc-800 p-3">
+              <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                <span>Plafond annuel parrain</span>
+                <span className="text-zinc-200">
+                  {fmt(referral.annual_credited_cdf)} / {fmt(referral.rules.annual_cap_cdf)} CDF
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                <div
+                  className="h-full bg-gold transition-all"
+                  style={{
+                    width: `${Math.min(100, (referral.annual_credited_cdf / referral.rules.annual_cap_cdf) * 100).toFixed(1)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Rules drawer — collapsed by default to keep the card
+              compact, but always one tap away. Server-driven so the
+              numbers stay accurate forever. */}
+          <button
+            type="button"
+            onClick={() => setRulesOpen((v) => !v)}
+            className="mt-3 w-full text-left text-xs text-zinc-400 hover:text-zinc-200 flex items-center justify-between"
+          >
+            <span>Comment ça marche ?</span>
+            <span className="text-zinc-500">{rulesOpen ? '▴' : '▾'}</span>
+          </button>
+          {rulesOpen && (
+            <div className="mt-2 rounded-xl bg-zinc-950/60 border border-zinc-800 p-3 space-y-2 text-xs text-zinc-300 leading-relaxed">
+              <div>
+                <b className="text-gold">Pour ton filleul :</b> {referral.rules.welcome_bonus_pct}% sur son 1<sup>er</sup> dépôt de {fmt(referral.rules.welcome_min_deposit_cdf)} CDF ou plus, jusqu'à {fmt(referral.rules.welcome_bonus_cap_cdf)} CDF.
+              </div>
+              <div>
+                <b className="text-gold">Pour toi (parrain) :</b> tu gagnes automatiquement quand ton filleul atteint :
+                <ul className="mt-1 ml-4 list-disc text-zinc-400 space-y-0.5">
+                  {referral.rules.tiers.map((t) => (
+                    <li key={t.tier}>
+                      {fmt(t.threshold_cdf)} CDF misés → <b className="text-emerald-400">+{fmt(t.reward_cdf)} CDF</b>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="text-[11px] text-zinc-500">
+                Plafond : {fmt(referral.rules.annual_cap_cdf)} CDF par an, tous filleuls confondus.
+              </div>
+            </div>
+          )}
         </div>
       )}
 

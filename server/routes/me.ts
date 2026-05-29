@@ -136,37 +136,131 @@ export default async function meRoutes(app: FastifyInstance) {
   });
 
   // ---------------- REFERRAL ----------------
+  //
+  // Returns both perspectives so the front-end can show:
+  //   - `as_referrer` : the player's own referral code, count of filleuls,
+  //     credited / pending earnings, lifetime wagered (used to compute next
+  //     tier progress on the client), annual cap usage.
+  //   - `as_referee`  : if the player was themselves referred, what the
+  //     welcome bonus status is and which referrer brought them. We never
+  //     leak the referrer's phone — only their display_name (or a masked
+  //     fallback) — so the relationship is visible without enabling
+  //     contact harvesting.
+  //
+  // The endpoint stays lightweight enough to be polled on every account
+  // page mount; rules constants are computed server-side so the UI can
+  // adapt automatically if the spec changes.
   app.get('/api/me/referral', { preHandler: app.requireAuth }, async (req, reply) => {
-    const [userRes, countRes, rewardsRes] = await Promise.all([
-      supabaseAdmin.from('users').select('referral_code').eq('id', req.user.id).maybeSingle(),
+    const [userRes, countRes, rewardsAsReferrerRes, welcomeRes] = await Promise.all([
+      // Self: code, lifetime wagered, who referred me.
+      supabaseAdmin
+        .from('users')
+        .select('referral_code, lifetime_wagered_cdf, referred_by')
+        .eq('id', req.user.id)
+        .maybeSingle(),
+      // How many filleuls do I have?
       supabaseAdmin
         .from('users')
         .select('id', { count: 'exact', head: true })
         .eq('referred_by', req.user.id),
+      // Rewards I earned as a referrer (excluding welcome bonuses below).
       supabaseAdmin
         .from('referral_rewards')
-        .select('amount_cdf, status, trigger_event')
+        .select('amount_cdf, status, trigger_event, credited_at')
         .eq('referrer_id', req.user.id),
+      // Welcome bonus row addressed to me (if I'm a filleul).
+      supabaseAdmin
+        .from('referral_rewards')
+        .select('amount_cdf, status, credited_at')
+        .eq('referred_id', req.user.id)
+        .eq('trigger_event', 'welcome_bonus')
+        .maybeSingle(),
     ]);
 
     if (userRes.error) return reply.code(500).send({ error: userRes.error.message });
 
-    // Welcome bonuses are paid to the FILLEUL (not the referrer) — exclude
-    // them from the referrer's earnings totals to avoid misleading stats.
+    // ---- AS REFERRER ----
     let totalCredited = 0;
     let totalPending = 0;
-    for (const r of rewardsRes.data || []) {
+    let annualCredited = 0;
+    const yearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+    for (const r of rewardsAsReferrerRes.data || []) {
+      // Welcome bonuses live in `referral_rewards` for traceability but
+      // are paid to the filleul, not the referrer. Never count them in
+      // referrer earnings.
       if (r.trigger_event === 'welcome_bonus') continue;
       const amt = Number(r.amount_cdf || 0);
-      if (r.status === 'credited') totalCredited += amt;
-      else if (r.status === 'pending') totalPending += amt;
+      if (r.status === 'credited') {
+        totalCredited += amt;
+        if (r.credited_at && new Date(r.credited_at).getTime() >= yearAgo) {
+          annualCredited += amt;
+        }
+      } else if (r.status === 'pending') {
+        totalPending += amt;
+      }
+    }
+
+    // ---- AS REFEREE ----
+    let asReferee: {
+      has_referrer: boolean;
+      referrer_display: string | null;
+      welcome_bonus_status: 'credited' | 'pending_first_deposit' | 'none';
+      welcome_bonus_cdf: number | null;
+      welcome_bonus_credited_at: string | null;
+    } = {
+      has_referrer: false,
+      referrer_display: null,
+      welcome_bonus_status: 'none',
+      welcome_bonus_cdf: null,
+      welcome_bonus_credited_at: null,
+    };
+
+    if (userRes.data?.referred_by) {
+      const { data: refUser } = await supabaseAdmin
+        .from('users')
+        .select('display_name, phone')
+        .eq('id', userRes.data.referred_by)
+        .maybeSingle();
+
+      const display =
+        refUser?.display_name?.trim()
+          ? refUser.display_name.trim()
+          : refUser?.phone
+            ? `0${refUser.phone.slice(0, 1)}••••••${refUser.phone.slice(-2)}`
+            : null;
+
+      const w = welcomeRes.data;
+      asReferee = {
+        has_referrer: true,
+        referrer_display: display,
+        welcome_bonus_status: w?.status === 'credited' ? 'credited' : 'pending_first_deposit',
+        welcome_bonus_cdf: w?.status === 'credited' ? Number(w.amount_cdf || 0) : null,
+        welcome_bonus_credited_at: w?.status === 'credited' ? (w.credited_at ?? null) : null,
+      };
     }
 
     return reply.send({
+      // Legacy fields (kept for backward compat with the existing UI).
       code: userRes.data?.referral_code ?? null,
       referred_count: countRes.count ?? 0,
       total_credited_cdf: totalCredited,
       total_pending_cdf: totalPending,
+      // ---- New fields ----
+      lifetime_wagered_cdf: Number(userRes.data?.lifetime_wagered_cdf || 0),
+      annual_credited_cdf: annualCredited,
+      // Program rules — kept server-authoritative so the UI never lies.
+      rules: {
+        welcome_bonus_pct: 10,
+        welcome_bonus_cap_cdf: 5000,
+        welcome_min_deposit_cdf: 5000,
+        tiers: [
+          { tier: 'wager_5k',   threshold_cdf: 5000,   reward_cdf: 2000 },
+          { tier: 'wager_25k',  threshold_cdf: 25000,  reward_cdf: 1000 },
+          { tier: 'wager_100k', threshold_cdf: 100000, reward_cdf: 5000 },
+        ],
+        annual_cap_cdf: 50000,
+      },
+      as_referee: asReferee,
     });
   });
 }

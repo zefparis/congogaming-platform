@@ -127,6 +127,21 @@ export default function RegisterScreen() {
             </div>
           </div>
 
+          {referralCode.length >= 4 && (
+            <div className="mt-3 rounded-2xl bg-gradient-to-br from-gold/10 to-amber-500/5 border border-gold/30 p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Gift className="w-4 h-4 text-gold" />
+                <div className="font-display text-sm text-gold tracking-wider">BONUS DE BIENVENUE</div>
+              </div>
+              <div className="text-sm text-zinc-200 leading-relaxed">
+                À ton 1<sup>er</sup> dépôt de <b>5 000 CDF</b> ou plus, tu reçois <b>10%</b> en bonus, jusqu'à <b>5 000 CDF</b> crédités automatiquement sur ton solde.
+              </div>
+              <div className="text-[11px] text-zinc-500 mt-2">
+                Le bonus est versé une seule fois, après confirmation de ton dépôt.
+              </div>
+            </div>
+          )}
+
           {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
 
           <div className="mt-5">

@@ -68,7 +68,28 @@ export const api = {
       body: JSON.stringify({ duration }),
     }),
   myReferral: () =>
-    req<{ code: string | null; referred_count: number; total_credited_cdf: number; total_pending_cdf: number }>('/api/me/referral'),
+    req<{
+      code: string | null;
+      referred_count: number;
+      total_credited_cdf: number;
+      total_pending_cdf: number;
+      lifetime_wagered_cdf: number;
+      annual_credited_cdf: number;
+      rules: {
+        welcome_bonus_pct: number;
+        welcome_bonus_cap_cdf: number;
+        welcome_min_deposit_cdf: number;
+        tiers: Array<{ tier: string; threshold_cdf: number; reward_cdf: number }>;
+        annual_cap_cdf: number;
+      };
+      as_referee: {
+        has_referrer: boolean;
+        referrer_display: string | null;
+        welcome_bonus_status: 'credited' | 'pending_first_deposit' | 'none';
+        welcome_bonus_cdf: number | null;
+        welcome_bonus_credited_at: string | null;
+      };
+    }>('/api/me/referral'),
   lotoTicket: (_user_id: string, numeros: number[]) =>
     req<{ ticket_id: string; new_balance: number }>('/api/loto/ticket', { method: 'POST', body: JSON.stringify({ numeros }) }),
   lotoLatest: () =>
