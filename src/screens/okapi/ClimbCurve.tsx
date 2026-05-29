@@ -148,56 +148,94 @@ export default function ClimbCurve({ state, startTime }: Props) {
           ctx.closePath()
         }
 
-        // Aviator-style fill: STRONG yellow at the top (just under the line)
-        // → vibrant orange in the middle → fades to dark/transparent at the
-        // bottom so it blends with the volcano scene without hiding it.
-        const grad = ctx.createLinearGradient(0, 0, 0, h)
-        if (isCrashed) {
-          grad.addColorStop(0, 'rgba(255,90,90,0.95)')
-          grad.addColorStop(0.45, 'rgba(220,40,40,0.55)')
-          grad.addColorStop(1, 'rgba(60,0,0,0)')
-        } else {
-          grad.addColorStop(0, 'rgba(255,215,70,0.95)')
-          grad.addColorStop(0.45, 'rgba(255,140,30,0.55)')
-          grad.addColorStop(1, 'rgba(80,30,0,0)')
-        }
+        // --- Strong Aviator-style filled area under the curve ---
         buildAreaPath()
-        ctx.fillStyle = grad
+
+        // 1) Base amber fill, dense but transparent enough to keep background visible
+        const fillGrad = ctx.createLinearGradient(0, 0, 0, h)
+
+        if (isCrashed) {
+          fillGrad.addColorStop(0.0, 'rgba(255, 55, 55, 0.88)')
+          fillGrad.addColorStop(0.35, 'rgba(220, 20, 35, 0.58)')
+          fillGrad.addColorStop(0.72, 'rgba(140, 0, 0, 0.34)')
+          fillGrad.addColorStop(1.0, 'rgba(40, 0, 0, 0.06)')
+        } else {
+          fillGrad.addColorStop(0.0, 'rgba(255, 235, 60, 0.92)')
+          fillGrad.addColorStop(0.28, 'rgba(255, 190, 0, 0.76)')
+          fillGrad.addColorStop(0.58, 'rgba(255, 132, 0, 0.46)')
+          fillGrad.addColorStop(0.82, 'rgba(170, 80, 0, 0.26)')
+          fillGrad.addColorStop(1.0, 'rgba(70, 25, 0, 0.08)')
+        }
+
+        ctx.fillStyle = fillGrad
         ctx.fill()
 
-        // Subtle "stairs" grid clipped to the area for the Aviator texture
-        // feel, but discreet — only 0.18 alpha so it never dominates.
+        // 2) Additive golden glow clipped under the curve
         ctx.save()
         buildAreaPath()
         ctx.clip()
-        ctx.globalAlpha = fadeAlphaRef.current * 0.18
+
+        ctx.globalCompositeOperation = 'lighter'
+        const tipPt = pts[pts.length - 1]
+        const glow = ctx.createRadialGradient(
+          tipPt.x,
+          tipPt.y,
+          0,
+          tipPt.x,
+          tipPt.y,
+          Math.max(w, h) * 0.65,
+        )
+
+        if (isCrashed) {
+          glow.addColorStop(0, 'rgba(255, 80, 80, 0.42)')
+          glow.addColorStop(0.45, 'rgba(220, 0, 0, 0.20)')
+          glow.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        } else {
+          glow.addColorStop(0, 'rgba(255, 230, 40, 0.55)')
+          glow.addColorStop(0.35, 'rgba(255, 165, 0, 0.28)')
+          glow.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        }
+
+        ctx.fillStyle = glow
+        ctx.fillRect(0, 0, w, h)
+        ctx.globalCompositeOperation = 'source-over'
+
+        // 3) Visible Aviator grid inside filled area
+        ctx.globalAlpha = fadeAlphaRef.current * 0.32
         ctx.lineWidth = 1
         ctx.strokeStyle = isCrashed
-          ? 'rgba(255,200,200,1)'
-          : 'rgba(255,235,140,1)'
+          ? 'rgba(255, 170, 170, 0.75)'
+          : 'rgba(255, 220, 80, 0.72)'
+
         const x0 = Math.floor(pts[0].x)
         const x1 = Math.ceil(pts[pts.length - 1].x)
-        for (let gx = x0; gx <= x1; gx += 26) {
+
+        for (let gx = x0; gx <= x1; gx += 34) {
           ctx.beginPath()
           ctx.moveTo(gx, 0)
           ctx.lineTo(gx, h)
           ctx.stroke()
         }
-        for (let gy = h; gy >= 0; gy -= 26) {
+
+        for (let gy = h; gy >= 0; gy -= 34) {
           ctx.beginPath()
           ctx.moveTo(0, gy)
           ctx.lineTo(w, gy)
           ctx.stroke()
         }
+
         ctx.restore()
 
+        // --- Bright Aviator line stroke ---
         ctx.beginPath()
         ctx.moveTo(pts[0].x, pts[0].y)
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-        ctx.lineWidth = 4
-        ctx.strokeStyle = stroke
-        ctx.shadowBlur = 25
-        ctx.shadowColor = isCrashed ? '#ef4444' : '#FFD700'
+        ctx.lineWidth = 6
+        ctx.strokeStyle = isCrashed ? '#ff2d2d' : '#ffe600'
+        ctx.shadowBlur = 32
+        ctx.shadowColor = isCrashed
+          ? 'rgba(255, 45, 45, 1)'
+          : 'rgba(255, 214, 0, 1)'
         ctx.lineJoin = 'round'
         ctx.lineCap = 'round'
         ctx.stroke()
@@ -207,9 +245,9 @@ export default function ClimbCurve({ state, startTime }: Props) {
           const pulse = 4 + Math.sin(performance.now() / 120) * 2
           ctx.beginPath()
           ctx.arc(tip.x, tip.y, pulse, 0, Math.PI * 2)
-          ctx.fillStyle = '#FFD700'
-          ctx.shadowBlur = 25
-          ctx.shadowColor = 'rgba(255,215,0,1)'
+          ctx.fillStyle = '#fff36a'
+          ctx.shadowBlur = 36
+          ctx.shadowColor = 'rgba(255, 230, 0, 1)'
           ctx.fill()
         }
 
