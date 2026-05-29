@@ -6,14 +6,16 @@ import OverviewTab from './admin/OverviewTab';
 import PlayersTab from './admin/PlayersTab';
 import GamesTab from './admin/GamesTab';
 import TransactionsTab from './admin/TransactionsTab';
+import ResponsibleTab from './admin/ResponsibleTab';
 
-type Tab = 'overview' | 'players' | 'games' | 'transactions';
+type Tab = 'overview' | 'players' | 'games' | 'transactions' | 'responsible';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'OVERVIEW' },
   { id: 'players', label: 'JOUEURS' },
   { id: 'games', label: 'JEUX' },
   { id: 'transactions', label: 'TRANSACTIONS' },
+  { id: 'responsible', label: 'RESPONSABLE' },
 ];
 
 export default function AdminScreen() {
@@ -106,6 +108,7 @@ export default function AdminScreen() {
         {tab === 'players' && <PlayersTab />}
         {tab === 'games' && <GamesTab />}
         {tab === 'transactions' && <TransactionsTab />}
+        {tab === 'responsible' && <ResponsibleTab />}
       </main>
     </div>
   );

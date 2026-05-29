@@ -397,7 +397,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
       let q = supabaseAdmin
         .from('users')
-        .select('id, phone, balance_cdf, created_at, kyc_status, blocked', { count: 'exact' })
+        .select('id, phone, display_name, balance_cdf, created_at, kyc_status, blocked, referral_code', { count: 'exact' })
         .order('created_at', { ascending: false });
       if (req.query.search) {
         q = q.ilike('phone', `%${req.query.search}%`);
@@ -411,9 +411,11 @@ export default async function adminRoutes(app: FastifyInstance) {
       // Aggregate okapi P&L (all-time) and rounds_played in last 24h to flag at-risk players.
       const pnlByUser = new Map<string, number>();
       const rounds24hByUser = new Map<string, number>();
+      const exclusionByUser = new Map<string, string>();
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const nowIso = new Date().toISOString();
       if (ids.length > 0) {
-        const [tx, ob, lt, betsAll] = await Promise.all([
+        const [tx, ob, lt, betsAll, limitsRows] = await Promise.all([
           supabaseAdmin
             .from('transactions')
             .select('user_id, created_at')
@@ -433,7 +435,15 @@ export default async function adminRoutes(app: FastifyInstance) {
             .from('okapi_bets')
             .select('user_id, amount_cdf, win_amount_cdf, status, created_at')
             .in('user_id', ids),
+          supabaseAdmin
+            .from('user_limits')
+            .select('user_id, self_exclusion_until')
+            .in('user_id', ids)
+            .gt('self_exclusion_until', nowIso),
         ]);
+        for (const r of limitsRows.data || []) {
+          exclusionByUser.set(String((r as any).user_id), String((r as any).self_exclusion_until));
+        }
         const accumulate = (rows: any[] | null) => {
           for (const r of rows || []) {
             const uid = String(r.user_id);
@@ -464,11 +474,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         items: (data || []).map((u: any) => ({
           id: u.id,
           phone: u.phone,
+          display_name: u.display_name || null,
+          referral_code: u.referral_code || null,
           balance_cdf: Number(u.balance_cdf || 0),
           created_at: u.created_at,
           last_activity_at: lastActivity.get(u.id) || null,
           kyc_status: (u.kyc_status as string) || 'pending',
           blocked: !!u.blocked,
+          self_exclusion_until: exclusionByUser.get(u.id) || null,
           pnl_cdf: pnlByUser.get(u.id) || 0,
           rounds_24h: rounds24hByUser.get(u.id) || 0,
         })),
@@ -483,13 +496,13 @@ export default async function adminRoutes(app: FastifyInstance) {
     const id = req.params.id;
     const { data: user, error } = await supabaseAdmin
       .from('users')
-      .select('id, phone, balance_cdf, created_at, kyc_status, blocked')
+      .select('id, phone, display_name, balance_cdf, created_at, kyc_status, blocked, referral_code, referred_by')
       .eq('id', id)
       .maybeSingle();
     if (error) return reply.code(500).send({ error: error.message });
     if (!user) return reply.code(404).send({ error: 'Not found' });
 
-    const [tx, bets] = await Promise.all([
+    const [tx, bets, limitsRes, refereeCountRes, referrerRes, rewardsRes] = await Promise.all([
       supabaseAdmin
         .from('transactions')
         .select('id, order_id, type, amount, provider_id, status, created_at')
@@ -500,6 +513,28 @@ export default async function adminRoutes(app: FastifyInstance) {
         .from('okapi_bets')
         .select('amount_cdf, win_amount_cdf, status')
         .eq('user_id', id),
+      supabaseAdmin
+        .from('user_limits')
+        .select('*')
+        .eq('user_id', id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('referred_by', id),
+      (user as any).referred_by
+        ? supabaseAdmin
+            .from('users')
+            .select('id, phone, referral_code')
+            .eq('id', (user as any).referred_by)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabaseAdmin
+        .from('referral_rewards')
+        .select('id, referred_id, amount_cdf, status, trigger_event, created_at, credited_at')
+        .eq('referrer_id', id)
+        .order('created_at', { ascending: false })
+        .limit(20),
     ]);
 
     let rounds_played = 0;
@@ -529,6 +564,248 @@ export default async function adminRoutes(app: FastifyInstance) {
         pnl_cdf: total_won - total_wagered,
       },
       kyc_checks: kycChecks || [],
+      limits: limitsRes.data || null,
+      referral: {
+        code: (user as any).referral_code || null,
+        referred_count: refereeCountRes.count ?? 0,
+        referrer: referrerRes.data || null,
+        rewards: rewardsRes.data || [],
+      },
+    });
+  });
+
+  // ---- RESPONSIBLE GAMING (admin-side overrides) ----
+  // Admin can set/clear limits with NO 24h cooldown (overrides cooling-off).
+  app.put<{ Params: { id: string }; Body: {
+    daily_deposit_cdf?: number | null;
+    weekly_deposit_cdf?: number | null;
+    monthly_deposit_cdf?: number | null;
+  } }>('/api/admin/users/:id/limits', async (req, reply) => {
+    const id = req.params.id;
+    const body = req.body || {};
+    const update: Record<string, unknown> = {
+      user_id: id,
+      updated_at: new Date().toISOString(),
+      // Admin override clears any pending raise.
+      pending_raise: null,
+      pending_raise_effective_at: null,
+    };
+    for (const k of ['daily_deposit_cdf', 'weekly_deposit_cdf', 'monthly_deposit_cdf'] as const) {
+      if (k in body) update[k] = body[k] ?? null;
+    }
+    const { error } = await supabaseAdmin
+      .from('user_limits')
+      .upsert(update, { onConflict: 'user_id' });
+    if (error) return reply.code(500).send({ error: error.message });
+    return reply.send({ ok: true });
+  });
+
+  // Set or clear self-exclusion. `until = null` clears it.
+  app.post<{ Params: { id: string }; Body: { until?: string | null; duration?: '24h' | '7d' | '30d' | 'permanent' | null } }>(
+    '/api/admin/users/:id/self-exclusion',
+    async (req, reply) => {
+      const id = req.params.id;
+      let until: string | null = null;
+      if (req.body?.until === null) until = null;
+      else if (typeof req.body?.until === 'string') {
+        const d = new Date(req.body.until);
+        if (Number.isNaN(d.getTime())) return reply.code(400).send({ error: 'Invalid until' });
+        until = d.toISOString();
+      } else if (req.body?.duration) {
+        const ms: Record<string, number> = {
+          '24h': 24 * 60 * 60 * 1000,
+          '7d': 7 * 24 * 60 * 60 * 1000,
+          '30d': 30 * 24 * 60 * 60 * 1000,
+          'permanent': 100 * 365 * 24 * 60 * 60 * 1000,
+        };
+        until = new Date(Date.now() + ms[req.body.duration]).toISOString();
+      } else if (req.body?.duration === null) {
+        until = null;
+      } else {
+        return reply.code(400).send({ error: 'until or duration required' });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('user_limits')
+        .upsert(
+          { user_id: id, self_exclusion_until: until, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        );
+      if (error) return reply.code(500).send({ error: error.message });
+      req.log.warn({ userId: id, until }, 'admin set self-exclusion');
+      return reply.send({ ok: true, self_exclusion_until: until });
+    },
+  );
+
+  // Manually credit a referral reward (e.g. one-time bonus campaign).
+  // Adjusts referrer balance and writes a `credited` row in referral_rewards.
+  app.post<{ Params: { id: string }; Body: { referred_id: string; amount_cdf: number; trigger_event?: string } }>(
+    '/api/admin/users/:id/referral-reward',
+    async (req, reply) => {
+      const referrerId = req.params.id;
+      const { referred_id, amount_cdf, trigger_event } = req.body || ({} as any);
+      const amt = Number(amount_cdf);
+      if (!referred_id || !Number.isFinite(amt) || amt <= 0) {
+        return reply.code(400).send({ error: 'referred_id et amount_cdf > 0 requis' });
+      }
+
+      // Confirm relationship.
+      const { data: referee } = await supabaseAdmin
+        .from('users')
+        .select('id, referred_by')
+        .eq('id', referred_id)
+        .maybeSingle();
+      if (!referee || String(referee.referred_by) !== referrerId) {
+        return reply.code(400).send({ error: 'Ce joueur n\'est pas un filleul de cet utilisateur' });
+      }
+
+      const { error: balErr } = await supabaseAdmin.rpc('adjust_balance', {
+        p_user_id: referrerId,
+        p_delta: amt,
+      });
+      if (balErr) return reply.code(500).send({ error: balErr.message });
+
+      const { error: rewErr } = await supabaseAdmin
+        .from('referral_rewards')
+        .upsert(
+          {
+            referrer_id: referrerId,
+            referred_id,
+            amount_cdf: amt,
+            status: 'credited',
+            trigger_event: trigger_event || 'admin_manual',
+            credited_at: new Date().toISOString(),
+          },
+          { onConflict: 'referrer_id,referred_id' },
+        );
+      if (rewErr) return reply.code(500).send({ error: rewErr.message });
+
+      return reply.send({ ok: true });
+    },
+  );
+
+  // Overview KPIs for the responsible-gaming admin tab.
+  app.get('/api/admin/responsible-gaming/overview', async (_req, reply) => {
+    const nowIso = new Date().toISOString();
+    const [allLimitsRes, excludedRes] = await Promise.all([
+      supabaseAdmin
+        .from('user_limits')
+        .select('user_id, daily_deposit_cdf, weekly_deposit_cdf, monthly_deposit_cdf, self_exclusion_until'),
+      supabaseAdmin
+        .from('user_limits')
+        .select('user_id, self_exclusion_until')
+        .gt('self_exclusion_until', nowIso),
+    ]);
+
+    const rows = allLimitsRes.data || [];
+    let users_with_limits = 0;
+    let users_with_daily = 0;
+    let users_with_weekly = 0;
+    let users_with_monthly = 0;
+    for (const r of rows) {
+      const hasAny = r.daily_deposit_cdf != null || r.weekly_deposit_cdf != null || r.monthly_deposit_cdf != null;
+      if (hasAny) users_with_limits += 1;
+      if (r.daily_deposit_cdf != null) users_with_daily += 1;
+      if (r.weekly_deposit_cdf != null) users_with_weekly += 1;
+      if (r.monthly_deposit_cdf != null) users_with_monthly += 1;
+    }
+
+    return reply.send({
+      users_with_limits,
+      users_with_daily,
+      users_with_weekly,
+      users_with_monthly,
+      users_self_excluded: excludedRes.data?.length ?? 0,
+    });
+  });
+
+  // List users currently self-excluded.
+  app.get('/api/admin/responsible-gaming/excluded', async (_req, reply) => {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabaseAdmin
+      .from('user_limits')
+      .select('user_id, self_exclusion_until, updated_at')
+      .gt('self_exclusion_until', nowIso)
+      .order('self_exclusion_until', { ascending: true });
+    if (error) return reply.code(500).send({ error: error.message });
+
+    const ids = (data || []).map((r: any) => String(r.user_id));
+    const phoneById = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: users } = await supabaseAdmin.from('users').select('id, phone').in('id', ids);
+      for (const u of users || []) phoneById.set(String(u.id), String(u.phone || ''));
+    }
+
+    return reply.send({
+      items: (data || []).map((r: any) => ({
+        user_id: r.user_id,
+        phone: phoneById.get(String(r.user_id)) || '—',
+        phone_masked: maskPhone(phoneById.get(String(r.user_id))),
+        self_exclusion_until: r.self_exclusion_until,
+        set_at: r.updated_at,
+      })),
+    });
+  });
+
+  // Top referrers leaderboard.
+  app.get<{ Querystring: { limit?: string } }>('/api/admin/referrals/leaderboard', async (req, reply) => {
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
+
+    // Group by referred_by, count > 0
+    const { data: refs, error } = await supabaseAdmin
+      .from('users')
+      .select('referred_by')
+      .not('referred_by', 'is', null);
+    if (error) return reply.code(500).send({ error: error.message });
+
+    const counts = new Map<string, number>();
+    for (const r of refs || []) {
+      const k = String((r as any).referred_by);
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    const top = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit);
+
+    const ids = top.map(([id]) => id);
+    const phoneById = new Map<string, { phone: string; code: string | null; display_name: string | null }>();
+    if (ids.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from('users')
+        .select('id, phone, display_name, referral_code')
+        .in('id', ids);
+      for (const u of users || [])
+        phoneById.set(String(u.id), {
+          phone: String(u.phone || ''),
+          code: (u.referral_code as string) || null,
+          display_name: (u.display_name as string) || null,
+        });
+    }
+
+    // Sum credited rewards per referrer.
+    const rewardsByRef = new Map<string, number>();
+    if (ids.length > 0) {
+      const { data: rwds } = await supabaseAdmin
+        .from('referral_rewards')
+        .select('referrer_id, amount_cdf, status')
+        .in('referrer_id', ids)
+        .eq('status', 'credited');
+      for (const r of rwds || []) {
+        const k = String((r as any).referrer_id);
+        rewardsByRef.set(k, (rewardsByRef.get(k) || 0) + Number((r as any).amount_cdf || 0));
+      }
+    }
+
+    return reply.send({
+      items: top.map(([id, count]) => ({
+        user_id: id,
+        phone: phoneById.get(id)?.phone || '—',
+        phone_masked: maskPhone(phoneById.get(id)?.phone),
+        display_name: phoneById.get(id)?.display_name ?? null,
+        referral_code: phoneById.get(id)?.code ?? null,
+        referred_count: count,
+        total_credited_cdf: rewardsByRef.get(id) || 0,
+      })),
     });
   });
 

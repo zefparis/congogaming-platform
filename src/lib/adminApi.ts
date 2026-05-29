@@ -195,11 +195,14 @@ export const adminApi = {
       items: Array<{
         id: string;
         phone: string;
+        display_name: string | null;
+        referral_code: string | null;
         balance_cdf: number;
         created_at: string;
         last_activity_at: string | null;
         kyc_status: 'pending' | 'approved' | 'denied' | 'verify_age';
         blocked: boolean;
+        self_exclusion_until: string | null;
         pnl_cdf: number;
         rounds_24h: number;
       }>;
@@ -214,10 +217,13 @@ export const adminApi = {
       user: {
         id: string;
         phone: string;
+        display_name?: string | null;
         balance_cdf: number;
         created_at: string;
         kyc_status?: 'pending' | 'approved' | 'denied' | 'verify_age';
         blocked?: boolean;
+        referral_code?: string | null;
+        referred_by?: string | null;
       };
       transactions: Array<{
         id: string;
@@ -245,7 +251,94 @@ export const adminApi = {
         scan_id: string | null;
         created_at: string;
       }>;
+      limits: null | {
+        daily_deposit_cdf: number | null;
+        weekly_deposit_cdf: number | null;
+        monthly_deposit_cdf: number | null;
+        self_exclusion_until: string | null;
+        pending_raise: Record<string, number | null> | null;
+        pending_raise_effective_at: string | null;
+        updated_at: string;
+      };
+      referral: {
+        code: string | null;
+        referred_count: number;
+        referrer: { id: string; phone: string; referral_code: string | null } | null;
+        rewards: Array<{
+          id: string;
+          referred_id: string;
+          amount_cdf: number;
+          status: 'pending' | 'credited' | 'cancelled';
+          trigger_event: string | null;
+          created_at: string;
+          credited_at: string | null;
+        }>;
+      };
     }>(`/api/admin/users/${id}`),
+
+  setUserLimits: (
+    id: string,
+    body: {
+      daily_deposit_cdf?: number | null;
+      weekly_deposit_cdf?: number | null;
+      monthly_deposit_cdf?: number | null;
+    },
+  ) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/limits`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  setUserSelfExclusion: (
+    id: string,
+    body: { until?: string | null; duration?: '24h' | '7d' | '30d' | 'permanent' | null },
+  ) =>
+    request<{ ok: boolean; self_exclusion_until: string | null }>(
+      `/api/admin/users/${id}/self-exclusion`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  creditReferralReward: (
+    referrerId: string,
+    body: { referred_id: string; amount_cdf: number; trigger_event?: string },
+  ) =>
+    request<{ ok: boolean }>(`/api/admin/users/${referrerId}/referral-reward`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  responsibleGamingOverview: () =>
+    request<{
+      users_with_limits: number;
+      users_with_daily: number;
+      users_with_weekly: number;
+      users_with_monthly: number;
+      users_self_excluded: number;
+    }>('/api/admin/responsible-gaming/overview'),
+
+  responsibleGamingExcluded: () =>
+    request<{
+      items: Array<{
+        user_id: string;
+        phone: string;
+        phone_masked: string;
+        self_exclusion_until: string;
+        set_at: string;
+      }>;
+    }>('/api/admin/responsible-gaming/excluded'),
+
+  referralsLeaderboard: (limit = 20) =>
+    request<{
+      items: Array<{
+        user_id: string;
+        phone: string;
+        phone_masked: string;
+        display_name: string | null;
+        referral_code: string | null;
+        referred_count: number;
+        total_credited_cdf: number;
+      }>;
+    }>(`/api/admin/referrals/leaderboard?limit=${limit}`),
 
   adjustBalance: (id: string, delta_cdf: number, reason?: string) =>
     request<{ new_balance_cdf: number }>(`/api/admin/users/${id}/balance`, {

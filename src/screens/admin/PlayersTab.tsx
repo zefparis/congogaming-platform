@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Gift, Pause, Search, ShieldOff, Wallet, X } from 'lucide-react';
 import { adminApi } from '../../lib/adminApi';
 import { fmtCdf, fmtDateTime, fmtRelative, txStatusLabel } from './format';
 import KycBadge from './KycBadge';
@@ -21,6 +21,15 @@ function Drawer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Limits inputs
+  const [limDaily, setLimDaily] = useState('');
+  const [limWeekly, setLimWeekly] = useState('');
+  const [limMonthly, setLimMonthly] = useState('');
+
+  // Referral reward inputs
+  const [rewardReferredId, setRewardReferredId] = useState('');
+  const [rewardAmount, setRewardAmount] = useState('');
+
   async function load() {
     setError(null);
     try {
@@ -33,6 +42,87 @@ function Drawer({
   useEffect(() => {
     load();
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (data?.limits) {
+      setLimDaily(data.limits.daily_deposit_cdf != null ? String(data.limits.daily_deposit_cdf) : '');
+      setLimWeekly(data.limits.weekly_deposit_cdf != null ? String(data.limits.weekly_deposit_cdf) : '');
+      setLimMonthly(data.limits.monthly_deposit_cdf != null ? String(data.limits.monthly_deposit_cdf) : '');
+    } else {
+      setLimDaily(''); setLimWeekly(''); setLimMonthly('');
+    }
+  }, [data?.limits]);
+
+  async function saveLimits() {
+    if (busy) return;
+    const parse = (v: string): number | null => {
+      const t = v.trim();
+      if (t === '') return null;
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+    };
+    setBusy(true);
+    setError(null);
+    try {
+      await adminApi.setUserLimits(userId, {
+        daily_deposit_cdf: parse(limDaily),
+        weekly_deposit_cdf: parse(limWeekly),
+        monthly_deposit_cdf: parse(limMonthly),
+      });
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setExclusion(duration: '24h' | '7d' | '30d' | 'permanent' | null) {
+    const action = duration === null ? 'lever l\'auto-exclusion' : `auto-exclure pour ${duration}`;
+    if (!confirm(`Confirmer : ${action} ?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (duration === null) {
+        await adminApi.setUserSelfExclusion(userId, { until: null });
+      } else {
+        await adminApi.setUserSelfExclusion(userId, { duration });
+      }
+      await load();
+      onChanged();
+    } catch (e: any) {
+      setError(e?.message || 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function creditReferral() {
+    if (busy) return;
+    const amt = Number(rewardAmount);
+    if (!rewardReferredId.trim() || !Number.isFinite(amt) || amt <= 0) {
+      setError('referred_id + montant > 0 requis');
+      return;
+    }
+    if (!confirm(`Créditer ${amt.toLocaleString('fr-FR')} CDF en récompense parrainage ?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await adminApi.creditReferralReward(userId, {
+        referred_id: rewardReferredId.trim(),
+        amount_cdf: amt,
+        trigger_event: 'admin_manual',
+      });
+      setRewardReferredId('');
+      setRewardAmount('');
+      await load();
+      onChanged();
+    } catch (e: any) {
+      setError(e?.message || 'Erreur');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function adjust() {
     const n = Number(delta);
@@ -126,9 +216,30 @@ function Drawer({
                 <div className="font-mono text-lg text-white">{data.user.phone}</div>
                 <KycBadge status={data.user.kyc_status} />
               </div>
+              {data.user.display_name && (
+                <div className="mt-1 text-sm text-gold">"{data.user.display_name}"</div>
+              )}
               <div className="mt-1 text-xs text-white/40">
                 Inscrit {fmtDateTime(data.user.created_at)} · id {data.user.id.slice(0, 8)}…
               </div>
+              {data.user.referral_code && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="text-white/40">Code parrain :</span>
+                  <span className="rounded bg-gold/15 px-2 py-0.5 font-mono tracking-wider text-gold ring-1 ring-gold/30">
+                    {data.user.referral_code}
+                  </span>
+                  {data.referral?.referrer && (
+                    <span className="text-white/40">
+                      · invité par <span className="font-mono text-white/70">{data.referral.referrer.phone}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+              {data.limits?.self_exclusion_until && new Date(data.limits.self_exclusion_until).getTime() > Date.now() && (
+                <div className="mt-2 inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40">
+                  <ShieldOff size={12} /> Auto-exclu jusqu'au {fmtDateTime(data.limits.self_exclusion_until)}
+                </div>
+              )}
               <div className="mt-3 font-display text-3xl text-gold">
                 {fmtCdf(data.user.balance_cdf)}
               </div>
@@ -196,6 +307,159 @@ function Drawer({
                   Débloquer
                 </button>
               </div>
+            </div>
+
+            {/* Limits override */}
+            <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+              <h4 className="mb-3 flex items-center gap-2 font-display tracking-wider text-gold">
+                <Wallet size={16} /> Limites de dépôt (override admin)
+              </h4>
+              <p className="mb-3 text-xs text-white/40">
+                L'override admin est immédiat (pas de cooldown 24h). Vide = aucune limite.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Journalière', value: limDaily, set: setLimDaily },
+                  { label: 'Hebdo', value: limWeekly, set: setLimWeekly },
+                  { label: 'Mensuelle', value: limMonthly, set: setLimMonthly },
+                ].map((f) => (
+                  <div key={f.label}>
+                    <label className="text-[10px] uppercase tracking-wider text-white/40">{f.label}</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={f.value}
+                      onChange={(e) => f.set(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                      placeholder="∞"
+                      className="mt-1 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-sm text-white outline-none focus:border-gold/60"
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={saveLimits}
+                disabled={busy}
+                className="mt-3 rounded-md bg-gold px-4 py-2 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-50"
+              >
+                Enregistrer les limites
+              </button>
+            </div>
+
+            {/* Self-exclusion */}
+            <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/[0.05] p-4">
+              <h4 className="mb-3 flex items-center gap-2 font-display tracking-wider text-red-300">
+                <Pause size={16} /> Auto-exclusion
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {(['24h', '7d', '30d', 'permanent'] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setExclusion(d)}
+                    disabled={busy}
+                    className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    {d}
+                  </button>
+                ))}
+                {data.limits?.self_exclusion_until && new Date(data.limits.self_exclusion_until).getTime() > Date.now() && (
+                  <button
+                    onClick={() => setExclusion(null)}
+                    disabled={busy}
+                    className="ml-auto rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+                  >
+                    Lever l'exclusion
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Referral panel */}
+            <div className="mt-5 rounded-xl border border-gold/30 bg-gold/[0.04] p-4">
+              <h4 className="mb-3 flex items-center gap-2 font-display tracking-wider text-gold">
+                <Gift size={16} /> Parrainage
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-2">
+                  <div className="text-[11px] uppercase tracking-wider text-white/40">Filleuls</div>
+                  <div className="mt-1 text-white">{data.referral?.referred_count ?? 0}</div>
+                </div>
+                <div className="rounded-lg border border-white/5 bg-white/[0.02] p-2">
+                  <div className="text-[11px] uppercase tracking-wider text-white/40">Bonus crédités</div>
+                  <div className="mt-1 text-emerald-300">
+                    {fmtCdf(
+                      (data.referral?.rewards || [])
+                        .filter((r) => r.status === 'credited')
+                        .reduce((s, r) => s + Number(r.amount_cdf || 0), 0),
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
+                <div className="mb-2 text-[11px] uppercase tracking-wider text-white/50">
+                  Créditer une récompense parrainage
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    placeholder="referred_id (UUID filleul)"
+                    value={rewardReferredId}
+                    onChange={(e) => setRewardReferredId(e.target.value)}
+                    className="min-w-[200px] flex-1 rounded-md border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-white outline-none focus:border-gold/60"
+                  />
+                  <input
+                    type="number"
+                    placeholder="CDF"
+                    value={rewardAmount}
+                    onChange={(e) => setRewardAmount(e.target.value)}
+                    className="w-32 rounded-md border border-white/10 bg-black/50 px-3 py-2 text-white outline-none focus:border-gold/60"
+                  />
+                  <button
+                    onClick={creditReferral}
+                    disabled={busy || !rewardReferredId || !rewardAmount}
+                    className="rounded-md bg-gold px-3 py-2 text-sm font-semibold text-black hover:brightness-110 disabled:opacity-50"
+                  >
+                    Créditer
+                  </button>
+                </div>
+              </div>
+
+              {data.referral?.rewards && data.referral.rewards.length > 0 && (
+                <div className="mt-3 overflow-hidden rounded-lg border border-white/5">
+                  <table className="w-full text-xs">
+                    <thead className="bg-white/[0.03] text-left text-[10px] uppercase tracking-wider text-white/50">
+                      <tr>
+                        <th className="px-2 py-1.5">Date</th>
+                        <th className="px-2 py-1.5">Filleul</th>
+                        <th className="px-2 py-1.5 text-right">Montant</th>
+                        <th className="px-2 py-1.5">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.referral.rewards.map((r) => (
+                        <tr key={r.id} className="border-t border-white/5">
+                          <td className="px-2 py-1.5 text-white/70">{fmtDateTime(r.created_at)}</td>
+                          <td className="px-2 py-1.5 font-mono text-white/70">{r.referred_id.slice(0, 8)}…</td>
+                          <td className="px-2 py-1.5 text-right text-gold">{fmtCdf(r.amount_cdf)}</td>
+                          <td className="px-2 py-1.5">
+                            <span
+                              className={
+                                r.status === 'credited'
+                                  ? 'text-emerald-400'
+                                  : r.status === 'pending'
+                                  ? 'text-amber-400'
+                                  : 'text-white/40'
+                              }
+                            >
+                              {r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {data.user.kyc_status === 'verify_age' && (
@@ -410,6 +674,7 @@ export default function PlayersTab() {
             {rows.map((u) => {
               const bigLoser = (u.pnl_cdf ?? 0) < -50_000;
               const excessivePlay = (u.rounds_24h ?? 0) > 100;
+              const selfExcluded = u.self_exclusion_until && new Date(u.self_exclusion_until).getTime() > Date.now();
               const atRisk = bigLoser || excessivePlay;
               const reasons: string[] = [];
               if (bigLoser) reasons.push(`P&L ${fmtCdf(u.pnl_cdf)}`);
@@ -420,12 +685,26 @@ export default function PlayersTab() {
                   onClick={() => setSelectedId(u.id)}
                   className="cursor-pointer border-t border-white/5 hover:bg-white/[0.03]"
                 >
-                  <td className="px-3 py-2 font-mono text-white">{u.phone}</td>
+                  <td className="px-3 py-2 font-mono text-white">
+                    <div className="flex items-center gap-2">
+                      <span>{u.phone}</span>
+                      {u.display_name && (
+                        <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60">{u.display_name}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-3 py-2">
                     <KycBadge status={u.kyc_status} />
                   </td>
                   <td className="px-3 py-2">
-                    {atRisk ? (
+                    {selfExcluded ? (
+                      <span
+                        title={`Auto-exclu jusqu'au ${fmtDateTime(u.self_exclusion_until!)}`}
+                        className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40"
+                      >
+                        <ShieldOff size={11} /> EXCLU
+                      </span>
+                    ) : atRisk ? (
                       <span
                         title={reasons.join(' · ')}
                         className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40"
