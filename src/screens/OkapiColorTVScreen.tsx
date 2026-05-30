@@ -197,7 +197,7 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'flex-start', justifyContent: 'space-between', overflowY: 'auto', minHeight: 0 }}
+      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'stretch', justifyContent: 'space-between', overflow: 'hidden', minHeight: 0 }}
     >
       {/* Left: numbers + stats */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, minHeight: 0 }}>
@@ -238,7 +238,7 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
 
       {/* Right: winners list — only after animation completes (prevents grid layout shift mid-flight) */}
       {isResult && animComplete && winners.length > 0 && (
-        <div style={{ width: 'clamp(260px,35vw,380px)', display: 'flex', flexDirection: 'column', gap: 'clamp(8px,1.2vw,12px)' }}>
+        <div style={{ width: 'clamp(260px,35vw,380px)', display: 'flex', flexDirection: 'column', gap: 'clamp(8px,1.2vw,12px)', overflowY: 'auto' }}>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2vw,22px)', color: '#9CA3AF', letterSpacing: 5, marginBottom: 4 }}>
             GAGNANTS
           </div>
