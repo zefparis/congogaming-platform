@@ -107,7 +107,7 @@ function TicketCard({ t }: { t: MyTicket }) {
         <StatusBadge status={t.status} />
       </div>
       <div className="flex flex-wrap gap-1 mb-2">
-        {t.numeros.map((n: number) => <Ball key={n} n={n} color="red" size="sm" />)}
+        {(t.numeros ?? []).map((n: number) => <Ball key={n} n={n} color="red" size="sm" />)}
       </div>
       {t.status !== 'pending' && t.status !== 'cancelled' && !t.jackpot_en_attente && (
         <div className="flex items-center gap-2 mt-1 text-[11px]">
@@ -487,13 +487,13 @@ export default function OkapiColorScreen() {
               <div className="mb-3">
                 <div className="text-[10px] uppercase tracking-widest text-red-400 mb-1.5">Rouges</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {live.lastDraw.numerosRouges.map((n) => <Ball key={n} n={n} color="red" size="md" />)}
+                  {(live.lastDraw.numerosRouges ?? []).map((n) => <Ball key={n} n={n} color="red" size="md" />)}
                 </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: '#fbbf24' }}>Or</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {live.lastDraw.numerosOr.map((n) => <Ball key={n} n={n} color="gold" size="md" />)}
+                  {(live.lastDraw.numerosOr ?? []).map((n) => <Ball key={n} n={n} color="gold" size="md" />)}
                 </div>
               </div>
               <div className="flex gap-4 mt-3 pt-3 border-t border-zinc-800">
@@ -595,10 +595,10 @@ export default function OkapiColorScreen() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-1.5">
-                  {d.numerosRouges.map((n) => <Ball key={`r${n}`} n={n} color="red" size="sm" />)}
+                  {(d.numerosRouges ?? []).map((n) => <Ball key={`r${n}`} n={n} color="red" size="sm" />)}
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {d.numerosOr.map((n) => <Ball key={`g${n}`} n={n} color="gold" size="sm" />)}
+                  {(d.numerosOr ?? []).map((n) => <Ball key={`g${n}`} n={n} color="gold" size="sm" />)}
                 </div>
               </div>
             ))}
