@@ -290,6 +290,15 @@ export default function OkapiColorTVScreen() {
   const [live, setLive]           = useState<LiveData | null>(null);
   const [secs, setSecs]           = useState(0);
   const [error, setError]         = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const [videoFailed, setVideoFailed]     = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsLargeScreen(window.innerWidth >= 900);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const playUrl = buildPlayUrl();
   const qrUrl   = buildQrUrl(playUrl);
@@ -326,12 +335,30 @@ export default function OkapiColorTVScreen() {
       color: 'white', overflow: 'hidden', display: 'flex', flexDirection: 'column',
       position: 'relative',
     }}>
+      {/* Background video — large screen only */}
+      {isLargeScreen && !videoFailed && (
+        <video
+          style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.40, pointerEvents: 'none', zIndex: 0 }}
+          src="/videos/backgroundtv.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          onError={() => setVideoFailed(true)}
+        />
+      )}
+      {/* Dark overlay above video, below UI */}
+      {isLargeScreen && !videoFailed && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', pointerEvents: 'none', zIndex: 1 }} />
+      )}
+
       {/* Decorative bg circles */}
-      <div style={{ position: 'absolute', top: -100, right: -100, width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,0.06), transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: -80, left: -80, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(251,191,36,0.04), transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: -100, right: -100, width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,0.06), transparent 70%)', pointerEvents: 'none', zIndex: 2 }} />
+      <div style={{ position: 'absolute', bottom: -80, left: -80, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(251,191,36,0.04), transparent 70%)', pointerEvents: 'none', zIndex: 2 }} />
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(10px,2vw,20px) clamp(16px,4vw,48px)', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(10px,2vw,20px) clamp(16px,4vw,48px)', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, position: 'relative', zIndex: 2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,1.5vw,20px)' }}>
           <div style={{ width: 'clamp(6px,0.8vw,10px)', height: 'clamp(6px,0.8vw,10px)', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 12px #ef4444' }} />
           <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(18px,3vw,36px)', letterSpacing: 6, color: '#fff' }}>OKAPI COLOR</span>
@@ -368,7 +395,7 @@ export default function OkapiColorTVScreen() {
       </div>
 
       {/* Content area — flex:1 + minHeight:0 so children can shrink below their intrinsic size */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', zIndex: 2 }}>
         {error && !live && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#9CA3AF', letterSpacing: 4 }}>
@@ -388,7 +415,7 @@ export default function OkapiColorTVScreen() {
       </div>
 
       {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(8px,1.5vw,12px) clamp(16px,4vw,48px)', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(8px,1.5vw,12px) clamp(16px,4vw,48px)', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, position: 'relative', zIndex: 2 }}>
         <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(9px,1.4vw,16px)', color: 'rgba(255,255,255,0.2)', letterSpacing: 3 }}>
           {`CONGO GAMING · TIRAGE LIVE TOUTES LES ${Math.round((live?.drawIntervalSeconds ?? 600) / 60)} MIN`}
         </span>
