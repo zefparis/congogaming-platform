@@ -197,7 +197,7 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'stretch', justifyContent: 'space-between', overflow: 'hidden', minHeight: 0 }}
+      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'stretch', justifyContent: 'space-between', overflow: 'auto', minHeight: 0 }}
     >
       {/* Left: numbers + stats */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, minHeight: 0 }}>
