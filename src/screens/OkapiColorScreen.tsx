@@ -341,7 +341,10 @@ export default function OkapiColorScreen() {
           {jackpot >= threshold && <span className="text-[10px] text-red-400 font-bold animate-pulse">DISPONIBLE !</span>}
         </div>
         <div className="font-display text-3xl mt-0.5" style={{ color: jackpot >= threshold ? '#ff5555' : '#FFD700' }}>
-          {threshold.toLocaleString('fr-FR')} CDF
+          {jackpot.toLocaleString('fr-FR')} CDF
+        </div>
+        <div className="text-[10px] text-zinc-500 mt-1">
+          Objectif : {threshold.toLocaleString('fr-FR')} CDF
         </div>
         {jackpot < threshold && (
           <div className="mt-2 w-full h-1 rounded-full bg-zinc-800">
