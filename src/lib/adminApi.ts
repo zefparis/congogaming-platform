@@ -12,6 +12,7 @@ console.log('BASE_URL:', BASE_URL);
 const TOKEN_KEY = 'cg_admin_token';
 const SECRET_KEY = 'cg_admin_secret';
 const FALLBACK_SECRET = 'cg_admin_loto_2026';
+const OKAPI_COLOR_FALLBACK_SECRET = 'cg_okapi_color_2026';
 // Toggle verbose Authorization logging by setting localStorage.cg_admin_debug = '1'.
 const DEBUG = (() => {
   try {
@@ -489,19 +490,27 @@ export const adminApi = {
     }),
 
   okapiColorForceDraw: () => {
-    const secret = getAdminSecret() || FALLBACK_SECRET;
-    return request<{ tirageId: string; rouges: number[]; ors: number[]; winners: number; totalPaidCdf: number }>(
-      '/api/okapi-color/draw',
-      { method: 'POST', headers: { 'x-admin-secret': secret } },
-    );
+    const secret = getAdminSecret() || OKAPI_COLOR_FALLBACK_SECRET;
+    return fetch(`${BASE}/api/okapi-color/draw`, {
+      method: 'POST',
+      headers: { 'x-admin-secret': secret },
+    }).then(async r => {
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json?.error || `HTTP ${r.status}`);
+      return json as { tirageId: string; rouges: number[]; ors: number[]; winners: number; totalPaidCdf: number };
+    });
   },
 
   okapiColorPurgePending: () => {
-    const secret = getAdminSecret() || FALLBACK_SECRET;
-    return request<{ scanned: number; refunded: number; total_refunded_cdf: number }>(
-      '/api/okapi-color/purge-pending',
-      { method: 'POST', headers: { 'x-admin-secret': secret } },
-    );
+    const secret = getAdminSecret() || OKAPI_COLOR_FALLBACK_SECRET;
+    return fetch(`${BASE}/api/okapi-color/purge-pending`, {
+      method: 'POST',
+      headers: { 'x-admin-secret': secret },
+    }).then(async r => {
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json?.error || `HTTP ${r.status}`);
+      return json as { scanned: number; refunded: number; total_refunded_cdf: number };
+    });
   },
 
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
