@@ -416,36 +416,24 @@ export default function OkapiColorScreen() {
           </motion.div>
         )}
 
-        {/* ── DRAWING : ball animation ── */}
-        {status === 'drawing' && (
-          <motion.div key="drawing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="mx-4 mt-6">
+        {/* ── DRAWING + RESULT : single persistent block so GSAP animation survives the transition ── */}
+        {(status === 'drawing' || status === 'result') && (
+          <motion.div key="draw-result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="mx-4 mt-4 space-y-3">
+            {/* Always-visible animation grid */}
             <OkapiColorDrawShow
               redNumbers={live?.lastDraw?.numerosRouges ?? []}
               goldNumbers={live?.lastDraw?.numerosOr ?? []}
-              status="drawing"
+              status={status}
               drawKey={live?.lastDraw?.slotKey ?? live?.currentDraw.slotKey ?? 'drawing'}
               mode="mobile"
             />
-          </motion.div>
-        )}
-
-        {/* ── RESULT : show draw + player results ── */}
-        {status === 'result' && live?.lastDraw && (
-          <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="mx-4 mt-4 space-y-3">
-            {/* Draw numbers */}
+            {/* Result-specific content */}
+            {status === 'result' && live?.lastDraw && (
             <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
               <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
                 Résultats {live.lastDraw.drawNumber ? `— Tirage #${live.lastDraw.drawNumber}` : ''}
               </div>
-              <OkapiColorDrawShow
-                redNumbers={live.lastDraw.numerosRouges ?? []}
-                goldNumbers={live.lastDraw.numerosOr ?? []}
-                status="result"
-                drawKey={live.lastDraw.slotKey ?? live.currentDraw.slotKey}
-                mode="mobile"
-              />
               <div className="flex gap-4 mt-3 pt-3 border-t border-zinc-800">
                 <div>
                   <div className="text-[10px] text-zinc-500">Gagnants</div>
@@ -466,9 +454,10 @@ export default function OkapiColorScreen() {
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Player tickets for this slot */}
-            {myTickets.length > 0 && (
+            {/* Player tickets — result only */}
+            {status === 'result' && myTickets.length > 0 && (
               <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
                 <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
                   Vos tickets ({myTickets.length})
@@ -479,8 +468,8 @@ export default function OkapiColorScreen() {
               </div>
             )}
 
-            {/* Prepare next ticket CTA */}
-            {session && (
+            {/* Prepare next ticket CTA — result only */}
+            {status === 'result' && session && (
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => {
                 quickPick_(); void Promise.resolve();
               }}

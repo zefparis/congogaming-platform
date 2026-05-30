@@ -169,59 +169,39 @@ function ClosingScreen({ secs }: { secs: number }) {
   );
 }
 
-function DrawingScreen({ live }: { live: LiveData }) {
-  const rouges = live.lastDraw?.numerosRouges ?? [];
-  const ors    = live.lastDraw?.numerosOr    ?? [];
-  const dn     = live.lastDraw?.drawNumber;
-  const drawKey = live.lastDraw?.slotKey ?? live.currentDraw.slotKey;
+// Merged drawing+result screen — single React instance persists across the transition
+// so the GSAP animation is never killed mid-flight.
+function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
+  const draw     = live.lastDraw;
+  const rouges   = draw?.numerosRouges ?? [];
+  const ors      = draw?.numerosOr     ?? [];
+  const winners  = draw?.winners       ?? [];
+  const drawKey  = draw?.slotKey ?? live.currentDraw.slotKey;
+  const isResult = live.currentDraw.status === 'result';
 
   return (
     <motion.div
-      key="drawing"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 'clamp(12px,2vw,24px)', padding: 'clamp(12px,2vw,22px) clamp(16px,4vw,48px)' }}
-    >
-      {dn && (
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,2.5vw,28px)', color: '#9CA3AF', letterSpacing: 6 }}>
-          TIRAGE #{dn}
-        </div>
-      )}
-      <OkapiColorDrawShow
-        redNumbers={rouges}
-        goldNumbers={ors}
-        status="drawing"
-        drawKey={drawKey}
-        mode="tv"
-      />
-    </motion.div>
-  );
-}
-
-function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
-  const draw    = live.lastDraw;
-  const rouges  = draw?.numerosRouges ?? [];
-  const ors     = draw?.numerosOr     ?? [];
-  const winners = draw?.winners       ?? [];
-  const drawKey = draw?.slotKey ?? live.currentDraw.slotKey;
-
-  return (
-    <motion.div
-      key="result"
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'flex-start', justifyContent: 'space-between', overflowY: 'auto' }}
     >
       {/* Left: numbers + stats */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
         {draw?.drawNumber && (
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2.2vw,24px)', color: '#9CA3AF', letterSpacing: 5 }}>
-            RÉSULTATS TIRAGE #{draw.drawNumber}
+            {isResult ? 'RÉSULTATS TIRAGE' : 'TIRAGE'} #{draw.drawNumber}
           </div>
         )}
 
-        <OkapiColorDrawShow redNumbers={rouges} goldNumbers={ors} status="result" drawKey={drawKey} mode="tv" />
+        <OkapiColorDrawShow
+          redNumbers={rouges}
+          goldNumbers={ors}
+          status={live.currentDraw.status as 'drawing' | 'result'}
+          drawKey={drawKey}
+          mode="tv"
+        />
 
-        {/* Stats */}
-        <div style={{ display: 'flex', gap: 40 }}>
+        {/* Stats — only visible in result phase */}
+        {isResult && <div style={{ display: 'flex', gap: 40 }}>
           <div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#9CA3AF', letterSpacing: 3 }}>GAGNANTS</div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(24px,5vw,56px)', color: '#fff' }}>{draw?.winnerCount ?? 0}</div>
@@ -232,16 +212,16 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
               {(draw?.totalPaidCdf ?? 0).toLocaleString('fr-FR')} <span style={{ fontSize: 'clamp(14px,2.5vw,28px)' }}>CDF</span>
             </div>
           </div>
-        </div>
+        </div>}
 
-        {/* Next draw */}
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 3 }}>
+        {/* Next draw timer */}
+        {isResult && <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 3 }}>
           PROCHAIN TIRAGE DANS {String(Math.floor(secs / 60)).padStart(2, '0')}:{String(secs % 60).padStart(2, '0')}
-        </div>
+        </div>}
       </div>
 
-      {/* Right: winners list */}
-      {winners.length > 0 && (
+      {/* Right: winners list — only in result */}
+      {isResult && winners.length > 0 && (
         <div style={{ width: 'clamp(260px,35vw,380px)', display: 'flex', flexDirection: 'column', gap: 'clamp(8px,1.2vw,12px)' }}>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2vw,22px)', color: '#9CA3AF', letterSpacing: 5, marginBottom: 4 }}>
             GAGNANTS
@@ -386,8 +366,9 @@ export default function OkapiColorTVScreen() {
         <AnimatePresence mode="wait">
           {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
           {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
-          {live.currentDraw.status === 'drawing' && <DrawingScreen key="drawing" live={live} />}
-          {live.currentDraw.status === 'result'  && <ResultScreen  key="result"  live={live} secs={secs} />}
+          {(live.currentDraw.status === 'drawing' || live.currentDraw.status === 'result') && (
+            <DrawResultScreen key="draw-result" live={live} secs={secs} />
+          )}
         </AnimatePresence>
       )}
 
