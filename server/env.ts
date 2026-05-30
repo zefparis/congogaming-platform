@@ -49,6 +49,21 @@ const envSchema = z.object({
     .transform((val) => Number(val))
     .pipe(z.number().int().nonnegative())
     .optional(),
+  OKAPI_COLOR_DRAW_INTERVAL_SECONDS: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().positive())
+    .optional(),
+  OKAPI_COLOR_CLOSE_BEFORE_SECONDS: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().nonnegative())
+    .optional(),
+  OKAPI_COLOR_RESULT_DISPLAY_SECONDS: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().nonnegative())
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

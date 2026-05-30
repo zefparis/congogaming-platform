@@ -44,7 +44,7 @@ export default function HomeScreen() {
     if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
     api.lotoLatest().then((r) => setLotoPot(Number(r.pot_cdf || 0))).catch(() => {});
     if (okapiColorEnabled) {
-      api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpot_cdf || 0))).catch(() => {});
+      api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotCdf || 0))).catch(() => {});
     }
     api
       .flashLatest()
@@ -815,7 +815,7 @@ export default function HomeScreen() {
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFFFFF', lineHeight: 1, letterSpacing: 1 }}>OKAPI</div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#ef4444', lineHeight: 1, letterSpacing: 2, marginBottom: 4 }}>COLOR</div>
               <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>6 numéros — rouges payent plus</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 4 }}>Tirage live toutes les 30 min</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 4 }}>Tirage live toutes les 10 min</div>
               <div style={{ color: okapiColorPot >= 250_000 ? '#ff5555' : '#FFD700', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
                 {okapiColorPot >= 250_000 ? '🔴 JACKPOT DISPONIBLE !' : `Jackpot : ${okapiColorPot.toLocaleString('fr-FR')} CDF`}
               </div>

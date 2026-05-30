@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { executerTirageFlash } from './routes/flash.js';
+import { getOkapiColorSlotBoundaries } from './routes/okapi-color.js';
 import { executerTirageLoto } from './routes/loto.js';
 import { executerTirageOkapiColor } from './routes/okapi-color.js';
 import { acquireJobLock } from './lib/jobLock.js';
@@ -65,26 +66,28 @@ async function recoverMissedFlashDraw(reason: 'boot' | 'safety-net') {
 }
 
 // =============================================================
-// Okapi Color scheduler — mirror of Flash scheduler
+// Okapi Color scheduler — intervalles configurables (défaut 10 min)
 // =============================================================
-function getOkapiColorSlotKey(at: Date = new Date()): string {
-  return getFlashSlotKey(at); // same :00/:30 UTC boundaries
+function msUntilNextOkapiColorSlot(): number {
+  const { drawAt } = getOkapiColorSlotBoundaries();
+  return Math.max(0, drawAt.getTime() - Date.now());
 }
 
 async function recoverMissedOkapiColorDraw(reason: 'boot' | 'safety-net') {
   try {
-    const cutoffIso = new Date(Date.now() - 31 * 60_000).toISOString();
+    // Cherche des tickets pending vieux de plus d'un intervalle
+    const { drawAt: prevDraw } = getOkapiColorSlotBoundaries(
+      new Date(Date.now() - (msUntilNextOkapiColorSlot() || 600_000)),
+    );
+    const cutoffIso = new Date(prevDraw.getTime() - 5_000).toISOString();
     const { count, error } = await supabaseAdmin
       .from('okapi_color_tickets')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
-      .lt('created_at', cutoffIso);
-    if (error) {
-      console.error(`[OKAPI-COLOR RECOVERY/${reason}] Probe failed:`, error.message);
-      return;
-    }
+      .lt('draw_at', cutoffIso);
+    if (error) { console.error(`[OKAPI-COLOR RECOVERY/${reason}]`, error.message); return; }
     if (!count || count === 0) return;
-    const slotKey = `oc:recover:${getOkapiColorSlotKey(new Date(Date.now() - 30 * 60_000))}`;
+    const slotKey = `oc:recover:${Date.now()}`;
     const acquired = await acquireJobLock('okapi_color_draw', slotKey);
     if (!acquired) return;
     console.log(`[OKAPI-COLOR RECOVERY/${reason}] ${count} orphan ticket(s) — catch-up draw`);
@@ -96,11 +99,12 @@ async function recoverMissedOkapiColorDraw(reason: 'boot' | 'safety-net') {
 }
 
 function scheduleNextOkapiColorDraw() {
-  const ms = msUntilNextFlashSlot();
+  const ms = msUntilNextOkapiColorSlot();
   setTimeout(async () => {
     try {
-      const slotKey = `oc:${getOkapiColorSlotKey()}`;
-      const acquired = await acquireJobLock('okapi_color_draw', slotKey);
+      const { slotKey } = getOkapiColorSlotBoundaries();
+      const lockKey = `oc:${slotKey}`;
+      const acquired = await acquireJobLock('okapi_color_draw', lockKey);
       if (!acquired) return;
       try {
         const result = await executerTirageOkapiColor();

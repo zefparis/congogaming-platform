@@ -7,34 +7,40 @@ import { motion, AnimatePresence } from 'framer-motion';
 type DrawState = 'open' | 'closing' | 'drawing' | 'result';
 
 interface Winner {
-  ticket_ref: string;
-  nb_rouges: number;
-  nb_or: number;
-  gains_cdf: number;
+  ticketRef: string;
+  nbRouges: number;
+  nbOr: number;
+  gainsCdf: number;
 }
 
 interface LastDraw {
-  draw_number: number | null;
-  slot_key: string | null;
-  numeros_rouges: number[];
-  numeros_or: number[];
-  drawn_at: string;
-  jackpot_paye: boolean;
-  winner_count: number;
-  total_paid_cdf: number;
+  drawNumber: number | null;
+  slotKey: string | null;
+  numerosRouges: number[];
+  numerosOr: number[];
+  drawnAt: string;
+  jackpotPaye: boolean;
+  winnerCount: number;
+  totalPaidCdf: number;
   winners: Winner[];
 }
 
 interface LiveData {
-  state: DrawState;
-  slot_key: string;
-  next_draw_at: string;
-  secs_to_next: number;
-  jackpot_cdf: number;
-  jackpot_threshold_cdf: number;
-  tickets_pending: number;
-  ticket_price_cdf: number;
-  last_draw: LastDraw | null;
+  enabled: boolean;
+  serverTime: string;
+  ticketPriceCdf: number;
+  jackpotCdf: number;
+  jackpotThresholdCdf: number;
+  drawIntervalSeconds: number;
+  currentDraw: {
+    slotKey: string;
+    status: DrawState;
+    drawAt: string;
+    closeAt: string;
+    secondsRemaining: number;
+  };
+  lastDraw: LastDraw | null;
+  publicStats: { ticketsCount: number; winnerCount: number; totalPaidCdf: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +120,7 @@ function Countdown({ secs }: { secs: number }) {
 // State screens
 // ---------------------------------------------------------------------------
 function OpenScreen({ live, secs }: { live: LiveData; secs: number }) {
-  const isJackpotReady = live.jackpot_cdf >= live.jackpot_threshold_cdf;
+  const isJackpotReady = live.jackpotCdf >= live.jackpotThresholdCdf;
   return (
     <motion.div
       key="open"
@@ -139,7 +145,7 @@ function OpenScreen({ live, secs }: { live: LiveData; secs: number }) {
             transition={{ duration: 1.5, repeat: Infinity }}
             style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 64, color: isJackpotReady ? '#ef4444' : '#FFD700', lineHeight: 1 }}
           >
-            {live.jackpot_cdf.toLocaleString('fr-FR')} <span style={{ fontSize: 32 }}>CDF</span>
+            {live.jackpotCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 32 }}>CDF</span>
           </motion.div>
           {isJackpotReady && (
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#ef4444', letterSpacing: 3, marginTop: 4 }}>
@@ -152,10 +158,10 @@ function OpenScreen({ live, secs }: { live: LiveData; secs: number }) {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 4 }}>TICKETS JOUÉS</div>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 64, color: '#fff', lineHeight: 1 }}>
-            {live.tickets_pending}
+            {live.publicStats.ticketsCount}
           </div>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#9CA3AF', letterSpacing: 2, marginTop: 4 }}>
-            {live.ticket_price_cdf.toLocaleString('fr-FR')} CDF / ticket
+            {live.ticketPriceCdf.toLocaleString('fr-FR')} CDF / ticket
           </div>
         </div>
 
@@ -174,7 +180,7 @@ function OpenScreen({ live, secs }: { live: LiveData; secs: number }) {
 
       {/* Payout hint */}
       <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: 'rgba(255,255,255,0.3)', letterSpacing: 3 }}>
-        6 ROUGES = JACKPOT · 6 NUMÉROS À CHOISIR · TIRAGE LIVE TOUTES LES 30 MIN
+        {`6 ROUGES = JACKPOT · 6 NUMÉROS À CHOISIR · TIRAGE LIVE TOUTES LES ${Math.round(live.drawIntervalSeconds / 60)} MIN`}
       </div>
     </motion.div>
   );
@@ -205,9 +211,9 @@ function ClosingScreen({ secs }: { secs: number }) {
 }
 
 function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; revealedRed: number[]; revealedGold: number[] }) {
-  const rouges = live.last_draw?.numeros_rouges ?? [];
-  const ors    = live.last_draw?.numeros_or    ?? [];
-  const dn     = live.last_draw?.draw_number;
+  const rouges = live.lastDraw?.numerosRouges ?? [];
+  const ors    = live.lastDraw?.numerosOr    ?? [];
+  const dn     = live.lastDraw?.drawNumber;
 
   return (
     <motion.div
@@ -227,12 +233,12 @@ function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; re
           🔴 NUMÉROS ROUGES
         </div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
-          {rouges.map((n, i) => (
+          {rouges.map((n: number, i: number) => (
             revealedRed.includes(n)
               ? <Ball key={i} n={n} color="red" visible />
               : <BallPlaceholder key={i} color="red" />
           ))}
-          {rouges.length === 0 && [0,1,2,3,4,5].map(i => <BallPlaceholder key={i} color="red" />)}
+          {rouges.length === 0 && [0,1,2,3,4,5].map((i: number) => <BallPlaceholder key={i} color="red" />)}
         </div>
       </div>
 
@@ -242,12 +248,12 @@ function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; re
           🟡 NUMÉROS OR
         </div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
-          {ors.map((n, i) => (
+          {ors.map((n: number, i: number) => (
             revealedGold.includes(n)
               ? <Ball key={i} n={n} color="gold" visible />
               : <BallPlaceholder key={i} color="gold" />
           ))}
-          {ors.length === 0 && [0,1,2,3].map(i => <BallPlaceholder key={i} color="gold" />)}
+          {ors.length === 0 && [0,1,2,3].map((i: number) => <BallPlaceholder key={i} color="gold" />)}
         </div>
       </div>
     </motion.div>
@@ -255,10 +261,10 @@ function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; re
 }
 
 function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
-  const draw    = live.last_draw;
-  const rouges  = draw?.numeros_rouges ?? [];
-  const ors     = draw?.numeros_or     ?? [];
-  const winners = draw?.winners        ?? [];
+  const draw    = live.lastDraw;
+  const rouges  = draw?.numerosRouges ?? [];
+  const ors     = draw?.numerosOr     ?? [];
+  const winners = draw?.winners       ?? [];
 
   return (
     <motion.div
@@ -268,9 +274,9 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
     >
       {/* Left: numbers + stats */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
-        {draw?.draw_number && (
+        {draw?.drawNumber && (
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, color: '#9CA3AF', letterSpacing: 5 }}>
-            RÉSULTATS TIRAGE #{draw.draw_number}
+            RÉSULTATS TIRAGE #{draw.drawNumber}
           </div>
         )}
 
@@ -278,7 +284,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
         <div>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#ef4444', letterSpacing: 4, marginBottom: 12 }}>🔴 ROUGES</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {rouges.map((n, i) => (
+            {rouges.map((n: number, i: number) => (
               <div key={i} style={{ width: 70, height: 70, borderRadius: '50%', background: RED_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 32, color: '#fff', boxShadow: '0 0 16px rgba(239,68,68,0.5)' }}>{n}</div>
             ))}
           </div>
@@ -288,7 +294,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
         <div>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#fbbf24', letterSpacing: 4, marginBottom: 12 }}>🟡 OR</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {ors.map((n, i) => (
+            {ors.map((n: number, i: number) => (
               <div key={i} style={{ width: 70, height: 70, borderRadius: '50%', background: GOLD_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 32, color: '#000', boxShadow: '0 0 16px rgba(251,191,36,0.5)' }}>{n}</div>
             ))}
           </div>
@@ -298,12 +304,12 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
         <div style={{ display: 'flex', gap: 40 }}>
           <div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#9CA3AF', letterSpacing: 3 }}>GAGNANTS</div>
-            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 56, color: '#fff' }}>{draw?.winner_count ?? 0}</div>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 56, color: '#fff' }}>{draw?.winnerCount ?? 0}</div>
           </div>
           <div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#9CA3AF', letterSpacing: 3 }}>DISTRIBUÉ</div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 56, color: '#00A86B' }}>
-              {(draw?.total_paid_cdf ?? 0).toLocaleString('fr-FR')} <span style={{ fontSize: 28 }}>CDF</span>
+              {(draw?.totalPaidCdf ?? 0).toLocaleString('fr-FR')} <span style={{ fontSize: 28 }}>CDF</span>
             </div>
           </div>
         </div>
@@ -320,7 +326,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 5, marginBottom: 4 }}>
             GAGNANTS
           </div>
-          {winners.map((w, i) => (
+          {winners.map((w: Winner, i: number) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, x: 30 }}
@@ -338,19 +344,19 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
             >
               <div>
                 <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#fff' }}>
-                  Ticket #{w.ticket_ref}
+                  Ticket #{w.ticketRef}
                 </div>
                 <div style={{ fontSize: 14, color: '#9CA3AF', marginTop: 2 }}>
-                  {w.nb_rouges > 0 && <span style={{ color: '#ef4444' }}>{w.nb_rouges}🔴 </span>}
-                  {w.nb_or > 0 && <span style={{ color: '#fbbf24' }}>{w.nb_or}🟡</span>}
+                  {w.nbRouges > 0 && <span style={{ color: '#ef4444' }}>{w.nbRouges}🔴 </span>}
+                  {w.nbOr > 0 && <span style={{ color: '#fbbf24' }}>{w.nbOr}🟡</span>}
                 </div>
               </div>
               <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#00A86B' }}>
-                +{w.gains_cdf.toLocaleString('fr-FR')} CDF
+                +{w.gainsCdf.toLocaleString('fr-FR')} CDF
               </div>
             </motion.div>
           ))}
-          {draw?.jackpot_paye && (
+          {draw?.jackpotPaye && (
             <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 12, padding: '14px 20px', textAlign: 'center' }}>
               <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, color: '#ef4444' }}>🎉 JACKPOT PAYÉ !</div>
             </div>
@@ -381,8 +387,8 @@ export default function OkapiColorTVScreen() {
         if (!r.ok) { setError(true); return; }
         const data: LiveData = await r.json();
         setError(false);
-        setLive(prev => {
-          setSecs(data.secs_to_next);
+        setLive(() => {
+          setSecs(data.currentDraw.secondsRemaining);
           return data;
         });
       } catch { setError(true); }
@@ -401,15 +407,16 @@ export default function OkapiColorTVScreen() {
   // Ball reveal animation — triggered when entering drawing state with a new slot
   useEffect(() => {
     if (!live) return;
-    const slotKey = live.last_draw?.slot_key ?? live.slot_key;
+    const st      = live.currentDraw.status;
+    const slotKey = live.lastDraw?.slotKey ?? live.currentDraw.slotKey;
 
-    if (live.state !== 'drawing') {
+    if (st !== 'drawing') {
       // Reset balls when leaving drawing state
       if (prevStateRef.current === 'drawing') {
         setRed([]);
         setGold([]);
       }
-      prevStateRef.current = live.state;
+      prevStateRef.current = st;
       return;
     }
 
@@ -418,8 +425,8 @@ export default function OkapiColorTVScreen() {
     prevSlotRef.current  = slotKey;
     prevStateRef.current = 'drawing';
 
-    const rouges = live.last_draw?.numeros_rouges ?? [];
-    const ors    = live.last_draw?.numeros_or    ?? [];
+    const rouges = live.lastDraw?.numerosRouges ?? [];
+    const ors    = live.lastDraw?.numerosOr    ?? [];
     setRed([]);
     setGold([]);
 
@@ -431,7 +438,7 @@ export default function OkapiColorTVScreen() {
       timers.push(setTimeout(() => setGold(p => [...p, n]), 600 + rouges.length * 1800 + 800 + i * 1800));
     });
     return () => timers.forEach(clearTimeout);
-  }, [live?.state, live?.last_draw?.slot_key, live?.slot_key]);
+  }, [live?.currentDraw.status, live?.lastDraw?.slotKey, live?.currentDraw.slotKey]);
 
   return (
     <div style={{
@@ -452,27 +459,32 @@ export default function OkapiColorTVScreen() {
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 12px #fbbf24' }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-          {live?.last_draw?.draw_number && (
+          {live?.lastDraw?.drawNumber && (
             <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, color: '#9CA3AF', letterSpacing: 3 }}>
-              TIRAGE #{live.last_draw.draw_number}
+              TIRAGE #{live.lastDraw.drawNumber}
             </span>
           )}
-          <div style={{
-            padding: '6px 16px', borderRadius: 20,
-            background: live?.state === 'open' ? 'rgba(0,168,107,0.2)' : live?.state === 'closing' ? 'rgba(239,68,68,0.2)' : live?.state === 'drawing' ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)',
-            border: `1px solid ${live?.state === 'open' ? 'rgba(0,168,107,0.4)' : live?.state === 'closing' ? 'rgba(239,68,68,0.4)' : live?.state === 'drawing' ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
-          }}>
-            <motion.span
-              animate={live?.state === 'drawing' ? { opacity: [1, 0.4, 1] } : {}}
-              transition={{ duration: 0.6, repeat: Infinity }}
-              style={{
-                fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, letterSpacing: 4,
-                color: live?.state === 'open' ? '#00A86B' : live?.state === 'closing' ? '#ef4444' : live?.state === 'drawing' ? '#fbbf24' : '#9CA3AF',
-              }}
-            >
-              {live?.state === 'open' ? '● EN DIRECT' : live?.state === 'closing' ? '● FERMETURE' : live?.state === 'drawing' ? '● TIRAGE' : live?.state === 'result' ? '● RÉSULTATS' : '● CONNEXION...'}
-            </motion.span>
-          </div>
+          {(() => {
+            const st = live?.currentDraw.status;
+            return (
+              <div style={{
+                padding: '6px 16px', borderRadius: 20,
+                background: st === 'open' ? 'rgba(0,168,107,0.2)' : st === 'closing' ? 'rgba(239,68,68,0.2)' : st === 'drawing' ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)',
+                border: `1px solid ${st === 'open' ? 'rgba(0,168,107,0.4)' : st === 'closing' ? 'rgba(239,68,68,0.4)' : st === 'drawing' ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              }}>
+                <motion.span
+                  animate={st === 'drawing' ? { opacity: [1, 0.4, 1] } : {}}
+                  transition={{ duration: 0.6, repeat: Infinity }}
+                  style={{
+                    fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, letterSpacing: 4,
+                    color: st === 'open' ? '#00A86B' : st === 'closing' ? '#ef4444' : st === 'drawing' ? '#fbbf24' : '#9CA3AF',
+                  }}
+                >
+                  {st === 'open' ? '● EN DIRECT' : st === 'closing' ? '● FERMETURE' : st === 'drawing' ? '● TIRAGE' : st === 'result' ? '● RÉSULTATS' : '● CONNEXION...'}
+                </motion.span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -487,17 +499,17 @@ export default function OkapiColorTVScreen() {
 
       {!error && live && (
         <AnimatePresence mode="wait">
-          {live.state === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} />}
-          {live.state === 'closing' && <ClosingScreen key="closing" secs={secs} />}
-          {live.state === 'drawing' && <DrawingScreen key="drawing" live={live} revealedRed={revealedRed} revealedGold={revealedGold} />}
-          {live.state === 'result'  && <ResultScreen  key="result"  live={live} secs={secs} />}
+          {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} />}
+          {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
+          {live.currentDraw.status === 'drawing' && <DrawingScreen key="drawing" live={live} revealedRed={revealedRed} revealedGold={revealedGold} />}
+          {live.currentDraw.status === 'result'  && <ResultScreen  key="result"  live={live} secs={secs} />}
         </AnimatePresence>
       )}
 
       {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 48px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
         <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 16, color: 'rgba(255,255,255,0.2)', letterSpacing: 3 }}>
-          CONGO GAMING · TIRAGE LIVE TOUTES LES 30 MIN
+          {`CONGO GAMING · TIRAGE LIVE TOUTES LES ${Math.round((live?.drawIntervalSeconds ?? 600) / 60)} MIN`}
         </span>
         <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 16, color: 'rgba(255,255,255,0.2)', letterSpacing: 2 }}>
           {PLAY_URL}
