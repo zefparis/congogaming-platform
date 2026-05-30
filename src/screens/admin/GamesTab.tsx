@@ -454,10 +454,10 @@ function OkapiColorSubTab() {
             Dernier tirage {live.lastDraw.drawNumber ? `#${live.lastDraw.drawNumber}` : ''} — {fmtDateTime(live.lastDraw.drawnAt)}
           </div>
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {live.lastDraw.numerosRouges.map((n) => (
+            {(live.lastDraw.numerosRouges ?? []).map((n) => (
               <span key={n} className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-700/80 text-xs font-bold text-white">{n}</span>
             ))}
-            {live.lastDraw.numerosOr.map((n) => (
+            {(live.lastDraw.numerosOr ?? []).map((n) => (
               <span key={n} className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-yellow-600/80 text-xs font-bold text-black">{n}</span>
             ))}
           </div>
@@ -493,14 +493,14 @@ function OkapiColorSubTab() {
                 <td className="px-3 py-2 text-white/80">{fmtDateTime(d.drawn_at)}</td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {d.numeros_rouges.map((n) => (
+                    {(d.numeros_rouges ?? []).map((n) => (
                       <span key={n} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-700/70 text-[11px] font-bold text-white">{n}</span>
                     ))}
                   </div>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {d.numeros_or.map((n) => (
+                    {(d.numeros_or ?? []).map((n) => (
                       <span key={n} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-yellow-600/70 text-[11px] font-bold text-black">{n}</span>
                     ))}
                   </div>
