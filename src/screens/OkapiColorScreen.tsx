@@ -311,11 +311,20 @@ export default function OkapiColorScreen() {
       <AnimatePresence>
         {showBetsOpen && (
           <motion.div
-            initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -40, opacity: 0 }}
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
             className="mx-4 mt-3 rounded-2xl p-3 flex items-center justify-between"
             style={{ background: 'rgba(0,168,107,0.15)', border: '1px solid rgba(0,168,107,0.4)' }}
           >
-            <span className="font-display tracking-widest text-sm" style={{ color: '#00A86B' }}>✅ PARIS OUVERTS — JOUEZ MAINTENANT !</span>
+            <motion.div
+              animate={{ scale: [1, 1.02, 1], opacity: [1, 0.85, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="font-display tracking-widest text-sm"
+              style={{ color: '#00A86B' }}
+            >
+              ✅ PARIS OUVERTS — JOUEZ MAINTENANT !
+            </motion.div>
             <button onClick={() => setShowBetsOpen(false)} className="text-zinc-500 text-lg leading-none ml-3">×</button>
           </motion.div>
         )}
