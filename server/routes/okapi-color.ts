@@ -526,10 +526,9 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             const contribution = OKAPI_COLOR_CONFIG.jackpotContributionCdf;
             if (contribution > 0) {
               // Best-effort : si le pot est déjà à 0 on ignore l'erreur
-              await supabaseAdmin
-                .rpc('increment_okapi_color_jackpot', { delta: -contribution })
-                .then()
-                .catch(() => {});
+              try {
+                await supabaseAdmin.rpc('increment_okapi_color_jackpot', { delta: -contribution });
+              } catch (_) { /* intentionally ignored */ }
               potRollbackCdf += contribution;
             }
           }
