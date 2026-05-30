@@ -459,25 +459,31 @@ export const adminApi = {
     }>('/api/admin/scratch/overview'),
 
   okapiColorLive: () =>
-    request<{
-      enabled: boolean;
-      jackpotCdf: number;
-      jackpotThresholdCdf: number;
-      ticketPriceCdf: number;
-      currentDraw: { slotKey: string; status: string; drawAt: string; closeAt: string; secondsRemaining: number };
-      lastDraw: { drawNumber: number | null; numerosRouges: number[]; numerosOr: number[]; drawnAt: string; jackpotPaye: boolean; winnerCount: number; totalPaidCdf: number } | null;
-      publicStats: { ticketsCount: number; winnerCount: number; totalPaidCdf: number };
-    }>('/api/okapi-color/live'),
+    fetch(`${BASE}/api/okapi-color/live`, { cache: 'no-store' }).then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<{
+        enabled: boolean;
+        jackpotCdf: number;
+        jackpotThresholdCdf: number;
+        ticketPriceCdf: number;
+        currentDraw: { slotKey: string; status: string; drawAt: string; closeAt: string; secondsRemaining: number };
+        lastDraw: { drawNumber: number | null; numerosRouges: number[]; numerosOr: number[]; drawnAt: string; jackpotPaye: boolean; winnerCount: number; totalPaidCdf: number } | null;
+        publicStats: { ticketsCount: number; winnerCount: number; totalPaidCdf: number };
+      }>;
+    }),
 
   okapiColorLatestDraws: () =>
-    request<Array<{
-      id: string;
-      draw_number: number | null;
-      numeros_rouges: number[];
-      numeros_or: number[];
-      drawn_at: string;
-      jackpot_paye: boolean;
-    }>>('/api/okapi-color/latest-draws'),
+    fetch(`${BASE}/api/okapi-color/latest-draws`, { cache: 'no-store' }).then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<Array<{
+        id: string;
+        draw_number: number | null;
+        numeros_rouges: number[];
+        numeros_or: number[];
+        drawn_at: string;
+        jackpot_paye: boolean;
+      }>>;
+    }),
 
   okapiColorForceDraw: () => {
     const secret = getAdminSecret() || FALLBACK_SECRET;
