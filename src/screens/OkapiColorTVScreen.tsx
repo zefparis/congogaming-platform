@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import OkapiColorDrawShow from '../components/okapi-color/OkapiColorDrawShow';
 
@@ -179,6 +179,21 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   const drawKey  = draw?.slotKey ?? live.currentDraw.slotKey;
   const isResult = live.currentDraw.status === 'result';
 
+  // animComplete: controls when the winners column is rendered.
+  // Starts true if we land directly on result (no animation to wait for).
+  // Set to true by onComplete callback when all balls have landed.
+  const [animComplete, setAnimComplete] = useState(isResult);
+  const prevStatusRef = useRef(live.currentDraw.status);
+  useEffect(() => {
+    const st = live.currentDraw.status;
+    // Fresh result with no prior drawing animation → show winners immediately
+    if (st === 'result' && prevStatusRef.current !== 'drawing') setAnimComplete(true);
+    // New draw cycle → reset
+    if (st === 'open' || st === 'closing') setAnimComplete(false);
+    prevStatusRef.current = st;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.currentDraw.status]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -198,6 +213,7 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           status={live.currentDraw.status as 'drawing' | 'result'}
           drawKey={drawKey}
           mode="tv"
+          onComplete={() => setAnimComplete(true)}
         />
 
         {/* Stats — only visible in result phase */}
@@ -220,8 +236,8 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
         </div>}
       </div>
 
-      {/* Right: winners list — only in result */}
-      {isResult && winners.length > 0 && (
+      {/* Right: winners list — only after animation completes (prevents grid layout shift mid-flight) */}
+      {isResult && animComplete && winners.length > 0 && (
         <div style={{ width: 'clamp(260px,35vw,380px)', display: 'flex', flexDirection: 'column', gap: 'clamp(8px,1.2vw,12px)' }}>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2vw,22px)', color: '#9CA3AF', letterSpacing: 5, marginBottom: 4 }}>
             GAGNANTS
