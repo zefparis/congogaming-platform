@@ -147,6 +147,9 @@ export default function OkapiColorScreen() {
   const [revGold, setRevGold] = useState<number[]>([]);
   const prevSlotRef  = useRef('');
   const prevStateRef = useRef<DrawStatus | ''>('');
+  const prevStatusForNotifRef = useRef<DrawStatus | ''>('');
+
+  const [showBetsOpen, setShowBetsOpen] = useState(false);
 
   const grid = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 1), []);
 
@@ -192,6 +195,19 @@ export default function OkapiColorScreen() {
     const id = setInterval(() => refreshBalance(session.id).then(setBalance).catch(() => {}), 30_000);
     return () => clearInterval(id);
   }, [session?.id]);
+
+  // Notify when betting reopens (result → open)
+  useEffect(() => {
+    if (!live) return;
+    const st = live.currentDraw.status;
+    if (prevStatusForNotifRef.current === 'result' && st === 'open') {
+      setShowBetsOpen(true);
+      const t = setTimeout(() => setShowBetsOpen(false), 7000);
+      prevStatusForNotifRef.current = st;
+      return () => clearTimeout(t);
+    }
+    prevStatusForNotifRef.current = st;
+  }, [live?.currentDraw.status]);
 
   // Ball reveal animation on DRAWING
   useEffect(() => {
@@ -259,6 +275,11 @@ export default function OkapiColorScreen() {
   const statusColor = status === 'open' ? '#00A86B' : status === 'closing' ? '#ef4444' : status === 'drawing' ? '#fbbf24' : '#9CA3AF';
   const statusLabel = { open: '● EN DIRECT', closing: '● FERMETURE', drawing: '● TIRAGE', result: '● RÉSULTATS' }[status];
 
+  // During result: approximate time until betting reopens (7.5 min = 450s before draw)
+  const secsUntilOpen = status === 'result' && secs > 450 ? secs - 450 : 0;
+  const openMinStr = String(Math.floor(secsUntilOpen / 60)).padStart(2, '0');
+  const openSecStr = String(secsUntilOpen % 60).padStart(2, '0');
+
   return (
     <div className="min-h-screen pb-28" style={{ background: '#060606', color: '#fff' }}>
 
@@ -285,6 +306,20 @@ export default function OkapiColorScreen() {
           </div>
         </div>
       </header>
+
+      {/* Betting-opens notification */}
+      <AnimatePresence>
+        {showBetsOpen && (
+          <motion.div
+            initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -40, opacity: 0 }}
+            className="mx-4 mt-3 rounded-2xl p-3 flex items-center justify-between"
+            style={{ background: 'rgba(0,168,107,0.15)', border: '1px solid rgba(0,168,107,0.4)' }}
+          >
+            <span className="font-display tracking-widest text-sm" style={{ color: '#00A86B' }}>✅ PARIS OUVERTS — JOUEZ MAINTENANT !</span>
+            <button onClick={() => setShowBetsOpen(false)} className="text-zinc-500 text-lg leading-none ml-3">×</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Jackpot banner */}
       <div className="mx-4 mt-4 rounded-2xl border px-4 py-3" style={{
@@ -455,8 +490,13 @@ export default function OkapiColorScreen() {
                   <div className="font-display text-lg text-emerald-400">{live.lastDraw.totalPaidCdf.toLocaleString('fr-FR')} CDF</div>
                 </div>
                 <div className="ml-auto text-right">
-                  <div className="text-[10px] text-zinc-500">Prochain</div>
+                  <div className="text-[10px] text-zinc-500">Prochain tirage</div>
                   <div className="font-display text-lg">{minStr}:{secStr}</div>
+                  {secsUntilOpen > 0 && (
+                    <div className="text-[10px] mt-0.5" style={{ color: '#fbbf24' }}>
+                      Paris dans {openMinStr}:{openSecStr}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -517,6 +557,35 @@ export default function OkapiColorScreen() {
           <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Vos tickets ce tirage ({myTickets.length})</div>
           <div className="space-y-2">
             {myTickets.map((t) => <TicketCard key={t.id} t={t} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Recent draws history */}
+      {live?.recentDraws && live.recentDraws.length > 0 && (
+        <div className="mx-4 mt-4 mb-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
+          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
+            Derniers tirages ({live.recentDraws.length})
+          </div>
+          <div className="space-y-2">
+            {live.recentDraws.slice(0, 10).map((d, i) => (
+              <div key={i} className="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono text-zinc-500">
+                    {d.drawNumber ? `Tirage #${d.drawNumber}` : d.slotKey ?? '—'}
+                  </span>
+                  <span className="text-[10px] text-zinc-600">
+                    {new Date(d.drawnAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {d.numerosRouges.map((n) => <Ball key={`r${n}`} n={n} color="red" size="sm" />)}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {d.numerosOr.map((n) => <Ball key={`g${n}`} n={n} color="gold" size="sm" />)}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
