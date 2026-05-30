@@ -58,8 +58,10 @@ export default function OkapiColorDrawShow({
   const goldRef = useRef<number[]>([]);
   redRef.current  = cleanRedNumbers;
   goldRef.current = cleanGoldNumbers;
-  const statusRef  = useRef<DrawStatus>('open');
-  statusRef.current = status;
+  const statusRef     = useRef<DrawStatus>('open');
+  statusRef.current   = status;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   // ─── Orientation lock (mobile only) ────────────────────────────────────────
   useEffect(() => {
@@ -144,7 +146,7 @@ export default function OkapiColorDrawShow({
     timelineRef.current?.kill();
 
     const rootBox = rootRef.current.getBoundingClientRect();
-    const tl = gsap.timeline({ onComplete });
+    const tl = gsap.timeline({ onComplete: () => onCompleteRef.current?.() });
     timelineRef.current = tl;
     const duration = isTv ? 3.0 : 2.2;   // visible travel time per ball
     const gap      = isTv ? 1.4 : 1.0;   // pause after each impact before next ball
@@ -230,8 +232,9 @@ export default function OkapiColorDrawShow({
       ballLayerRef.current?.querySelectorAll('.okapi-draw-ball, .okapi-trail-particle').forEach((b) => b.remove());
     };
   // totalNumbers in deps: re-run when gold numbers arrive after reds (common on first poll)
+  // onComplete intentionally NOT in deps — accessed via ref to prevent killing timeline on re-render
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawKey, totalNumbers, isTv, onComplete]);
+  }, [drawKey, totalNumbers, isTv]);
 
   return (
     <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode} okapi-draw-show-${status}`}>
