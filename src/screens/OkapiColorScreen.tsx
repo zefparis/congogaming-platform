@@ -150,6 +150,12 @@ export default function OkapiColorScreen() {
 
   const grid = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 1), []);
 
+  // Debug mount
+  useEffect(() => {
+    console.log('[OkapiColor] mounted');
+    console.log('[OkapiColor] live endpoint = /api/okapi-color/live');
+  }, []);
+
   // Poll live data every 2s
   useEffect(() => {
     const fetch_ = () => {

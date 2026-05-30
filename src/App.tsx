@@ -103,7 +103,6 @@ function KycRoute() {
 
 function AppRoutes() {
   const location = useLocation();
-  const okapiColorEnabled = import.meta.env.VITE_OKAPI_COLOR_ENABLED === 'true';
   const showNav = ['/', '/loto', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
   return (
     <>
@@ -131,9 +130,7 @@ function AppRoutes() {
           <Route path="/flash" element={<Protected><PageWrap><FlashScreen /></PageWrap></Protected>} />
           <Route path="/scratch" element={<Protected><PageWrap><ScratchScreen /></PageWrap></Protected>} />
           <Route path="/climb" element={<Protected><PageWrap fullscreen><OkapiGame /></PageWrap></Protected>} />
-          {okapiColorEnabled && (
-            <Route path="/okapi-color" element={<Protected><PageWrap><OkapiColorScreen /></PageWrap></Protected>} />
-          )}
+          <Route path="/okapi-color" element={<Protected><PageWrap><OkapiColorScreen /></PageWrap></Protected>} />
           <Route path="/legal" element={<Protected><PageWrap><LegalScreen /></PageWrap></Protected>} />
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />
           <Route path="*" element={<Navigate to="/" replace />} />
