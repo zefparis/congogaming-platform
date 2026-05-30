@@ -155,24 +155,13 @@ function OpenScreen({ live, secs, qrUrl, playUrl }: { live: LiveData; secs: numb
             transition={{ duration: 1.5, repeat: Infinity }}
             style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 64, color: isJackpotReady ? '#ef4444' : '#FFD700', lineHeight: 1 }}
           >
-            {live.jackpotCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 32 }}>CDF</span>
+            {live.jackpotThresholdCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 32 }}>CDF</span>
           </motion.div>
           {isJackpotReady && (
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#ef4444', letterSpacing: 3, marginTop: 4 }}>
               🔴 JACKPOT DISPONIBLE !
             </div>
           )}
-        </div>
-
-        {/* Tickets */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 4 }}>TICKETS JOUÉS</div>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 64, color: '#fff', lineHeight: 1 }}>
-            {live.publicStats.ticketsCount}
-          </div>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#9CA3AF', letterSpacing: 2, marginTop: 4 }}>
-            {live.ticketPriceCdf.toLocaleString('fr-FR')} CDF / ticket
-          </div>
         </div>
 
         {/* QR code */}
