@@ -42,7 +42,7 @@ export default function HomeScreen() {
   useEffect(() => {
     if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
     api.lotoLatest().then((r) => setLotoPot(Number(r.pot_cdf || 0))).catch(() => {});
-    api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotCdf || 0))).catch(() => {});
+    api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
     api
       .flashLatest()
       .then((r) => {
@@ -710,7 +710,7 @@ export default function HomeScreen() {
               <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>6 numéros — rouges et or</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 6 }}>Tirage live toutes les 10 min</div>
               <div style={{ color: '#FFD700', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
-                Jackpot : {(okapiColorPot > 0 ? okapiColorPot : 250_000).toLocaleString('fr-FR')} CDF
+                Jackpot : {okapiColorPot.toLocaleString('fr-FR')} CDF
               </div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 16 }}>1 000 CDF / ticket</div>
               <motion.button
