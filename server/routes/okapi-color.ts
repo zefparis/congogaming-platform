@@ -716,8 +716,9 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // ----------------------------------------------------------
   app.post('/api/okapi-color/draw', async (req, reply) => {
     const adminSecret = env.OKAPI_COLOR_ADMIN_SECRET || '';
+    const lotoAdminSecret = env.LOTO_ADMIN_SECRET || '';
     const provided    = req.headers['x-admin-secret'];
-    if (!adminSecret || provided !== adminSecret) {
+    if ((!adminSecret || provided !== adminSecret) && (!lotoAdminSecret || provided !== lotoAdminSecret)) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     try {
@@ -734,8 +735,9 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // ----------------------------------------------------------
   app.post('/api/okapi-color/purge-pending', async (req, reply) => {
     const adminSecret = env.OKAPI_COLOR_ADMIN_SECRET || '';
+    const lotoAdminSecret = env.LOTO_ADMIN_SECRET || '';
     const provided    = req.headers['x-admin-secret'];
-    if (!adminSecret || provided !== adminSecret) {
+    if ((!adminSecret || provided !== adminSecret) && (!lotoAdminSecret || provided !== lotoAdminSecret)) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
 
