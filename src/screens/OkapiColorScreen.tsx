@@ -356,10 +356,10 @@ export default function OkapiColorScreen() {
         )}
       </div>
 
-      {/* VOIR LE LIVE CTA — scrolls to live section */}
+      {/* VOIR LE LIVE CTA — opens TV screen in new window */}
       <div className="mx-4 mt-3 flex">
         <button
-          onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
+          onClick={() => window.open('/tv/okapi-color', '_blank')}
           className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold tracking-wide"
           style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}
         >

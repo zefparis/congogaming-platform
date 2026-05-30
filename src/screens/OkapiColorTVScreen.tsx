@@ -491,7 +491,8 @@ export default function OkapiColorTVScreen() {
       </div>
 
       {/* Content area */}
-      {error && (
+      {/* Show connection error only when we have NO live data yet */}
+      {error && !live && (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#9CA3AF', letterSpacing: 4 }}>
             CONNEXION AU SERVEUR...
@@ -499,7 +500,8 @@ export default function OkapiColorTVScreen() {
         </div>
       )}
 
-      {!error && live && (
+      {/* Always render content once live data has loaded, even if a subsequent fetch fails */}
+      {live && (
         <AnimatePresence mode="wait">
           {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
           {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
