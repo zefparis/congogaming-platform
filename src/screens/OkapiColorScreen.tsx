@@ -196,11 +196,12 @@ export default function OkapiColorScreen() {
     return () => clearInterval(id);
   }, [session?.id]);
 
-  // Notify when betting reopens (result → open)
+  // Notify when betting reopens (result → open) or already open on mount
   useEffect(() => {
     if (!live) return;
     const st = live.currentDraw.status;
-    if (prevStatusForNotifRef.current === 'result' && st === 'open') {
+    // Show notification if transition result → open OR if already open on first load
+    if ((prevStatusForNotifRef.current === 'result' && st === 'open') || (prevStatusForNotifRef.current === '' && st === 'open')) {
       setShowBetsOpen(true);
       const t = setTimeout(() => setShowBetsOpen(false), 7000);
       prevStatusForNotifRef.current = st;
