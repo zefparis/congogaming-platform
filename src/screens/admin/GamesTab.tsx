@@ -337,22 +337,24 @@ const STATUS_COLOR: Record<string, string> = {
 function OkapiColorSubTab() {
   const [live, setLive] = useState<OkapiColorLive | null>(null);
   const [draws, setDraws] = useState<OkapiColorDraw[]>([]);
+  const [secs, setSecs] = useState(0);
   const [actionMsg, setActionMsg] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   async function load() {
     const [l, d] = await Promise.all([
       adminApi.okapiColorLive().catch(() => null),
-      adminApi.okapiColorLatestDraws().catch(() => []),
+      adminApi.okapiColorLatestDraws().catch(() => null),
     ]);
-    if (l) setLive(l);
-    setDraws(d ?? []);
+    if (l) { setLive(l); setSecs(l.currentDraw.secondsRemaining); }
+    if (d) setDraws(d);
   }
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    const poll = setInterval(load, 15_000);
+    const tick = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000);
+    return () => { clearInterval(poll); clearInterval(tick); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function forceDraw() {
@@ -384,7 +386,6 @@ function OkapiColorSubTab() {
   }
 
   const st = live?.currentDraw.status ?? '—';
-  const secs = live?.currentDraw.secondsRemaining ?? 0;
   const mm = String(Math.floor(secs / 60)).padStart(2, '0');
   const ss = String(secs % 60).padStart(2, '0');
 
