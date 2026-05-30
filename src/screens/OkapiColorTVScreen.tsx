@@ -182,10 +182,10 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'flex-start', justifyContent: 'space-between', overflowY: 'auto' }}
+      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'flex-start', justifyContent: 'space-between', overflowY: 'auto', minHeight: 0 }}
     >
       {/* Left: numbers + stats */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, minHeight: 0 }}>
         {draw?.drawNumber && (
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2.2vw,24px)', color: '#9CA3AF', letterSpacing: 5 }}>
             {isResult ? 'RÉSULTATS TIRAGE' : 'TIRAGE'} #{draw.drawNumber}
@@ -305,9 +305,9 @@ export default function OkapiColorTVScreen() {
 
   return (
     <div style={{
-      width: '100vw', minHeight: '100vh',
+      width: '100vw', height: '100vh',
       background: 'radial-gradient(ellipse at 20% 50%, rgba(185,28,28,0.08) 0%, #050505 60%)',
-      color: 'white', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+      color: 'white', overflow: 'hidden', display: 'flex', flexDirection: 'column',
       position: 'relative',
     }}>
       {/* Decorative bg circles */}
@@ -351,26 +351,25 @@ export default function OkapiColorTVScreen() {
         </div>
       </div>
 
-      {/* Content area */}
-      {/* Show connection error only when we have NO live data yet */}
-      {error && !live && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#9CA3AF', letterSpacing: 4 }}>
-            CONNEXION AU SERVEUR...
+      {/* Content area — flex:1 + minHeight:0 so children can shrink below their intrinsic size */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {error && !live && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#9CA3AF', letterSpacing: 4 }}>
+              CONNEXION AU SERVEUR...
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Always render content once live data has loaded, even if a subsequent fetch fails */}
-      {live && (
-        <AnimatePresence mode="wait">
-          {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
-          {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
-          {(live.currentDraw.status === 'drawing' || live.currentDraw.status === 'result') && (
-            <DrawResultScreen key="draw-result" live={live} secs={secs} />
-          )}
-        </AnimatePresence>
-      )}
+        )}
+        {live && (
+          <AnimatePresence mode="wait">
+            {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
+            {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
+            {(live.currentDraw.status === 'drawing' || live.currentDraw.status === 'result') && (
+              <DrawResultScreen key="draw-result" live={live} secs={secs} />
+            )}
+          </AnimatePresence>
+        )}
+      </div>
 
       {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(8px,1.5vw,12px) clamp(16px,4vw,48px)', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>

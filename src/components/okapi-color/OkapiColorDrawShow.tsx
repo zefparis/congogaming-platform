@@ -302,7 +302,7 @@ export default function OkapiColorDrawShow({
         .okapi-trail-particle-gold { background: radial-gradient(circle at 35% 30%, rgba(255,252,180,0.95), rgba(251,191,36,0.6) 50%, transparent); }
 
         /* ── TV mode ─────────────────────────────────────────────────────────── */
-        .okapi-draw-show-tv { min-height: min(74vh, 760px); border-radius: 34px; }
+        .okapi-draw-show-tv { flex: 1; min-height: 0; border-radius: 34px; }
         .okapi-draw-show-tv .okapi-draw-content  { padding: clamp(22px,3vw,44px);   gap: clamp(18px,2.2vw,30px); }
         .okapi-draw-show-tv .okapi-draw-kicker   { font-size: clamp(18px,2.6vw,36px); letter-spacing: 7px; }
         .okapi-draw-show-tv .okapi-draw-message  { font-size: clamp(18px,2.6vw,34px); letter-spacing: 5px; }
