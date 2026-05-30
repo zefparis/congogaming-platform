@@ -108,6 +108,28 @@ export const api = {
     req<{ win_amount_cdf: number; new_balance: number; grid: string[] }>('/api/scratch/claim', { method: 'POST', body: JSON.stringify({ ticket_id }) }),
   kycScan: (_user_id: string, selfie_b64: string) =>
     req<{ verdict: 'APPROVED' | 'DENIED' | 'VERIFY_AGE'; kyc_status: 'approved' | 'denied' | 'verify_age'; estimated_age: number; age_low: number; age_high: number; is_minor: boolean; scan_id: string; blocked: boolean }>('/api/kyc/scan', { method: 'POST', body: JSON.stringify({ selfie_b64 }) }),
+  okapiColorLive: () =>
+    req<{
+      state: 'open' | 'closing' | 'drawing' | 'result';
+      slot_key: string;
+      next_draw_at: string;
+      secs_to_next: number;
+      jackpot_cdf: number;
+      jackpot_threshold_cdf: number;
+      tickets_pending: number;
+      ticket_price_cdf: number;
+      last_draw: {
+        draw_number: number | null;
+        slot_key: string | null;
+        numeros_rouges: number[];
+        numeros_or: number[];
+        drawn_at: string;
+        jackpot_paye: boolean;
+        winner_count: number;
+        total_paid_cdf: number;
+        winners: Array<{ ticket_ref: string; nb_rouges: number; nb_or: number; gains_cdf: number }>;
+      } | null;
+    }>('/api/okapi-color/live'),
   okapiColorLatest: () =>
     req<{
       tirages: Array<{ id: string; numeros_rouges: number[]; numeros_or: number[]; drawn_at: string; jackpot_paye: boolean }>;

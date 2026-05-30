@@ -12,6 +12,7 @@ import WithdrawScreen from './screens/WithdrawScreen';
 import AccountScreen from './screens/AccountScreen';
 import LotoScreen from './screens/LotoScreen';
 import OkapiColorScreen from './screens/OkapiColorScreen';
+import OkapiColorTVScreen from './screens/OkapiColorTVScreen';
 import FlashScreen from './screens/FlashScreen';
 import ScratchScreen from './screens/ScratchScreen';
 import LegalScreen from './screens/LegalScreen';
@@ -153,10 +154,18 @@ function AppShell() {
   // /admin is a desktop-oriented dashboard: it must not be constrained to
   // the 430px mobile shell, and must not show the player BottomNav.
   const isAdmin = location.pathname.startsWith('/admin');
+  const isTV    = location.pathname.startsWith('/tv');
   if (isAdmin) {
     return (
       <Routes>
         <Route path="/admin" element={<AdminScreen />} />
+      </Routes>
+    );
+  }
+  if (isTV) {
+    return (
+      <Routes>
+        <Route path="/tv/okapi-color" element={<OkapiColorTVScreen />} />
       </Routes>
     );
   }

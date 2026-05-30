@@ -138,6 +138,44 @@ export function calculateOkapiColorPayout(
 }
 
 // =============================================================
+// State machine — calcul côté serveur de l'état du slot actuel
+// Les tirages se font aux frontières :00/:30 UTC comme Flash.
+// =============================================================
+export function getOkapiColorSlotKey(at: Date = new Date()): string {
+  const min  = at.getUTCMinutes();
+  const slot = min < 30 ? '00' : '30';
+  const yyyy = at.getUTCFullYear();
+  const mm   = String(at.getUTCMonth() + 1).padStart(2, '0');
+  const dd   = String(at.getUTCDate()).padStart(2, '0');
+  const hh   = String(at.getUTCHours()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${slot}`;
+}
+
+export type OkapiColorDrawState = 'open' | 'closing' | 'drawing' | 'result';
+
+export function computeOkapiColorState(
+  now: Date = new Date(),
+  secsSinceLastDraw: number = Infinity,
+): { state: OkapiColorDrawState; nextDrawAt: Date; secsToNext: number; slotKey: string } {
+  const min  = now.getUTCMinutes();
+  const sec  = now.getUTCSeconds();
+  const ms   = now.getUTCMilliseconds();
+  const secondsInSlot = (min % 30) * 60 + sec + ms / 1000;
+  const secsToNext    = 30 * 60 - secondsInSlot;
+  const nextDrawAt    = new Date(now.getTime() + secsToNext * 1000);
+  const slotKey       = getOkapiColorSlotKey(now);
+
+  // Priorité au timestamp réel du dernier tirage si disponible
+  let state: OkapiColorDrawState;
+  if (secsSinceLastDraw <= 25)  state = 'drawing';
+  else if (secsSinceLastDraw <= 130) state = 'result';
+  else if (secsToNext <= 40)    state = 'closing';
+  else                          state = 'open';
+
+  return { state, nextDrawAt, secsToNext: Math.round(secsToNext), slotKey };
+}
+
+// =============================================================
 // Tirage — logique partagée (admin route + cron futur)
 // =============================================================
 export type TirageOkapiColorResult = {
@@ -169,9 +207,19 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
     .update(JSON.stringify({ rouges, ors, ts }))
     .digest('hex');
 
+  const drawAt   = new Date();
+  const slotKey  = getOkapiColorSlotKey(drawAt);
+
   const { data: tirage, error: tirErr } = await supabaseAdmin
     .from('okapi_color_tirages')
-    .insert({ numeros_rouges: rouges, numeros_or: ors, hash_pre })
+    .insert({
+      numeros_rouges: rouges,
+      numeros_or:     ors,
+      hash_pre,
+      slot_key:       slotKey,
+      draw_at:        drawAt.toISOString(),
+      channel:        'public',
+    })
     .select('*')
     .single();
   if (tirErr || !tirage) {
@@ -316,6 +364,88 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
 // =============================================================
 const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
+  // ----------------------------------------------------------
+  // GET /api/okapi-color/live
+  // Public — pas d'auth, utilisé par l'affichage TV
+  // ----------------------------------------------------------
+  app.get('/api/okapi-color/live', async (_req, reply) => {
+    const now = new Date();
+
+    // Dernier tirage en DB
+    const { data: lastTirage } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .select('id, draw_number, slot_key, numeros_rouges, numeros_or, drawn_at, jackpot_paye, draw_at')
+      .order('drawn_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const secsSinceLast = lastTirage?.drawn_at
+      ? (now.getTime() - new Date(lastTirage.drawn_at).getTime()) / 1000
+      : Infinity;
+
+    const { state, nextDrawAt, secsToNext, slotKey } = computeOkapiColorState(now, secsSinceLast);
+
+    // Jackpot pot
+    const { data: jackpotRow } = await supabaseAdmin
+      .from('okapi_color_jackpot')
+      .select('pot_cdf')
+      .eq('id', 1)
+      .maybeSingle();
+    const jackpot_cdf = Number(jackpotRow?.pot_cdf ?? 0);
+
+    // Tickets en attente (slot actuel)
+    const { count: pendingCount } = await supabaseAdmin
+      .from('okapi_color_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    // Gagnants du dernier tirage (anonymisés)
+    let last_draw = null;
+    if (lastTirage) {
+      const { data: winTickets } = await supabaseAdmin
+        .from('okapi_color_tickets')
+        .select('id, nb_rouges, nb_or, gains_cdf')
+        .eq('tirage_id', lastTirage.id)
+        .in('status', ['gagnant', 'jackpot_attente'])
+        .gt('gains_cdf', 0)
+        .order('gains_cdf', { ascending: false })
+        .limit(10);
+
+      const totalPaid = (winTickets || []).reduce((s, w) => s + Number(w.gains_cdf), 0);
+
+      last_draw = {
+        draw_number:    lastTirage.draw_number,
+        slot_key:       lastTirage.slot_key,
+        numeros_rouges: lastTirage.numeros_rouges,
+        numeros_or:     lastTirage.numeros_or,
+        drawn_at:       lastTirage.drawn_at,
+        jackpot_paye:   lastTirage.jackpot_paye,
+        winner_count:   (winTickets || []).length,
+        total_paid_cdf: totalPaid,
+        winners: (winTickets || []).map((w) => ({
+          ticket_ref: (w.id as string).slice(-4).toUpperCase(),
+          nb_rouges:  w.nb_rouges,
+          nb_or:      w.nb_or,
+          gains_cdf:  Number(w.gains_cdf),
+        })),
+      };
+    }
+
+    return reply
+      .header('Cache-Control', 'no-store')
+      .send({
+        state,
+        slot_key:              slotKey,
+        next_draw_at:          nextDrawAt.toISOString(),
+        secs_to_next:          secsToNext,
+        jackpot_cdf,
+        jackpot_threshold_cdf: OKAPI_COLOR_CONFIG.jackpotCdf,
+        tickets_pending:       pendingCount ?? 0,
+        ticket_price_cdf:      OKAPI_COLOR_CONFIG.ticketPriceCdf,
+        last_draw,
+      });
+  });
+
   function featureGuard(reply: any): boolean {
     if (!env.OKAPI_COLOR_ENABLED) {
       reply.code(404).send({ error: 'Feature not available' });
@@ -390,6 +520,24 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     if (!isValidOkapiColorNumbers(numeros)) {
       return reply.code(400).send({
         error: 'numeros invalides : 6 entiers distincts entre 1 et 24',
+      });
+    }
+
+    // Refuser les achats pendant CLOSING et DRAWING
+    const { data: lastT } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .select('drawn_at')
+      .order('drawn_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const secsSinceLastDraw = lastT?.drawn_at
+      ? (Date.now() - new Date(lastT.drawn_at).getTime()) / 1000
+      : Infinity;
+    const { state: drawState } = computeOkapiColorState(new Date(), secsSinceLastDraw);
+    if (drawState === 'closing' || drawState === 'drawing') {
+      return reply.code(423).send({
+        error: 'Tirage en cours — paris fermés. Réessayez dans quelques secondes.',
+        code:  'DRAW_IN_PROGRESS',
       });
     }
 
