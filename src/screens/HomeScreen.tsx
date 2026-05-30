@@ -674,7 +674,7 @@ export default function HomeScreen() {
             overflow: 'hidden',
             borderRadius: 16,
             cursor: 'pointer',
-            minHeight: 200,
+            minHeight: 220,
             background: 'linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%)',
             border: '1px solid rgba(220,38,38,0.3)',
           }}
