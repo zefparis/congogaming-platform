@@ -704,7 +704,7 @@ export default function HomeScreen() {
             />
 
             <div style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '58%' }}>
-              <div style={{ fontFamily: 'Bebas Neue', fontSize: 13, color: '#ef4444', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>🔴 Nouveau Live</div>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: 13, color: '#00A86B', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>� Nouveau Live</div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFFFFF', lineHeight: 1, letterSpacing: 1 }}>OKAPI</div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#ef4444', lineHeight: 1, letterSpacing: 2, marginBottom: 4 }}>COLOR</div>
               <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>6 numéros — rouges et or</div>
