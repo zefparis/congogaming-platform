@@ -238,8 +238,9 @@ export default function OkapiColorScreen() {
   const status     = live?.currentDraw.status ?? 'open';
   const isBlocked  = status === 'closing' || status === 'drawing';
   const isFull     = selected.length === 6;
-  const jackpot    = live?.jackpotCdf ?? 0;
-  const threshold  = live?.jackpotThresholdCdf ?? 250_000;
+  const jackpotPrizeCdf = live?.jackpotThresholdCdf ?? 250_000;
+  const potCdf           = live?.jackpotCdf ?? 0;
+  const jackpotAvailable = potCdf >= jackpotPrizeCdf;
   const price      = live?.ticketPriceCdf ?? 1000;
   const intervalMin = Math.round((live?.drawIntervalSeconds ?? 600) / 60);
   const minStr     = String(Math.floor(secs / 60)).padStart(2, '0');
@@ -295,7 +296,7 @@ export default function OkapiColorScreen() {
         </div>
         <div className="ml-auto flex items-center gap-3">
           <button
-            onClick={() => window.open('/tv/okapi-color', '_blank')}
+            onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
             style={{ color: statusColor, background: 'rgba(255,255,255,0.06)', border: `1px solid ${statusColor}44` }}
           >
@@ -333,30 +334,32 @@ export default function OkapiColorScreen() {
 
       {/* Jackpot banner */}
       <div className="mx-4 mt-4 rounded-2xl border px-4 py-3" style={{
-        background: jackpot >= threshold ? 'rgba(239,68,68,0.1)' : 'rgba(30,20,5,0.9)',
-        borderColor: jackpot >= threshold ? 'rgba(239,68,68,0.4)' : 'rgba(255,140,0,0.2)',
+        background: jackpotAvailable ? 'rgba(239,68,68,0.1)' : 'rgba(30,20,5,0.9)',
+        borderColor: jackpotAvailable ? 'rgba(239,68,68,0.4)' : 'rgba(255,140,0,0.2)',
       }}>
         <div className="flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-widest text-zinc-500">Jackpot</span>
-          {jackpot >= threshold && <span className="text-[10px] text-red-400 font-bold animate-pulse">DISPONIBLE !</span>}
+          {jackpotAvailable && <span className="text-[10px] text-red-400 font-bold animate-pulse">DISPONIBLE !</span>}
         </div>
-        <div className="font-display text-3xl mt-0.5" style={{ color: jackpot >= threshold ? '#ff5555' : '#FFD700' }}>
-          {jackpot.toLocaleString('fr-FR')} CDF
+        <div className="font-display text-3xl mt-0.5" style={{ color: jackpotAvailable ? '#ff5555' : '#FFD700' }}>
+          {jackpotPrizeCdf.toLocaleString('fr-FR')} CDF
         </div>
-        <div className="text-[10px] text-zinc-500 mt-1">
-          Objectif : {threshold.toLocaleString('fr-FR')} CDF
-        </div>
-        {jackpot < threshold && (
+        {potCdf > 0 && (
+          <div className="text-[10px] text-zinc-500 mt-1">
+            Pot actuel : {potCdf.toLocaleString('fr-FR')} CDF
+          </div>
+        )}
+        {!jackpotAvailable && (
           <div className="mt-2 w-full h-1 rounded-full bg-zinc-800">
-            <div className="h-1 rounded-full" style={{ width: `${Math.min((jackpot / threshold) * 100, 100)}%`, background: 'linear-gradient(90deg,#c0392b,#e74c3c)' }} />
+            <div className="h-1 rounded-full" style={{ width: `${Math.min((potCdf / jackpotPrizeCdf) * 100, 100)}%`, background: 'linear-gradient(90deg,#c0392b,#e74c3c)' }} />
           </div>
         )}
       </div>
 
-      {/* VOIR LE LIVE CTA — always visible, opens TV screen in new window */}
+      {/* VOIR LE LIVE CTA — scrolls to live section */}
       <div className="mx-4 mt-3 flex">
         <button
-          onClick={() => window.open('/tv/okapi-color', '_blank')}
+          onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
           className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold tracking-wide"
           style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}
         >
