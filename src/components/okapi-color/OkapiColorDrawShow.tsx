@@ -159,7 +159,6 @@ export default function OkapiColorDrawShow({
       const bounceTwoY = rootBox.height * (0.72 - (item.index % 3) * 0.08);
 
       const ball = document.createElement('div');
-      ball.textContent = String(item.number);
       ball.className = `okapi-draw-ball okapi-draw-ball-${item.color}`;
       ball.style.width = `${size}px`;
       ball.style.height = `${size}px`;
@@ -167,6 +166,7 @@ export default function OkapiColorDrawShow({
       ball.style.marginTop = `${-size / 2}px`;
       ballLayerRef.current.appendChild(ball);
 
+      let trailFrame = 0;
       tl.set(ball, { x: startX, y: startY, scale: 0.72, opacity: 0, rotate: 0 })
         .to(ball, { opacity: 1, scale: 1, duration: 0.18, ease: 'power2.out' })
         .to(ball, {
@@ -175,6 +175,29 @@ export default function OkapiColorDrawShow({
             { x: bounceTwoX, y: bounceTwoY, rotate: item.color === 'red' ? 420 : -420, scale: 0.96, duration: duration * 0.28, ease: 'power1.inOut' },
             { x: targetX,    y: targetY,    rotate: item.color === 'red' ? 720 : -720, scale: 0.82, duration: duration * 0.4,  ease: 'power3.in' },
           ],
+          onUpdate() {
+            trailFrame++;
+            if (trailFrame % 2 !== 0 || !ballLayerRef.current) return;
+            const cx = gsap.getProperty(ball, 'x') as number;
+            const cy = gsap.getProperty(ball, 'y') as number;
+            const variance = size * 0.35;
+            const pSize = size * (0.28 + Math.random() * 0.38);
+            const p = document.createElement('div');
+            p.className = `okapi-trail-particle okapi-trail-particle-${item.color}`;
+            p.style.width  = `${pSize}px`;
+            p.style.height = `${pSize}px`;
+            p.style.left   = `${cx - pSize / 2 + (Math.random() - 0.5) * variance}px`;
+            p.style.top    = `${cy - pSize / 2 + (Math.random() - 0.5) * variance}px`;
+            ballLayerRef.current.appendChild(p);
+            gsap.to(p, {
+              opacity: 0, scale: 0.08,
+              x: (Math.random() - 0.5) * size * 0.9,
+              y: (Math.random() - 0.5) * size * 0.9 + size * 0.25,
+              duration: 0.32 + Math.random() * 0.28,
+              ease: 'power2.out',
+              onComplete: () => p.remove(),
+            });
+          },
         })
         .add(() => {
           setHits((prev) => ({ ...prev, [item.number]: item.color === 'red' ? 'redHit' : 'goldHit' }));
@@ -195,7 +218,7 @@ export default function OkapiColorDrawShow({
 
     return () => {
       tl.kill();
-      ballLayerRef.current?.querySelectorAll('.okapi-draw-ball').forEach((b) => b.remove());
+      ballLayerRef.current?.querySelectorAll('.okapi-draw-ball, .okapi-trail-particle').forEach((b) => b.remove());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawKey, status, isTv, onComplete]);
@@ -248,8 +271,24 @@ export default function OkapiColorDrawShow({
           font-family: Bebas Neue, sans-serif; font-weight: 900;
           will-change: transform, opacity; border: 2px solid rgba(255,255,255,0.22);
         }
-        .okapi-draw-ball-red  { color: white;   background: radial-gradient(circle at 30% 25%, #fecaca, #ef4444 35%, #7f1d1d 78%); box-shadow: 0 0 34px rgba(239,68,68,0.95),  0 18px 30px rgba(0,0,0,0.42); }
-        .okapi-draw-ball-gold { color: #090909; background: radial-gradient(circle at 30% 25%, #fff7ad, #fbbf24 35%, #92400e 78%); box-shadow: 0 0 34px rgba(251,191,36,0.95), 0 18px 30px rgba(0,0,0,0.42); }
+        .okapi-draw-ball-red  {
+          background: radial-gradient(circle at 32% 28%, #fecaca, #ef4444 40%, #7f1d1d 80%);
+          box-shadow: 0 0 38px rgba(239,68,68,0.95), 0 0 70px rgba(239,68,68,0.3), 0 14px 28px rgba(0,0,0,0.5);
+          animation: okapi-glow-red 0.38s ease-in-out infinite alternate;
+        }
+        .okapi-draw-ball-gold {
+          background: radial-gradient(circle at 32% 28%, #fff7ad, #fbbf24 40%, #92400e 80%);
+          box-shadow: 0 0 38px rgba(251,191,36,0.95), 0 0 70px rgba(251,191,36,0.3), 0 14px 28px rgba(0,0,0,0.5);
+          animation: okapi-glow-gold 0.38s ease-in-out infinite alternate;
+        }
+        @keyframes okapi-glow-red  { to { box-shadow: 0 0 60px rgba(239,68,68,1), 0 0 110px rgba(239,68,68,0.45), 0 14px 28px rgba(0,0,0,0.5); } }
+        @keyframes okapi-glow-gold { to { box-shadow: 0 0 60px rgba(251,191,36,1), 0 0 110px rgba(251,191,36,0.45), 0 14px 28px rgba(0,0,0,0.5); } }
+        .okapi-trail-particle {
+          position: absolute; border-radius: 50%; pointer-events: none; z-index: 4;
+          opacity: 0.75;
+        }
+        .okapi-trail-particle-red  { background: radial-gradient(circle at 35% 30%, rgba(255,220,220,0.95), rgba(239,68,68,0.6) 50%, transparent); }
+        .okapi-trail-particle-gold { background: radial-gradient(circle at 35% 30%, rgba(255,252,180,0.95), rgba(251,191,36,0.6) 50%, transparent); }
 
         /* ── TV mode ─────────────────────────────────────────────────────────── */
         .okapi-draw-show-tv { min-height: min(74vh, 760px); border-radius: 34px; }
