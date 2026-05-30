@@ -76,12 +76,12 @@ function Ball({ n, color, visible, delay = 0 }: { n: number; color: 'red' | 'gol
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 320, damping: 20, delay }}
           style={{
-            width: 90, height: 90,
+            width: 'clamp(40px,10vw,90px)', height: 'clamp(40px,10vw,90px)',
             borderRadius: '50%',
             background: color === 'red' ? RED_GRADIENT : GOLD_GRADIENT,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: 'Bebas Neue, sans-serif',
-            fontSize: 42, color: color === 'gold' ? '#000' : '#fff',
+            fontSize: 'clamp(18px,5vw,42px)', color: color === 'gold' ? '#000' : '#fff',
             boxShadow: color === 'red'
               ? '0 0 24px rgba(239,68,68,0.7), 0 4px 16px rgba(0,0,0,0.5)'
               : '0 0 24px rgba(251,191,36,0.7), 0 4px 16px rgba(0,0,0,0.5)',
@@ -97,7 +97,7 @@ function Ball({ n, color, visible, delay = 0 }: { n: number; color: 'red' | 'gol
 function BallPlaceholder({ color }: { color: 'red' | 'gold' }) {
   return (
     <div style={{
-      width: 90, height: 90, borderRadius: '50%',
+      width: 'clamp(40px,10vw,90px)', height: 'clamp(40px,10vw,90px)', borderRadius: '50%',
       background: color === 'red' ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.1)',
       border: `2px dashed ${color === 'red' ? 'rgba(239,68,68,0.3)' : 'rgba(251,191,36,0.3)'}`,
     }} />
@@ -109,17 +109,17 @@ function Countdown({ secs }: { secs: number }) {
   const s = String(secs % 60).padStart(2, '0');
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 140, lineHeight: 1, color: '#fff', textShadow: '0 0 40px rgba(255,255,255,0.3)' }}>
+      <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(52px,17vw,140px)', lineHeight: 1, color: '#fff', textShadow: '0 0 40px rgba(255,255,255,0.3)' }}>
         {m}
       </span>
       <motion.span
         animate={{ opacity: [1, 0, 1] }}
         transition={{ duration: 1, repeat: Infinity }}
-        style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 120, color: '#ef4444', lineHeight: 1 }}
+        style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(44px,14vw,120px)', color: '#ef4444', lineHeight: 1 }}
       >
         :
       </motion.span>
-      <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 140, lineHeight: 1, color: '#fff', textShadow: '0 0 40px rgba(255,255,255,0.3)' }}>
+      <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(52px,17vw,140px)', lineHeight: 1, color: '#fff', textShadow: '0 0 40px rgba(255,255,255,0.3)' }}>
         {s}
       </span>
     </div>
@@ -135,30 +135,30 @@ function OpenScreen({ live, secs, qrUrl, playUrl }: { live: LiveData; secs: numb
     <motion.div
       key="open"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 32, padding: '0 60px' }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 'clamp(16px,3vw,32px)', padding: '0 clamp(16px,5vw,60px)' }}
     >
       {/* Countdown */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#9CA3AF', letterSpacing: 6, marginBottom: 8 }}>
+        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2.5vw,28px)', color: '#9CA3AF', letterSpacing: 6, marginBottom: 8 }}>
           PROCHAIN TIRAGE DANS
         </div>
         <Countdown secs={secs} />
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'flex', gap: 60, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(20px,5vw,60px)', alignItems: 'flex-start', justifyContent: 'center' }}>
         {/* Jackpot */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 4 }}>JACKPOT</div>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 4 }}>JACKPOT</div>
           <motion.div
             animate={isJackpotReady ? { scale: [1, 1.06, 1], color: ['#ef4444', '#ff6666', '#ef4444'] } : {}}
             transition={{ duration: 1.5, repeat: Infinity }}
-            style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 64, color: isJackpotReady ? '#ef4444' : '#FFD700', lineHeight: 1 }}
+            style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(28px,6vw,64px)', color: isJackpotReady ? '#ef4444' : '#FFD700', lineHeight: 1 }}
           >
-            {live.jackpotThresholdCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 32 }}>CDF</span>
+            {live.jackpotThresholdCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 'clamp(14px,3vw,32px)' }}>CDF</span>
           </motion.div>
           {isJackpotReady && (
-            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#ef4444', letterSpacing: 3, marginTop: 4 }}>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(10px,1.6vw,18px)', color: '#ef4444', letterSpacing: 3, marginTop: 4 }}>
               🔴 JACKPOT DISPONIBLE !
             </div>
           )}
@@ -166,20 +166,19 @@ function OpenScreen({ live, secs, qrUrl, playUrl }: { live: LiveData; secs: numb
 
         {/* QR code */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 4, marginBottom: 12 }}>SCANNE POUR JOUER</div>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 4, marginBottom: 12 }}>SCANNE POUR JOUER</div>
           <img
             src={qrUrl}
             alt="QR code"
-            width={160} height={160}
-            style={{ borderRadius: 12, display: 'block' }}
+            style={{ width: 'clamp(100px,18vw,160px)', height: 'clamp(100px,18vw,160px)', borderRadius: 12, display: 'block' }}
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 8, letterSpacing: 1 }}>{playUrl}</div>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(8px,1vw,11px)', color: 'rgba(255,255,255,0.2)', marginTop: 8, letterSpacing: 1 }}>{playUrl}</div>
         </div>
       </div>
 
       {/* Payout hint */}
-      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: 'rgba(255,255,255,0.3)', letterSpacing: 3 }}>
+      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(10px,1.8vw,22px)', color: 'rgba(255,255,255,0.3)', letterSpacing: 3, textAlign: 'center' }}>
         {`6 ROUGES = JACKPOT · 6 NUMÉROS À CHOISIR · TIRAGE LIVE TOUTES LES ${Math.round(live.drawIntervalSeconds / 60)} MIN`}
       </div>
     </motion.div>
@@ -196,14 +195,14 @@ function ClosingScreen({ secs }: { secs: number }) {
       <motion.div
         animate={{ scale: [1, 1.04, 1], opacity: [0.9, 1, 0.9] }}
         transition={{ duration: 0.8, repeat: Infinity }}
-        style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 36, color: '#ef4444', letterSpacing: 8 }}
+        style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(16px,3.5vw,36px)', color: '#ef4444', letterSpacing: 8, textAlign: 'center' }}
       >
         ⚠️ FERMETURE DES PARIS
       </motion.div>
-      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 110, color: '#fff', lineHeight: 1 }}>
+      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(32px,10vw,110px)', color: '#fff', lineHeight: 1, textAlign: 'center' }}>
         TIRAGE IMMINENT
       </div>
-      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 36, color: '#9CA3AF', letterSpacing: 4 }}>
+      <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(16px,3.5vw,36px)', color: '#9CA3AF', letterSpacing: 4 }}>
         DANS {secs} SECONDES
       </div>
     </motion.div>
@@ -219,20 +218,20 @@ function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; re
     <motion.div
       key="drawing"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 48 }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 'clamp(20px,5vw,48px)', padding: '0 clamp(12px,3vw,40px)' }}
     >
       {dn && (
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#9CA3AF', letterSpacing: 6 }}>
+        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,2.5vw,28px)', color: '#9CA3AF', letterSpacing: 6 }}>
           TIRAGE #{dn}
         </div>
       )}
 
       {/* Boules rouges */}
       <div>
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#ef4444', letterSpacing: 6, textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#ef4444', letterSpacing: 6, textAlign: 'center', marginBottom: 'clamp(8px,2vw,20px)' }}>
           🔴 NUMÉROS ROUGES
         </div>
-        <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(8px,2vw,20px)', justifyContent: 'center' }}>
           {rouges.map((n: number, i: number) => (
             revealedRed.includes(n)
               ? <Ball key={i} n={n} color="red" visible />
@@ -244,10 +243,10 @@ function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; re
 
       {/* Boules or */}
       <div>
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#fbbf24', letterSpacing: 6, textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#fbbf24', letterSpacing: 6, textAlign: 'center', marginBottom: 'clamp(8px,2vw,20px)' }}>
           🟡 NUMÉROS OR
         </div>
-        <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(8px,2vw,20px)', justifyContent: 'center' }}>
           {ors.map((n: number, i: number) => (
             revealedGold.includes(n)
               ? <Ball key={i} n={n} color="gold" visible />
@@ -270,32 +269,32 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
     <motion.div
       key="result"
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flex: 1, gap: 40, padding: '0 60px', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 20 }}
+      style={{ display: 'flex', flex: 1, flexWrap: 'wrap', gap: 'clamp(20px,4vw,40px)', padding: 'clamp(12px,2vw,20px) clamp(16px,5vw,60px)', alignItems: 'flex-start', justifyContent: 'space-between', overflowY: 'auto' }}
     >
       {/* Left: numbers + stats */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
         {draw?.drawNumber && (
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, color: '#9CA3AF', letterSpacing: 5 }}>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2.2vw,24px)', color: '#9CA3AF', letterSpacing: 5 }}>
             RÉSULTATS TIRAGE #{draw.drawNumber}
           </div>
         )}
 
         {/* Rouges */}
         <div>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#ef4444', letterSpacing: 4, marginBottom: 12 }}>🔴 ROUGES</div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#ef4444', letterSpacing: 4, marginBottom: 12 }}>🔴 ROUGES</div>
+          <div style={{ display: 'flex', gap: 'clamp(6px,1.2vw,12px)', flexWrap: 'wrap' }}>
             {rouges.map((n: number, i: number) => (
-              <div key={i} style={{ width: 70, height: 70, borderRadius: '50%', background: RED_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 32, color: '#fff', boxShadow: '0 0 16px rgba(239,68,68,0.5)' }}>{n}</div>
+              <div key={i} style={{ width: 'clamp(32px,7vw,70px)', height: 'clamp(32px,7vw,70px)', borderRadius: '50%', background: RED_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,3.5vw,32px)', color: '#fff', boxShadow: '0 0 16px rgba(239,68,68,0.5)' }}>{n}</div>
             ))}
           </div>
         </div>
 
         {/* Or */}
         <div>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#fbbf24', letterSpacing: 4, marginBottom: 12 }}>🟡 OR</div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#fbbf24', letterSpacing: 4, marginBottom: 12 }}>🟡 OR</div>
+          <div style={{ display: 'flex', gap: 'clamp(6px,1.2vw,12px)', flexWrap: 'wrap' }}>
             {ors.map((n: number, i: number) => (
-              <div key={i} style={{ width: 70, height: 70, borderRadius: '50%', background: GOLD_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 32, color: '#000', boxShadow: '0 0 16px rgba(251,191,36,0.5)' }}>{n}</div>
+              <div key={i} style={{ width: 'clamp(32px,7vw,70px)', height: 'clamp(32px,7vw,70px)', borderRadius: '50%', background: GOLD_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,3.5vw,32px)', color: '#000', boxShadow: '0 0 16px rgba(251,191,36,0.5)' }}>{n}</div>
             ))}
           </div>
         </div>
@@ -303,27 +302,27 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
         {/* Stats */}
         <div style={{ display: 'flex', gap: 40 }}>
           <div>
-            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#9CA3AF', letterSpacing: 3 }}>GAGNANTS</div>
-            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 56, color: '#fff' }}>{draw?.winnerCount ?? 0}</div>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#9CA3AF', letterSpacing: 3 }}>GAGNANTS</div>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(24px,5vw,56px)', color: '#fff' }}>{draw?.winnerCount ?? 0}</div>
           </div>
           <div>
-            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, color: '#9CA3AF', letterSpacing: 3 }}>DISTRIBUÉ</div>
-            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 56, color: '#00A86B' }}>
-              {(draw?.totalPaidCdf ?? 0).toLocaleString('fr-FR')} <span style={{ fontSize: 28 }}>CDF</span>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#9CA3AF', letterSpacing: 3 }}>DISTRIBUÉ</div>
+            <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(24px,5vw,56px)', color: '#00A86B' }}>
+              {(draw?.totalPaidCdf ?? 0).toLocaleString('fr-FR')} <span style={{ fontSize: 'clamp(14px,2.5vw,28px)' }}>CDF</span>
             </div>
           </div>
         </div>
 
         {/* Next draw */}
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 3 }}>
+        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 3 }}>
           PROCHAIN TIRAGE DANS {String(Math.floor(secs / 60)).padStart(2, '0')}:{String(secs % 60).padStart(2, '0')}
         </div>
       </div>
 
       {/* Right: winners list */}
       {winners.length > 0 && (
-        <div style={{ width: 380, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 5, marginBottom: 4 }}>
+        <div style={{ width: 'clamp(260px,35vw,380px)', display: 'flex', flexDirection: 'column', gap: 'clamp(8px,1.2vw,12px)' }}>
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2vw,22px)', color: '#9CA3AF', letterSpacing: 5, marginBottom: 4 }}>
             GAGNANTS
           </div>
           {winners.map((w: Winner, i: number) => (
@@ -336,14 +335,14 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
                 background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 12,
-                padding: '14px 20px',
+                padding: 'clamp(8px,1.2vw,14px) clamp(10px,1.8vw,20px)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
               }}
             >
               <div>
-                <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#fff' }}>
+                <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(13px,2vw,22px)', color: '#fff' }}>
                   Ticket #{w.ticketRef}
                 </div>
                 <div style={{ fontSize: 14, color: '#9CA3AF', marginTop: 2 }}>
@@ -351,7 +350,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
                   {w.nbOr > 0 && <span style={{ color: '#fbbf24' }}>{w.nbOr}🟡</span>}
                 </div>
               </div>
-              <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 28, color: '#00A86B' }}>
+              <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,2.5vw,28px)', color: '#00A86B' }}>
                 +{w.gainsCdf.toLocaleString('fr-FR')} CDF
               </div>
             </motion.div>
@@ -445,9 +444,9 @@ export default function OkapiColorTVScreen() {
 
   return (
     <div style={{
-      width: '100vw', height: '100vh',
+      width: '100vw', minHeight: '100vh',
       background: 'radial-gradient(ellipse at 20% 50%, rgba(185,28,28,0.08) 0%, #050505 60%)',
-      color: 'white', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      color: 'white', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column',
       position: 'relative',
     }}>
       {/* Decorative bg circles */}
@@ -455,15 +454,15 @@ export default function OkapiColorTVScreen() {
       <div style={{ position: 'absolute', bottom: -80, left: -80, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(251,191,36,0.04), transparent 70%)', pointerEvents: 'none' }} />
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 48px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 12px #ef4444' }} />
-          <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 36, letterSpacing: 6, color: '#fff' }}>OKAPI COLOR</span>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 12px #fbbf24' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(10px,2vw,20px) clamp(16px,4vw,48px)', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,1.5vw,20px)' }}>
+          <div style={{ width: 'clamp(6px,0.8vw,10px)', height: 'clamp(6px,0.8vw,10px)', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 12px #ef4444' }} />
+          <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(18px,3vw,36px)', letterSpacing: 6, color: '#fff' }}>OKAPI COLOR</span>
+          <div style={{ width: 'clamp(6px,0.8vw,10px)', height: 'clamp(6px,0.8vw,10px)', borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 12px #fbbf24' }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(12px,2.5vw,32px)' }}>
           {live?.lastDraw?.drawNumber && (
-            <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, color: '#9CA3AF', letterSpacing: 3 }}>
+            <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,24px)', color: '#9CA3AF', letterSpacing: 3 }}>
               TIRAGE #{live.lastDraw.drawNumber}
             </span>
           )}
@@ -479,7 +478,7 @@ export default function OkapiColorTVScreen() {
                   animate={st === 'drawing' ? { opacity: [1, 0.4, 1] } : {}}
                   transition={{ duration: 0.6, repeat: Infinity }}
                   style={{
-                    fontFamily: 'Bebas Neue, sans-serif', fontSize: 18, letterSpacing: 4,
+                    fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(10px,1.5vw,18px)', letterSpacing: 4,
                     color: st === 'open' ? '#00A86B' : st === 'closing' ? '#ef4444' : st === 'drawing' ? '#fbbf24' : '#9CA3AF',
                   }}
                 >
@@ -510,11 +509,11 @@ export default function OkapiColorTVScreen() {
       )}
 
       {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 48px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 16, color: 'rgba(255,255,255,0.2)', letterSpacing: 3 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'clamp(8px,1.5vw,12px) clamp(16px,4vw,48px)', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(9px,1.4vw,16px)', color: 'rgba(255,255,255,0.2)', letterSpacing: 3 }}>
           {`CONGO GAMING · TIRAGE LIVE TOUTES LES ${Math.round((live?.drawIntervalSeconds ?? 600) / 60)} MIN`}
         </span>
-        <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 16, color: 'rgba(255,255,255,0.2)', letterSpacing: 2 }}>
+        <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(9px,1.4vw,16px)', color: 'rgba(255,255,255,0.2)', letterSpacing: 2 }}>
           {playUrl}
         </span>
       </div>
