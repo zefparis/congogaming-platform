@@ -57,6 +57,8 @@ export default function OkapiColorDrawShow({
   const goldRef = useRef<number[]>([]);
   redRef.current  = cleanRedNumbers;
   goldRef.current = cleanGoldNumbers;
+  const statusRef  = useRef<DrawStatus>('open');
+  statusRef.current = status;
 
   // ─── Orientation lock (mobile only) ────────────────────────────────────────
   useEffect(() => {
@@ -92,30 +94,34 @@ export default function OkapiColorDrawShow({
     }
   }, [status, mode]);
 
-  // ─── Status / drawKey effect ─────────────────────────────────────────────
-  // deps: ONLY drawKey, status, isTv, onComplete — NOT the number arrays.
-  // This prevents every 2-second poll from killing the GSAP timeline.
+  // ─── Effect 1 : status watcher — never kills a running animation ──────────
+  // When backend switches drawing→result, we let the GSAP timeline play to its
+  // natural end so every ball is revealed before the grid locks in place.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (status === 'result') {
-      timelineRef.current?.kill();
-      timelineRef.current = null;
+      if (timelineRef.current?.isActive()) return; // animation still running → hands off
       const next: Record<number, HitState> = {};
       redRef.current.forEach((n)  => { next[n] = 'redHit'; });
       goldRef.current.forEach((n) => { next[n] = 'goldHit'; });
       setHits(next);
       return;
     }
-
     if (status === 'open' || status === 'closing') {
       timelineRef.current?.kill();
       timelineRef.current = null;
       lastAnimatedDrawKeyRef.current = '';
       setHits({});
-      return;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
-    if (status !== 'drawing') return;
+  // ─── Effect 2 : ball animation — deps do NOT include status ─────────────────
+  // Cleanup only fires on drawKey/isTv/onComplete change or unmount.
+  // A status change to 'result' will NOT kill this timeline mid-flight.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (statusRef.current !== 'drawing') return;
     if (!drawKey || lastAnimatedDrawKeyRef.current === drawKey) return;
     if (!rootRef.current || !ballLayerRef.current) return;
 
@@ -221,7 +227,7 @@ export default function OkapiColorDrawShow({
       ballLayerRef.current?.querySelectorAll('.okapi-draw-ball, .okapi-trail-particle').forEach((b) => b.remove());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawKey, status, isTv, onComplete]);
+  }, [drawKey, isTv, onComplete]);
 
   return (
     <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode}`}>
