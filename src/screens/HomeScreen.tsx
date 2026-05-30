@@ -679,21 +679,32 @@ export default function HomeScreen() {
             border: '1px solid rgba(220,38,38,0.3)',
           }}
         >
-            {/* Ambient glow */}
-            <div style={{ position: 'absolute', top: -30, right: -30, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle,rgba(220,38,38,0.22),transparent 70%)', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', bottom: -20, left: 40, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle,rgba(251,191,36,0.12),transparent 70%)', pointerEvents: 'none' }} />
-
-            {/* Decorative balls — or row top, rouge row below */}
-            <div style={{ position: 'absolute', top: 16, right: 12, display: 'flex', gap: 6, zIndex: 1 }}>
-              {[7, 14, 22, 3].map((n) => (
-                <div key={n} style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#d97706,#fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: 14, color: '#000', boxShadow: '0 0 8px rgba(251,191,36,0.5)' }}>{n}</div>
-              ))}
-            </div>
-            <div style={{ position: 'absolute', top: 56, right: 12, display: 'flex', gap: 6, zIndex: 1 }}>
-              {[5, 18, 9].map((n) => (
-                <div key={n} style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#b91c1c,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: 14, color: '#fff', boxShadow: '0 0 8px rgba(239,68,68,0.5)' }}>{n}</div>
-              ))}
-            </div>
+            {/* Background image */}
+            <img
+              src="/images/okapicolor.png"
+              alt=""
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'right center',
+                opacity: 0.85,
+                zIndex: 0,
+              }}
+            />
+            {/* Dark overlay for text legibility */}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to right, rgba(10,2,2,0.92) 0%, rgba(10,2,2,0.65) 55%, rgba(10,2,2,0.15) 100%)',
+                zIndex: 1,
+              }}
+            />
 
             <div style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '58%' }}>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 13, color: '#ef4444', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>🔴 Nouveau Live</div>
