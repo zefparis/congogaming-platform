@@ -12,7 +12,6 @@ console.log('BASE_URL:', BASE_URL);
 const TOKEN_KEY = 'cg_admin_token';
 const SECRET_KEY = 'cg_admin_secret';
 const FALLBACK_SECRET = 'cg_admin_loto_2026';
-const OKAPI_COLOR_FALLBACK_SECRET = 'cg_okapi_color_2026';
 // Toggle verbose Authorization logging by setting localStorage.cg_admin_debug = '1'.
 const DEBUG = (() => {
   try {
@@ -490,7 +489,7 @@ export const adminApi = {
     }),
 
   okapiColorForceDraw: () => {
-    const secret = getAdminSecret() || OKAPI_COLOR_FALLBACK_SECRET;
+    const secret = getAdminSecret() || FALLBACK_SECRET;
     return fetch(`${BASE}/api/okapi-color/draw`, {
       method: 'POST',
       headers: { 'x-admin-secret': secret },
@@ -502,7 +501,7 @@ export const adminApi = {
   },
 
   okapiColorPurgePending: () => {
-    const secret = getAdminSecret() || OKAPI_COLOR_FALLBACK_SECRET;
+    const secret = getAdminSecret() || FALLBACK_SECRET;
     return fetch(`${BASE}/api/okapi-color/purge-pending`, {
       method: 'POST',
       headers: { 'x-admin-secret': secret },

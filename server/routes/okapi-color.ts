@@ -232,6 +232,18 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
   const prevSlotMs  = Math.floor(drawAt.getTime() / iv) * iv - iv;
   const slotKey     = formatSlotKey(new Date(prevSlotMs));
 
+  const { data: existingTirage, error: existingErr } = await supabaseAdmin
+    .from('okapi_color_tirages')
+    .select('id')
+    .eq('slot_key', slotKey)
+    .maybeSingle();
+  if (existingErr) {
+    throw new Error(existingErr.message);
+  }
+  if (existingTirage) {
+    throw new Error('Ce slot Okapi Color a déjà été tiré. Attendez le prochain créneau.');
+  }
+
   const { data: tirage, error: tirErr } = await supabaseAdmin
     .from('okapi_color_tirages')
     .insert({
@@ -715,10 +727,9 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Admin only — lancer un tirage
   // ----------------------------------------------------------
   app.post('/api/okapi-color/draw', async (req, reply) => {
-    const adminSecret = env.OKAPI_COLOR_ADMIN_SECRET || '';
-    const lotoAdminSecret = env.LOTO_ADMIN_SECRET || '';
+    const adminSecret = env.LOTO_ADMIN_SECRET || '';
     const provided    = req.headers['x-admin-secret'];
-    if ((!adminSecret || provided !== adminSecret) && (!lotoAdminSecret || provided !== lotoAdminSecret)) {
+    if (!adminSecret || provided !== adminSecret) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     try {
@@ -734,10 +745,9 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Admin only — annuler et rembourser les tickets bloqués
   // ----------------------------------------------------------
   app.post('/api/okapi-color/purge-pending', async (req, reply) => {
-    const adminSecret = env.OKAPI_COLOR_ADMIN_SECRET || '';
-    const lotoAdminSecret = env.LOTO_ADMIN_SECRET || '';
+    const adminSecret = env.LOTO_ADMIN_SECRET || '';
     const provided    = req.headers['x-admin-secret'];
-    if ((!adminSecret || provided !== adminSecret) && (!lotoAdminSecret || provided !== lotoAdminSecret)) {
+    if (!adminSecret || provided !== adminSecret) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
 
