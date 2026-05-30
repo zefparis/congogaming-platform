@@ -34,6 +34,7 @@ export default function OkapiColorDrawShow({
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
   const lastAnimatedDrawKeyRef = useRef('');
   const [hits, setHits] = useState<Record<number, HitState>>({});
+  const [showRotateOverlay, setShowRotateOverlay] = useState(false);
 
   const isTv = mode === 'tv';
   const numbers = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 1), []);
@@ -56,6 +57,40 @@ export default function OkapiColorDrawShow({
   const goldRef = useRef<number[]>([]);
   redRef.current  = cleanRedNumbers;
   goldRef.current = cleanGoldNumbers;
+
+  // ─── Orientation lock (mobile only) ────────────────────────────────────────
+  useEffect(() => {
+    if (mode !== 'mobile') return;
+
+    if (status === 'drawing') {
+      const tryLock = async () => {
+        try {
+          await (screen.orientation as ScreenOrientation & { lock: (o: string) => Promise<void> }).lock('landscape');
+          setShowRotateOverlay(false);
+        } catch {
+          // Lock not supported (iOS) or no permission → check if still portrait
+          const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+          setShowRotateOverlay(isPortrait);
+        }
+      };
+      tryLock();
+
+      const onOrientationChange = () => {
+        const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+        setShowRotateOverlay(isPortrait);
+      };
+      screen.orientation?.addEventListener('change', onOrientationChange);
+      window.addEventListener('orientationchange', onOrientationChange);
+
+      return () => {
+        screen.orientation?.removeEventListener('change', onOrientationChange);
+        window.removeEventListener('orientationchange', onOrientationChange);
+      };
+    } else {
+      setShowRotateOverlay(false);
+      try { screen.orientation.unlock(); } catch { /* noop */ }
+    }
+  }, [status, mode]);
 
   // ─── Status / drawKey effect ─────────────────────────────────────────────
   // deps: ONLY drawKey, status, isTv, onComplete — NOT the number arrays.
@@ -235,7 +270,65 @@ export default function OkapiColorDrawShow({
         .okapi-draw-show-mobile .okapi-draw-cell    { border-radius: 14px; font-size: clamp(24px,6.5vw,40px); }
         .okapi-draw-show-mobile .okapi-draw-badge   { position: absolute; top: 5px; right: 7px; font-family: system-ui,sans-serif; font-weight: 900; font-size: 9px; letter-spacing: 0.08em; opacity: 0.82; }
         .okapi-draw-show-mobile .okapi-draw-ball    { font-size: 24px; }
+
+        /* ── Mobile landscape (auto-triggered during draw) ───────────────────── */
+        @media (orientation: landscape) {
+          .okapi-draw-show-mobile { min-height: 100svh; border-radius: 0; }
+          .okapi-draw-show-mobile .okapi-draw-content { padding: 14px 20px; gap: 10px; }
+          .okapi-draw-show-mobile .okapi-draw-kicker  { font-size: clamp(13px,2.2vh,20px); letter-spacing: 3px; }
+          .okapi-draw-show-mobile .okapi-draw-message { font-size: clamp(12px,2vh,18px); }
+          .okapi-draw-show-mobile .okapi-draw-grid    { grid-template-columns: repeat(8, minmax(0,1fr)); gap: clamp(6px,1.2vw,12px); }
+          .okapi-draw-show-mobile .okapi-draw-cell    { border-radius: 12px; font-size: clamp(18px,4.5vh,38px); }
+          .okapi-draw-show-mobile .okapi-draw-ball    { font-size: clamp(20px,4vh,32px); }
+        }
+
+        /* ── Rotate overlay ──────────────────────────────────────────────────── */
+        .okapi-rotate-overlay {
+          position: fixed; inset: 0; z-index: 9999;
+          background: linear-gradient(160deg, rgba(4,4,8,0.97) 0%, rgba(12,2,2,0.97) 100%);
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+          backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+        .okapi-rotate-phone {
+          font-size: 80px; line-height: 1;
+          animation: okapi-phone-spin 1.5s cubic-bezier(0.4,0,0.2,1) infinite;
+          transform-origin: center;
+          filter: drop-shadow(0 0 24px rgba(251,191,36,0.55));
+        }
+        @keyframes okapi-phone-spin {
+          0%   { transform: rotate(0deg)   scale(1);    }
+          35%  { transform: rotate(-90deg) scale(1.12); }
+          55%  { transform: rotate(-90deg) scale(1.12); }
+          80%  { transform: rotate(0deg)   scale(1);    }
+          100% { transform: rotate(0deg)   scale(1);    }
+        }
+        .okapi-rotate-title {
+          font-family: Bebas Neue, sans-serif; font-size: 28px; letter-spacing: 5px;
+          color: #fbbf24; text-shadow: 0 0 28px rgba(251,191,36,0.55);
+          text-align: center;
+        }
+        .okapi-rotate-sub {
+          font-family: system-ui, sans-serif; font-size: 14px;
+          color: rgba(255,255,255,0.45); letter-spacing: 0.5px; text-align: center;
+        }
+        .okapi-rotate-pulse {
+          width: 56px; height: 3px; border-radius: 99px;
+          background: linear-gradient(90deg, #ef4444, #fbbf24);
+          animation: okapi-pulse-bar 1.5s ease-in-out infinite;
+        }
+        @keyframes okapi-pulse-bar {
+          0%, 100% { opacity: 0.4; transform: scaleX(0.6); }
+          50%       { opacity: 1;   transform: scaleX(1);   }
+        }
       `}</style>
+      {mode === 'mobile' && showRotateOverlay && (
+        <div className="okapi-rotate-overlay">
+          <div className="okapi-rotate-phone">📱</div>
+          <div className="okapi-rotate-title">TOURNE TON TÉLÉPHONE</div>
+          <div className="okapi-rotate-sub">Pour vivre le tirage en grand</div>
+          <div className="okapi-rotate-pulse" />
+        </div>
+      )}
       <div className="okapi-draw-stage-glow" />
       <div ref={flashRef} className="okapi-draw-flash" />
       <div ref={ballLayerRef} className="okapi-draw-ball-layer" />
