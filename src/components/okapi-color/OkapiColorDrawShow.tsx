@@ -37,21 +37,38 @@ export default function OkapiColorDrawShow({
 
   const isTv = mode === 'tv';
   const numbers = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 1), []);
-  const cleanRedNumbers = useMemo(() => (Array.isArray(redNumbers) ? redNumbers : []).filter((n) => n >= 1 && n <= 24), [redNumbers]);
-  const cleanGoldNumbers = useMemo(() => (Array.isArray(goldNumbers) ? goldNumbers : []).filter((n) => n >= 1 && n <= 24), [goldNumbers]);
 
-  const finalHits = useMemo(() => {
-    const next: Record<number, HitState> = {};
-    cleanRedNumbers.forEach((n) => { next[n] = 'redHit'; });
-    cleanGoldNumbers.forEach((n) => { next[n] = 'goldHit'; });
-    return next;
-  }, [cleanRedNumbers, cleanGoldNumbers]);
+  // Stabilised arrays → useMemo won't re-create them unless values actually change
+  const cleanRedNumbers  = useMemo(
+    () => (Array.isArray(redNumbers)  ? redNumbers  : []).filter((n) => n >= 1 && n <= 24),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [redNumbers.join(',')],
+  );
+  const cleanGoldNumbers = useMemo(
+    () => (Array.isArray(goldNumbers) ? goldNumbers : []).filter((n) => n >= 1 && n <= 24),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [goldNumbers.join(',')],
+  );
 
+  // Always-current refs so the animation effect can read latest numbers
+  // without those arrays being in the effect's dependency array.
+  const redRef  = useRef<number[]>([]);
+  const goldRef = useRef<number[]>([]);
+  redRef.current  = cleanRedNumbers;
+  goldRef.current = cleanGoldNumbers;
+
+  // ─── Status / drawKey effect ─────────────────────────────────────────────
+  // deps: ONLY drawKey, status, isTv, onComplete — NOT the number arrays.
+  // This prevents every 2-second poll from killing the GSAP timeline.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (status === 'result') {
       timelineRef.current?.kill();
       timelineRef.current = null;
-      setHits(finalHits);
+      const next: Record<number, HitState> = {};
+      redRef.current.forEach((n)  => { next[n] = 'redHit'; });
+      goldRef.current.forEach((n) => { next[n] = 'goldHit'; });
+      setHits(next);
       return;
     }
 
@@ -67,9 +84,12 @@ export default function OkapiColorDrawShow({
     if (!drawKey || lastAnimatedDrawKeyRef.current === drawKey) return;
     if (!rootRef.current || !ballLayerRef.current) return;
 
+    const reds  = redRef.current.slice(0, 6);
+    const golds = goldRef.current.slice(0, 4);
+
     const items: DrawItem[] = [
-      ...cleanRedNumbers.slice(0, 6).map((number, index) => ({ number, color: 'red' as const, index })),
-      ...cleanGoldNumbers.slice(0, 4).map((number, index) => ({ number, color: 'gold' as const, index: index + cleanRedNumbers.slice(0, 6).length })),
+      ...reds.map((number, index) => ({ number, color: 'red' as const, index })),
+      ...golds.map((number, index) => ({ number, color: 'gold' as const, index: index + reds.length })),
     ];
 
     if (items.length === 0) return;
@@ -81,8 +101,8 @@ export default function OkapiColorDrawShow({
     const rootBox = rootRef.current.getBoundingClientRect();
     const tl = gsap.timeline({ onComplete });
     timelineRef.current = tl;
-    const duration = isTv ? 1.45 : 0.92;
-    const gap = isTv ? 0.2 : 0.1;
+    const duration = isTv ? 1.6 : 1.1;   // visible travel time per ball
+    const gap      = isTv ? 0.35 : 0.22;  // pause after each impact before next ball
 
     items.forEach((item) => {
       const target = cellRefs.current[item.number];
@@ -90,16 +110,20 @@ export default function OkapiColorDrawShow({
 
       const targetBox = target.getBoundingClientRect();
       const targetX = targetBox.left - rootBox.left + targetBox.width / 2;
-      const targetY = targetBox.top - rootBox.top + targetBox.height / 2;
-      const size = isTv ? 74 : 42;
-      const startX = rootBox.width + size + (item.index % 2) * 70;
-      const startY = item.index % 2 === 0 ? -size : rootBox.height + size;
-      const bounceOneX = rootBox.width * (0.78 - (item.index % 3) * 0.08);
-      const bounceOneY = rootBox.height * (0.18 + (item.index % 4) * 0.12);
-      const bounceTwoX = rootBox.width * (0.45 + (item.index % 2) * 0.12);
-      const bounceTwoY = rootBox.height * (0.78 - (item.index % 3) * 0.1);
-      const ball = document.createElement('div');
+      const targetY = targetBox.top  - rootBox.top  + targetBox.height / 2;
+      const size    = isTv ? 74 : 42;
 
+      // Alternate entry sides for variety
+      const fromRight = item.index % 2 === 0;
+      const startX = fromRight ? rootBox.width + size + (item.index % 3) * 40 : -size - (item.index % 3) * 40;
+      const startY = item.index % 3 === 0 ? -size : item.index % 3 === 1 ? rootBox.height + size : rootBox.height * 0.5;
+
+      const bounceOneX = rootBox.width * (0.72 - (item.index % 3) * 0.07);
+      const bounceOneY = rootBox.height * (0.22 + (item.index % 4) * 0.10);
+      const bounceTwoX = rootBox.width * (0.42 + (item.index % 2) * 0.14);
+      const bounceTwoY = rootBox.height * (0.72 - (item.index % 3) * 0.08);
+
+      const ball = document.createElement('div');
       ball.textContent = String(item.number);
       ball.className = `okapi-draw-ball okapi-draw-ball-${item.color}`;
       ball.style.width = `${size}px`;
@@ -109,32 +133,37 @@ export default function OkapiColorDrawShow({
       ballLayerRef.current.appendChild(ball);
 
       tl.set(ball, { x: startX, y: startY, scale: 0.72, opacity: 0, rotate: 0 })
-        .to(ball, { opacity: 1, scale: 1, duration: 0.14, ease: 'power2.out' })
+        .to(ball, { opacity: 1, scale: 1, duration: 0.18, ease: 'power2.out' })
         .to(ball, {
           keyframes: [
-            { x: bounceOneX, y: bounceOneY, rotate: item.color === 'red' ? 210 : -210, scale: 1.08, duration: duration * 0.33, ease: 'power2.out' },
-            { x: bounceTwoX, y: bounceTwoY, rotate: item.color === 'red' ? 430 : -430, scale: 0.96, duration: duration * 0.27, ease: 'power1.inOut' },
-            { x: targetX, y: targetY, rotate: item.color === 'red' ? 720 : -720, scale: 0.86, duration: duration * 0.4, ease: 'power3.in' },
+            { x: bounceOneX, y: bounceOneY, rotate: item.color === 'red' ? 200 : -200, scale: 1.1,  duration: duration * 0.32, ease: 'power2.out' },
+            { x: bounceTwoX, y: bounceTwoY, rotate: item.color === 'red' ? 420 : -420, scale: 0.96, duration: duration * 0.28, ease: 'power1.inOut' },
+            { x: targetX,    y: targetY,    rotate: item.color === 'red' ? 720 : -720, scale: 0.82, duration: duration * 0.4,  ease: 'power3.in' },
           ],
         })
         .add(() => {
           setHits((prev) => ({ ...prev, [item.number]: item.color === 'red' ? 'redHit' : 'goldHit' }));
-          gsap.fromTo(target, { scale: 1, x: 0 }, { scale: 1.12, x: isTv ? 6 : 3, yoyo: true, repeat: 3, duration: 0.065, ease: 'power1.inOut' });
-          gsap.fromTo(target, { boxShadow: item.color === 'red' ? '0 0 0 rgba(239,68,68,0)' : '0 0 0 rgba(251,191,36,0)' }, { boxShadow: item.color === 'red' ? '0 0 42px rgba(239,68,68,0.95)' : '0 0 42px rgba(251,191,36,0.95)', duration: 0.22, yoyo: true, repeat: 1 });
+          gsap.fromTo(target, { scale: 1, x: 0 }, { scale: 1.14, x: isTv ? 7 : 4, yoyo: true, repeat: 3, duration: 0.07, ease: 'power1.inOut' });
+          gsap.fromTo(
+            target,
+            { boxShadow: item.color === 'red' ? '0 0 0 rgba(239,68,68,0)' : '0 0 0 rgba(251,191,36,0)' },
+            { boxShadow: item.color === 'red' ? '0 0 52px rgba(239,68,68,0.95)' : '0 0 52px rgba(251,191,36,0.95)', duration: 0.28, yoyo: true, repeat: 1 },
+          );
           if (flashRef.current) {
-            gsap.fromTo(flashRef.current, { opacity: 0 }, { opacity: isTv ? 0.34 : 0.18, duration: 0.06, yoyo: true, repeat: 1, ease: 'power2.out' });
+            gsap.fromTo(flashRef.current, { opacity: 0 }, { opacity: isTv ? 0.38 : 0.2, duration: 0.07, yoyo: true, repeat: 1, ease: 'power2.out' });
           }
         })
-        .to(ball, { scale: 1.26, duration: 0.1, ease: 'power2.out' })
-        .to(ball, { scale: 0, opacity: 0, duration: 0.2, ease: 'power2.in', onComplete: () => ball.remove() })
+        .to(ball, { scale: 1.3, duration: 0.12, ease: 'power2.out' })
+        .to(ball, { scale: 0, opacity: 0, duration: 0.22, ease: 'power2.in', onComplete: () => ball.remove() })
         .to({}, { duration: gap });
     });
 
     return () => {
       tl.kill();
-      ballLayerRef.current?.querySelectorAll('.okapi-draw-ball').forEach((ball) => ball.remove());
+      ballLayerRef.current?.querySelectorAll('.okapi-draw-ball').forEach((b) => b.remove());
     };
-  }, [cleanGoldNumbers, cleanRedNumbers, drawKey, finalHits, isTv, onComplete, status]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawKey, status, isTv, onComplete]);
 
   return (
     <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode}`}>
