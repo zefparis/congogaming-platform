@@ -667,19 +667,18 @@ export default function HomeScreen() {
         </div>
 
         {/* OKAPI COLOR card */}
-        {okapiColorEnabled && (
-          <div
-            onClick={() => nav('/okapi-color')}
-            style={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 16,
-              cursor: 'pointer',
-              minHeight: 200,
-              background: 'linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%)',
-              border: '1px solid rgba(220,38,38,0.3)',
-            }}
-          >
+        <div
+          onClick={() => nav('/okapi-color')}
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 16,
+            cursor: 'pointer',
+            minHeight: 200,
+            background: 'linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%)',
+            border: '1px solid rgba(220,38,38,0.3)',
+          }}
+        >
             {/* Ambient glow */}
             <div style={{ position: 'absolute', top: -30, right: -30, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle,rgba(220,38,38,0.22),transparent 70%)', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', bottom: -20, left: 40, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle,rgba(251,191,36,0.12),transparent 70%)', pointerEvents: 'none' }} />
@@ -715,8 +714,7 @@ export default function HomeScreen() {
                 JOUER MAINTENANT →
               </motion.button>
             </div>
-          </div>
-        )}
+        </div>
 
         {/* SCRATCH CARD promo */}
         <div
