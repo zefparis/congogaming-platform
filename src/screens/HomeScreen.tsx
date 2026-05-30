@@ -37,15 +37,12 @@ export default function HomeScreen() {
   const [flashPot, setFlashPot] = useState<number>(0);
   const [flashData, setFlashData] = useState<FlashLatest | null>(null);
   const [okapiColorPot, setOkapiColorPot] = useState<number>(0);
-  const okapiColorEnabled = import.meta.env.VITE_OKAPI_COLOR_ENABLED === 'true';
   const [countdown, setCountdown] = useState<string>('--:--');
 
   useEffect(() => {
     if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
     api.lotoLatest().then((r) => setLotoPot(Number(r.pot_cdf || 0))).catch(() => {});
-    if (okapiColorEnabled) {
-      api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotCdf || 0))).catch(() => {});
-    }
+    api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotCdf || 0))).catch(() => {});
     api
       .flashLatest()
       .then((r) => {

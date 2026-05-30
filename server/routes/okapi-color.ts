@@ -519,20 +519,11 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       });
   });
 
-  function featureGuard(reply: any): boolean {
-    if (!env.OKAPI_COLOR_ENABLED) {
-      reply.code(404).send({ error: 'Feature not available' });
-      return false;
-    }
-    return true;
-  }
-
   // ----------------------------------------------------------
   // GET /api/okapi-color/latest-draws
   // Public — derniers tirages (sans données sensibles)
   // ----------------------------------------------------------
   app.get('/api/okapi-color/latest-draws', async (_req, reply) => {
-    if (!featureGuard(reply)) return;
     const { data, error } = await supabaseAdmin
       .from('okapi_color_tirages')
       .select('id, numeros_rouges, numeros_or, drawn_at, jackpot_paye')
@@ -563,7 +554,6 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Auth required — tickets du joueur connecté uniquement
   // ----------------------------------------------------------
   app.get('/api/okapi-color/history', { preHandler: app.requireAuth }, async (req, reply) => {
-    if (!featureGuard(reply)) return;
     const user_id = req.user.id; // jamais depuis body
     const { data, error } = await supabaseAdmin
       .from('okapi_color_tickets')
@@ -580,7 +570,6 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Auth required — achat ticket
   // ----------------------------------------------------------
   app.post('/api/okapi-color/tickets', { preHandler: app.requireAuth }, async (req, reply) => {
-    if (!featureGuard(reply)) return;
 
     const user_id = req.user.id; // jamais depuis body
 
@@ -690,7 +679,6 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Auth required — tickets du joueur pour le slot courant
   // ----------------------------------------------------------
   app.get('/api/okapi-color/my-current-tickets', { preHandler: app.requireAuth }, async (req, reply) => {
-    if (!featureGuard(reply)) return;
     const user_id = req.user.id;
     const { slotKey } = getOkapiColorSlotBoundaries();
 
@@ -727,7 +715,6 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Admin only — lancer un tirage
   // ----------------------------------------------------------
   app.post('/api/okapi-color/draw', async (req, reply) => {
-    if (!featureGuard(reply)) return;
     const adminSecret = env.OKAPI_COLOR_ADMIN_SECRET || '';
     const provided    = req.headers['x-admin-secret'];
     if (!adminSecret || provided !== adminSecret) {
@@ -746,7 +733,6 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Admin only — annuler et rembourser les tickets bloqués
   // ----------------------------------------------------------
   app.post('/api/okapi-color/purge-pending', async (req, reply) => {
-    if (!featureGuard(reply)) return;
     const adminSecret = env.OKAPI_COLOR_ADMIN_SECRET || '';
     const provided    = req.headers['x-admin-secret'];
     if (!adminSecret || provided !== adminSecret) {
