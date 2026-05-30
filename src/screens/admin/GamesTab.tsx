@@ -162,7 +162,7 @@ function LotoSubTab() {
                 <td className="px-3 py-2 text-white/80">{fmtDateTime(t.drawn_at)}</td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {t.numeros.map((n, i) => (
+                    {(t.numeros ?? []).map((n, i) => (
                       <span
                         key={i}
                         className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gold/20 text-xs font-bold text-gold"
