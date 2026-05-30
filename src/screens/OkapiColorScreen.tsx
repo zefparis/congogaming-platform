@@ -273,7 +273,7 @@ export default function OkapiColorScreen() {
         </div>
         <div className="ml-auto flex items-center gap-3">
           <button
-            onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={() => window.open('/tv/okapi-color', '_blank')}
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
             style={{ color: statusColor, background: 'rgba(255,255,255,0.06)', border: `1px solid ${statusColor}44` }}
           >
@@ -305,18 +305,16 @@ export default function OkapiColorScreen() {
         )}
       </div>
 
-      {/* VOIR LE LIVE CTA — visible in OPEN/CLOSING */}
-      {(status === 'open' || status === 'closing') && (
-        <div className="mx-4 mt-3 flex">
-          <button
-            onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold tracking-wide"
-            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}
-          >
-            <span>📺</span> VOIR LE TIRAGE LIVE
-          </button>
-        </div>
-      )}
+      {/* VOIR LE LIVE CTA — always visible, opens TV screen in new window */}
+      <div className="mx-4 mt-3 flex">
+        <button
+          onClick={() => window.open('/tv/okapi-color', '_blank')}
+          className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold tracking-wide"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}
+        >
+          <span>📺</span> VOIR LE TIRAGE LIVE
+        </button>
+      </div>
 
       {/* State-aware main section */}
       <div id="live">
