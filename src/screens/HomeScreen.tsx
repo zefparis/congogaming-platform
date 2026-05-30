@@ -666,6 +666,58 @@ export default function HomeScreen() {
           </div>
         </div>
 
+        {/* OKAPI COLOR card */}
+        {okapiColorEnabled && (
+          <div
+            onClick={() => nav('/okapi-color')}
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: 16,
+              cursor: 'pointer',
+              minHeight: 200,
+              background: 'linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%)',
+              border: '1px solid rgba(220,38,38,0.3)',
+            }}
+          >
+            {/* Ambient glow */}
+            <div style={{ position: 'absolute', top: -30, right: -30, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle,rgba(220,38,38,0.22),transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: -20, left: 40, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle,rgba(251,191,36,0.12),transparent 70%)', pointerEvents: 'none' }} />
+
+            {/* Decorative balls — or row top, rouge row below */}
+            <div style={{ position: 'absolute', top: 16, right: 12, display: 'flex', gap: 6, zIndex: 1 }}>
+              {[7, 14, 22, 3].map((n) => (
+                <div key={n} style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#d97706,#fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: 14, color: '#000', boxShadow: '0 0 8px rgba(251,191,36,0.5)' }}>{n}</div>
+              ))}
+            </div>
+            <div style={{ position: 'absolute', top: 56, right: 12, display: 'flex', gap: 6, zIndex: 1 }}>
+              {[5, 18, 9].map((n) => (
+                <div key={n} style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#b91c1c,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: 14, color: '#fff', boxShadow: '0 0 8px rgba(239,68,68,0.5)' }}>{n}</div>
+              ))}
+            </div>
+
+            <div style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '58%' }}>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: 13, color: '#ef4444', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>🔴 Nouveau Live</div>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFFFFF', lineHeight: 1, letterSpacing: 1 }}>OKAPI</div>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#ef4444', lineHeight: 1, letterSpacing: 2, marginBottom: 4 }}>COLOR</div>
+              <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>6 numéros — rouges et or</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 6 }}>Tirage live toutes les 10 min</div>
+              <div style={{ color: '#FFD700', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
+                Jackpot : {(okapiColorPot > 0 ? okapiColorPot : 250_000).toLocaleString('fr-FR')} CDF
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 16 }}>1 000 CDF / ticket</div>
+              <motion.button
+                whileHover={{ filter: 'brightness(1.1)' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => { e.stopPropagation(); nav('/okapi-color'); }}
+                style={{ ...ctaStyle, background: 'linear-gradient(135deg,#b91c1c,#ef4444)' }}
+              >
+                JOUER MAINTENANT →
+              </motion.button>
+            </div>
+          </div>
+        )}
+
         {/* SCRATCH CARD promo */}
         <div
           onClick={() => nav('/scratch')}
@@ -779,57 +831,6 @@ export default function HomeScreen() {
             </motion.button>
           </div>
         </div>
-
-        {/* OKAPI COLOR card */}
-        {okapiColorEnabled && (
-          <div
-            onClick={() => nav('/okapi-color')}
-            style={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 24,
-              cursor: 'pointer',
-              minHeight: 200,
-              background: 'linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%)',
-              border: '1px solid rgba(220,38,38,0.3)',
-            }}
-          >
-            {/* Decorative circles */}
-            <div style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle,rgba(220,38,38,0.25),transparent 70%)' }} />
-            <div style={{ position: 'absolute', bottom: -20, left: 40, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle,rgba(251,191,36,0.15),transparent 70%)' }} />
-
-            {/* Number balls decoration */}
-            <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 6 }}>
-              {[7, 14, 22, 3].map((n) => (
-                <div key={n} style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#d97706,#fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: 14, color: '#000', boxShadow: '0 0 8px rgba(251,191,36,0.5)' }}>{n}</div>
-              ))}
-            </div>
-            <div style={{ position: 'absolute', top: 56, right: 16, display: 'flex', gap: 6 }}>
-              {[5, 18, 9].map((n) => (
-                <div key={n} style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#b91c1c,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue', fontSize: 14, color: '#fff', boxShadow: '0 0 8px rgba(239,68,68,0.5)' }}>{n}</div>
-              ))}
-            </div>
-
-            <div style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '58%' }}>
-              <div style={{ fontFamily: 'Bebas Neue', fontSize: 13, color: '#ef4444', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>Nouveau jeu</div>
-              <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFFFFF', lineHeight: 1, letterSpacing: 1 }}>OKAPI</div>
-              <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#ef4444', lineHeight: 1, letterSpacing: 2, marginBottom: 4 }}>COLOR</div>
-              <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>6 numéros — rouges payent plus</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 4 }}>Tirage live toutes les 10 min</div>
-              <div style={{ color: okapiColorPot >= 250_000 ? '#ff5555' : '#FFD700', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
-                {okapiColorPot >= 250_000 ? '🔴 JACKPOT DISPONIBLE !' : `Jackpot : ${okapiColorPot.toLocaleString('fr-FR')} CDF`}
-              </div>
-              <motion.button
-                whileHover={{ filter: 'brightness(1.1)' }}
-                whileTap={{ scale: 0.98 }}
-                onClick={(e) => { e.stopPropagation(); nav('/okapi-color'); }}
-                style={{ ...ctaStyle, background: 'linear-gradient(135deg,#b91c1c,#ef4444)' }}
-              >
-                JOUER 1 000 CDF →
-              </motion.button>
-            </div>
-          </div>
-        )}
 
         {/* DÉPÔT / RETRAIT — glassmorphism buttons */}
         <div style={{ display: 'flex', gap: 12 }}>
