@@ -108,4 +108,23 @@ export const api = {
     req<{ win_amount_cdf: number; new_balance: number; grid: string[] }>('/api/scratch/claim', { method: 'POST', body: JSON.stringify({ ticket_id }) }),
   kycScan: (_user_id: string, selfie_b64: string) =>
     req<{ verdict: 'APPROVED' | 'DENIED' | 'VERIFY_AGE'; kyc_status: 'approved' | 'denied' | 'verify_age'; estimated_age: number; age_low: number; age_high: number; is_minor: boolean; scan_id: string; blocked: boolean }>('/api/kyc/scan', { method: 'POST', body: JSON.stringify({ selfie_b64 }) }),
+  okapiColorLatest: () =>
+    req<{
+      tirages: Array<{ id: string; numeros_rouges: number[]; numeros_or: number[]; drawn_at: string; jackpot_paye: boolean }>;
+      pot_cdf: number;
+      config: { ticketPriceCdf: number; jackpotCdf: number; numbersRange: number; playerPickCount: number; redDrawCount: number; goldDrawCount: number };
+    }>('/api/okapi-color/latest-draws'),
+  okapiColorBuyTicket: (numeros: number[]) =>
+    req<{ ticket_id: string; new_balance: number }>('/api/okapi-color/tickets', {
+      method: 'POST',
+      body: JSON.stringify({ numeros }),
+    }),
+  okapiColorHistory: () =>
+    req<{
+      tickets: Array<{
+        id: string; numeros: number[]; prix_cdf: number; status: 'pending' | 'gagnant' | 'perdant' | 'cancelled' | 'jackpot_attente';
+        nb_rouges: number; nb_or: number; total_bons: number; gains_cdf: number;
+        jackpot_en_attente: boolean; tirage_id: string | null; created_at: string; settled_at: string | null;
+      }>;
+    }>('/api/okapi-color/history'),
 };

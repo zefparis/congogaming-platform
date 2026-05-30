@@ -1,10 +1,12 @@
 import cron from 'node-cron';
 import { executerTirageFlash } from './routes/flash.js';
 import { executerTirageLoto } from './routes/loto.js';
+import { executerTirageOkapiColor } from './routes/okapi-color.js';
 import { acquireJobLock } from './lib/jobLock.js';
 import { isCongoLotoEnabled } from './lib/featureFlags.js';
 import { supabaseAdmin } from './lib/supabase.js';
 import { startReconciliationLoop } from './lib/unipesa-reconciliation.js';
+import { env } from './env.js';
 
 /**
  * Self-healing recovery for Loto Express (Flash) draws.
@@ -60,6 +62,58 @@ async function recoverMissedFlashDraw(reason: 'boot' | 'safety-net') {
   } catch (err) {
     console.error(`[FLASH RECOVERY/${reason}] Unexpected error:`, err);
   }
+}
+
+// =============================================================
+// Okapi Color scheduler — mirror of Flash scheduler
+// =============================================================
+function getOkapiColorSlotKey(at: Date = new Date()): string {
+  return getFlashSlotKey(at); // same :00/:30 UTC boundaries
+}
+
+async function recoverMissedOkapiColorDraw(reason: 'boot' | 'safety-net') {
+  try {
+    const cutoffIso = new Date(Date.now() - 31 * 60_000).toISOString();
+    const { count, error } = await supabaseAdmin
+      .from('okapi_color_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .lt('created_at', cutoffIso);
+    if (error) {
+      console.error(`[OKAPI-COLOR RECOVERY/${reason}] Probe failed:`, error.message);
+      return;
+    }
+    if (!count || count === 0) return;
+    const slotKey = `oc:recover:${getOkapiColorSlotKey(new Date(Date.now() - 30 * 60_000))}`;
+    const acquired = await acquireJobLock('okapi_color_draw', slotKey);
+    if (!acquired) return;
+    console.log(`[OKAPI-COLOR RECOVERY/${reason}] ${count} orphan ticket(s) — catch-up draw`);
+    const result = await executerTirageOkapiColor();
+    console.log(`[OKAPI-COLOR RECOVERY/${reason}] Done`, result);
+  } catch (err) {
+    console.error(`[OKAPI-COLOR RECOVERY/${reason}] Error:`, err);
+  }
+}
+
+function scheduleNextOkapiColorDraw() {
+  const ms = msUntilNextFlashSlot();
+  setTimeout(async () => {
+    try {
+      const slotKey = `oc:${getOkapiColorSlotKey()}`;
+      const acquired = await acquireJobLock('okapi_color_draw', slotKey);
+      if (!acquired) return;
+      try {
+        const result = await executerTirageOkapiColor();
+        console.log('[OKAPI-COLOR SCHEDULER] Draw complete', new Date().toISOString(), result);
+      } catch (err) {
+        console.error('[OKAPI-COLOR SCHEDULER] Draw failed:', err);
+      }
+    } catch (err) {
+      console.error('[OKAPI-COLOR SCHEDULER] Tick error:', err);
+    } finally {
+      scheduleNextOkapiColorDraw();
+    }
+  }, ms).unref();
 }
 
 function getFlashSlotKey(at: Date = new Date()): string {
@@ -211,6 +265,17 @@ export function startCrons() {
     console.log('[LOTO CRON] Tirage quotidien planifié — 20h00 Africa/Kinshasa');
   } else {
     console.log('[LOTO CRON] Désactivé (CONGO_LOTO_ENABLED=false)');
+  }
+
+  // Okapi Color — tirage toutes les 30 minutes si feature activée.
+  // Même architecture que Flash : self-rescheduling, slot lock, safety-net.
+  if (env.OKAPI_COLOR_ENABLED) {
+    scheduleNextOkapiColorDraw();
+    void recoverMissedOkapiColorDraw('boot');
+    setInterval(() => { void recoverMissedOkapiColorDraw('safety-net'); }, 60_000).unref();
+    console.log('[OKAPI-COLOR SCHEDULER] Tirage toutes les 30 min activé');
+  } else {
+    console.log('[OKAPI-COLOR SCHEDULER] Désactivé (OKAPI_COLOR_ENABLED=false)');
   }
 
   // Unipesa reconciliation worker — resolves transactions left in

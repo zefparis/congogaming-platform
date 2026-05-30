@@ -1372,7 +1372,144 @@ export default async function adminRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get<{ Querystring: Record<string, string> }>('/api/admin/transactions/export', async (req, reply) => {
+  // ---- OKAPI COLOR (admin) ----
+
+  app.get('/api/admin/okapi-color/overview', async (_req, reply) => {
+    const todayIso = startOfTodayIso();
+
+    const [ticketRes, jackpotRes] = await Promise.all([
+      supabaseAdmin
+        .from('okapi_color_tickets')
+        .select('prix_cdf, gains_cdf, status, created_at'),
+      supabaseAdmin
+        .from('okapi_color_jackpot')
+        .select('pot_cdf')
+        .eq('id', 1)
+        .single(),
+    ]);
+
+    if (ticketRes.error) return reply.code(500).send({ error: ticketRes.error.message });
+
+    const tickets = ticketRes.data || [];
+    let totalVendus = 0, totalEncaisse = 0, totalPaye = 0;
+    let todayVendus = 0, todayEncaisse = 0, todayPaye = 0;
+
+    for (const t of tickets) {
+      totalVendus++;
+      totalEncaisse += Number(t.prix_cdf || 0);
+      totalPaye += Number(t.gains_cdf || 0);
+      if (t.created_at >= todayIso) {
+        todayVendus++;
+        todayEncaisse += Number(t.prix_cdf || 0);
+        todayPaye += Number(t.gains_cdf || 0);
+      }
+    }
+
+    const pot = Number(jackpotRes.data?.pot_cdf ?? 0);
+    const payoutRate = totalEncaisse > 0 ? ((totalPaye / totalEncaisse) * 100).toFixed(2) + ' %' : 'N/A';
+
+    return reply.send({
+      total: { tickets: totalVendus, encaisse_cdf: totalEncaisse, paye_cdf: totalPaye, payout_rate: payoutRate },
+      today: { tickets: todayVendus, encaisse_cdf: todayEncaisse, paye_cdf: todayPaye },
+      jackpot_pot_cdf: pot,
+    });
+  });
+
+  app.get<{ Querystring: { page?: string; page_size?: string; status?: string } }>(
+    '/api/admin/okapi-color/tickets',
+    async (req, reply) => {
+      const page = Math.max(1, Number(req.query.page || 1));
+      const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size || 25)));
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabaseAdmin
+        .from('okapi_color_tickets')
+        .select('id, user_id, numeros, prix_cdf, status, nb_rouges, nb_or, gains_cdf, tirage_id, created_at', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (req.query.status) query = query.eq('status', req.query.status);
+
+      const { data, error, count } = await query;
+      if (error) return reply.code(500).send({ error: error.message });
+
+      const ids = Array.from(new Set((data || []).map((t: any) => String(t.user_id))));
+      const phoneById = new Map<string, string>();
+      if (ids.length > 0) {
+        const { data: users } = await supabaseAdmin.from('users').select('id, phone').in('id', ids);
+        for (const u of users || []) phoneById.set(String(u.id), String(u.phone || ''));
+      }
+
+      return reply.send({
+        items: (data || []).map((t: any) => ({
+          ...t,
+          phone: maskPhone(phoneById.get(String(t.user_id))),
+        })),
+        page, page_size: pageSize, total: count ?? null,
+      });
+    },
+  );
+
+  app.post('/api/admin/okapi-color/draw', async (req, reply) => {
+    const { executerTirageOkapiColor } = await import('./okapi-color.js');
+    try {
+      const result = await executerTirageOkapiColor();
+      return reply.send(result);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message || 'Draw failed' });
+    }
+  });
+
+  app.post('/api/admin/okapi-color/purge-pending', async (req, reply) => {
+    const { data: claimed, error: claimErr } = await supabaseAdmin
+      .from('okapi_color_tickets')
+      .update({ status: 'cancelled', gains_cdf: 0, jackpot_en_attente: false })
+      .eq('status', 'pending')
+      .select('id, user_id, prix_cdf');
+    if (claimErr) return reply.code(500).send({ error: claimErr.message });
+
+    const { recordLedgerEntry } = await import('../lib/ledger.js');
+    const tickets = claimed ?? [];
+    let refunded = 0, totalRefundedCdf = 0;
+    const failures: Array<{ ticket_id: string; error: string }> = [];
+
+    for (const t of tickets) {
+      const price = Number(t.prix_cdf || 0);
+      if (price <= 0) continue;
+      try {
+        const result = await recordLedgerEntry({
+          user_id: String(t.user_id),
+          direction: 'credit',
+          amount: price,
+          currency: 'CDF',
+          reason: 'okapi_color_ticket_cancel_refund',
+          reference_type: 'okapi_color_ticket',
+          reference_id: String(t.id),
+          idempotency_key: `okapi-color:ticket:${t.id}:cancel:refund`,
+        });
+        if (result.applied || result.duplicate) {
+          refunded++;
+          totalRefundedCdf += price;
+        }
+      } catch (err: any) {
+        failures.push({ ticket_id: String(t.id), error: err?.message || 'refund failed' });
+      }
+    }
+    return reply.send({ scanned: tickets.length, refunded, total_refunded_cdf: totalRefundedCdf, failures });
+  });
+
+  app.get('/api/admin/okapi-color/draws', async (_req, reply) => {
+    const { data, error } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .select('id, numeros_rouges, numeros_or, hash_pre, jackpot_paye, drawn_at')
+      .order('drawn_at', { ascending: false })
+      .limit(20);
+    if (error) return reply.code(500).send({ error: error.message });
+    return reply.send({ draws: data || [] });
+  });
+
+  app.get('/api/admin/transactions/export', async (req, reply) => {
     const { data, error } = await buildTxQuery(req.query).limit(10000);
     if (error) return reply.code(500).send({ error: error.message });
     const ids = Array.from(new Set((data || []).map((t: any) => String(t.user_id))));

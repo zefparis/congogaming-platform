@@ -34,6 +34,21 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.toLowerCase() === 'true')
     .default('true'),
+  OKAPI_COLOR_ENABLED: z
+    .string()
+    .transform((val) => val.toLowerCase() === 'true')
+    .default('false'),
+  OKAPI_COLOR_ADMIN_SECRET: z.string().optional(),
+  OKAPI_COLOR_JACKPOT_CDF: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().positive())
+    .optional(),
+  OKAPI_COLOR_CONTRIBUTION_CDF: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().nonnegative())
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

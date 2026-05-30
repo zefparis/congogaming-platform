@@ -74,3 +74,7 @@ export const ScratchBuyBodySchema = z.object({
 export const ScratchClaimBodySchema = z.object({
   ticket_id: z.string().min(1),
 });
+
+export const OkapiColorTicketBodySchema = z.object({
+  numeros: z.array(z.number().int().min(1).max(24)).length(6),
+});
