@@ -47,8 +47,18 @@ interface LiveData {
 // Constants
 // ---------------------------------------------------------------------------
 const BASE_URL = import.meta.env.VITE_API_URL || '';
-const PLAY_URL = typeof window !== 'undefined' ? `${window.location.origin}/okapi-color` : '';
-const QR_URL   = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(PLAY_URL)}&bgcolor=0a0a0a&color=ffffff&qzone=1`;
+
+function buildPlayUrl(): string {
+  if (typeof window === 'undefined') return '/okapi-color';
+  const params = new URLSearchParams(window.location.search);
+  const locationId = params.get('location_id');
+  const base = `${window.location.origin}/okapi-color`;
+  return locationId ? `${base}?location_id=${encodeURIComponent(locationId)}` : base;
+}
+
+function buildQrUrl(playUrl: string): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(playUrl)}&bgcolor=0a0a0a&color=ffffff&qzone=1`;
+}
 
 const RED_GRADIENT  = 'linear-gradient(135deg,#b91c1c,#ef4444)';
 const GOLD_GRADIENT = 'linear-gradient(135deg,#b45309,#fbbf24)';
@@ -119,7 +129,7 @@ function Countdown({ secs }: { secs: number }) {
 // ---------------------------------------------------------------------------
 // State screens
 // ---------------------------------------------------------------------------
-function OpenScreen({ live, secs }: { live: LiveData; secs: number }) {
+function OpenScreen({ live, secs, qrUrl, playUrl }: { live: LiveData; secs: number; qrUrl: string; playUrl: string }) {
   const isJackpotReady = live.jackpotCdf >= live.jackpotThresholdCdf;
   return (
     <motion.div
@@ -169,12 +179,13 @@ function OpenScreen({ live, secs }: { live: LiveData; secs: number }) {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 22, color: '#9CA3AF', letterSpacing: 4, marginBottom: 12 }}>SCANNE POUR JOUER</div>
           <img
-            src={QR_URL}
+            src={qrUrl}
             alt="QR code"
             width={160} height={160}
             style={{ borderRadius: 12, display: 'block' }}
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
           />
+          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 8, letterSpacing: 1 }}>{playUrl}</div>
         </div>
       </div>
 
@@ -379,6 +390,9 @@ export default function OkapiColorTVScreen() {
   const prevSlotRef               = useRef('');
   const prevStateRef              = useRef<DrawState | ''>('');
 
+  const playUrl = buildPlayUrl();
+  const qrUrl   = buildQrUrl(playUrl);
+
   // Poll live data every 2s
   useEffect(() => {
     const fetchLive = async () => {
@@ -499,7 +513,7 @@ export default function OkapiColorTVScreen() {
 
       {!error && live && (
         <AnimatePresence mode="wait">
-          {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} />}
+          {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
           {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
           {live.currentDraw.status === 'drawing' && <DrawingScreen key="drawing" live={live} revealedRed={revealedRed} revealedGold={revealedGold} />}
           {live.currentDraw.status === 'result'  && <ResultScreen  key="result"  live={live} secs={secs} />}
@@ -512,7 +526,7 @@ export default function OkapiColorTVScreen() {
           {`CONGO GAMING · TIRAGE LIVE TOUTES LES ${Math.round((live?.drawIntervalSeconds ?? 600) / 60)} MIN`}
         </span>
         <span style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 16, color: 'rgba(255,255,255,0.2)', letterSpacing: 2 }}>
-          {PLAY_URL}
+          {playUrl}
         </span>
       </div>
     </div>
