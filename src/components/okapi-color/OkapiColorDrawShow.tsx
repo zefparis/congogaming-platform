@@ -136,8 +136,8 @@ export default function OkapiColorDrawShow({
     const rootBox = rootRef.current.getBoundingClientRect();
     const tl = gsap.timeline({ onComplete });
     timelineRef.current = tl;
-    const duration = isTv ? 2.0 : 1.4;   // visible travel time per ball
-    const gap      = isTv ? 0.7 : 0.48;  // pause after each impact before next ball
+    const duration = isTv ? 3.0 : 2.2;   // visible travel time per ball
+    const gap      = isTv ? 1.4 : 1.0;   // pause after each impact before next ball
 
     items.forEach((item) => {
       const target = cellRefs.current[item.number];
@@ -394,8 +394,6 @@ export default function OkapiColorDrawShow({
                 className={`okapi-draw-cell okapi-draw-cell-${hit}`}
               >
                 <span>{n}</span>
-                {hit === 'redHit' && <span className="okapi-draw-badge">ROUGE</span>}
-                {hit === 'goldHit' && <span className="okapi-draw-badge">OR</span>}
               </div>
             );
           })}
