@@ -143,6 +143,7 @@ export default function OkapiColorDrawShow({
     setHits({});
     timelineRef.current?.kill();
 
+    const rootBox = rootRef.current.getBoundingClientRect();
     const tl = gsap.timeline({ onComplete });
     timelineRef.current = tl;
     const duration = isTv ? 3.0 : 2.2;   // visible travel time per ball
@@ -152,7 +153,20 @@ export default function OkapiColorDrawShow({
       const target = cellRefs.current[item.number];
       if (!target || !ballLayerRef.current || !rootRef.current) return;
 
-      const size = isTv ? 74 : 42;
+      const targetBox = target.getBoundingClientRect();
+      const targetX = targetBox.left - rootBox.left + targetBox.width  / 2;
+      const targetY = targetBox.top  - rootBox.top  + targetBox.height / 2;
+      const size    = isTv ? 74 : 42;
+
+      const fromRight = item.index % 2 === 0;
+      const startX = fromRight ? rootBox.width + size + (item.index % 3) * 40 : -size - (item.index % 3) * 40;
+      const startY = item.index % 3 === 0 ? -size : item.index % 3 === 1 ? rootBox.height + size : rootBox.height * 0.5;
+
+      const bounceOneX = rootBox.width  * (0.72 - (item.index % 3) * 0.07);
+      const bounceOneY = rootBox.height * (0.22 + (item.index % 4) * 0.10);
+      const bounceTwoX = rootBox.width  * (0.42 + (item.index % 2) * 0.14);
+      const bounceTwoY = rootBox.height * (0.72 - (item.index % 3) * 0.08);
+
       const ball = document.createElement('div');
       ball.className = `okapi-draw-ball okapi-draw-ball-${item.color}`;
       ball.style.width  = `${size}px`;
@@ -161,72 +175,38 @@ export default function OkapiColorDrawShow({
       ball.style.marginTop  = `${-size / 2}px`;
       ballLayerRef.current.appendChild(ball);
 
-      // Positions populated fresh at actual launch time (inside tl.call below).
-      // Using () => pos.x function values in tl.to() ensures GSAP reads them at
-      // tween-start time, not at setup time — so layout shifts don't affect aim.
-      const pos = { targetX: 0, targetY: 0, boneX: 0, boneY: 0, btwoX: 0, btwoY: 0 };
-
       let trailFrame = 0;
-      const addTrail = () => {
-        trailFrame++;
-        if (trailFrame % 2 !== 0 || !ballLayerRef.current) return;
-        const cx = gsap.getProperty(ball, 'x') as number;
-        const cy = gsap.getProperty(ball, 'y') as number;
-        const variance = size * 0.35;
-        const pSize = size * (0.28 + Math.random() * 0.38);
-        const p = document.createElement('div');
-        p.className = `okapi-trail-particle okapi-trail-particle-${item.color}`;
-        p.style.width  = `${pSize}px`;
-        p.style.height = `${pSize}px`;
-        p.style.left   = `${cx - pSize / 2 + (Math.random() - 0.5) * variance}px`;
-        p.style.top    = `${cy - pSize / 2 + (Math.random() - 0.5) * variance}px`;
-        ballLayerRef.current.appendChild(p);
-        gsap.to(p, {
-          opacity: 0, scale: 0.08,
-          x: (Math.random() - 0.5) * size * 0.9,
-          y: (Math.random() - 0.5) * size * 0.9 + size * 0.25,
-          duration: 0.32 + Math.random() * 0.28,
-          ease: 'power2.out',
-          onComplete: () => p.remove(),
-        });
-      };
-
-      // Measure layout FRESH at the exact moment this ball is about to launch.
-      // This captures any shifts caused by status changes (stats/timer appearing).
-      tl.call(() => {
-        if (!rootRef.current || !target) return;
-        const rootBox   = rootRef.current.getBoundingClientRect();
-        const targetBox = target.getBoundingClientRect();
-        pos.targetX = targetBox.left - rootBox.left + targetBox.width  / 2;
-        pos.targetY = targetBox.top  - rootBox.top  + targetBox.height / 2;
-        pos.boneX = rootBox.width  * (0.72 - (item.index % 3) * 0.07);
-        pos.boneY = rootBox.height * (0.22 + (item.index % 4) * 0.10);
-        pos.btwoX = rootBox.width  * (0.42 + (item.index % 2) * 0.14);
-        pos.btwoY = rootBox.height * (0.72 - (item.index % 3) * 0.08);
-        const fromRight = item.index % 2 === 0;
-        const startX = fromRight
-          ? rootBox.width + size + (item.index % 3) * 40
-          : -size - (item.index % 3) * 40;
-        const startY = item.index % 3 === 0 ? -size
-          : item.index % 3 === 1 ? rootBox.height + size
-          : rootBox.height * 0.5;
-        gsap.set(ball, { x: startX, y: startY, scale: 0.72, opacity: 0, rotate: 0 });
-      })
+      tl.set(ball, { x: startX, y: startY, scale: 0.72, opacity: 0, rotate: 0 })
         .to(ball, { opacity: 1, scale: 1, duration: 0.18, ease: 'power2.out' })
         .to(ball, {
-          x: () => pos.boneX, y: () => pos.boneY,
-          rotate: item.color === 'red' ? 200 : -200, scale: 1.1,
-          duration: duration * 0.32, ease: 'power2.out', onUpdate: addTrail,
-        })
-        .to(ball, {
-          x: () => pos.btwoX, y: () => pos.btwoY,
-          rotate: item.color === 'red' ? 420 : -420, scale: 0.96,
-          duration: duration * 0.28, ease: 'power1.inOut', onUpdate: addTrail,
-        })
-        .to(ball, {
-          x: () => pos.targetX, y: () => pos.targetY,
-          rotate: item.color === 'red' ? 720 : -720, scale: 0.82,
-          duration: duration * 0.4, ease: 'power3.in', onUpdate: addTrail,
+          keyframes: [
+            { x: bounceOneX, y: bounceOneY, rotate: item.color === 'red' ? 200 : -200, scale: 1.1,  duration: duration * 0.32, ease: 'power2.out' },
+            { x: bounceTwoX, y: bounceTwoY, rotate: item.color === 'red' ? 420 : -420, scale: 0.96, duration: duration * 0.28, ease: 'power1.inOut' },
+            { x: targetX,    y: targetY,    rotate: item.color === 'red' ? 720 : -720, scale: 0.82, duration: duration * 0.4,  ease: 'power3.in' },
+          ],
+          onUpdate() {
+            trailFrame++;
+            if (trailFrame % 2 !== 0 || !ballLayerRef.current) return;
+            const cx = gsap.getProperty(ball, 'x') as number;
+            const cy = gsap.getProperty(ball, 'y') as number;
+            const variance = size * 0.35;
+            const pSize = size * (0.28 + Math.random() * 0.38);
+            const p = document.createElement('div');
+            p.className = `okapi-trail-particle okapi-trail-particle-${item.color}`;
+            p.style.width  = `${pSize}px`;
+            p.style.height = `${pSize}px`;
+            p.style.left   = `${cx - pSize / 2 + (Math.random() - 0.5) * variance}px`;
+            p.style.top    = `${cy - pSize / 2 + (Math.random() - 0.5) * variance}px`;
+            ballLayerRef.current.appendChild(p);
+            gsap.to(p, {
+              opacity: 0, scale: 0.08,
+              x: (Math.random() - 0.5) * size * 0.9,
+              y: (Math.random() - 0.5) * size * 0.9 + size * 0.25,
+              duration: 0.32 + Math.random() * 0.28,
+              ease: 'power2.out',
+              onComplete: () => p.remove(),
+            });
+          },
         })
         .add(() => {
           setHits((prev) => ({ ...prev, [item.number]: item.color === 'red' ? 'redHit' : 'goldHit' }));

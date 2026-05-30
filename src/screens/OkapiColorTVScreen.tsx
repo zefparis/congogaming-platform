@@ -216,8 +216,8 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           onComplete={() => setAnimComplete(true)}
         />
 
-        {/* Stats — only visible in result phase */}
-        {isResult && <div style={{ display: 'flex', gap: 40 }}>
+        {/* Stats — only after animation completes (prevents layout shift mid-flight) */}
+        {isResult && animComplete && <div style={{ display: 'flex', gap: 40 }}>
           <div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#9CA3AF', letterSpacing: 3 }}>GAGNANTS</div>
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(24px,5vw,56px)', color: '#fff' }}>{draw?.winnerCount ?? 0}</div>
@@ -230,8 +230,8 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           </div>
         </div>}
 
-        {/* Next draw timer */}
-        {isResult && <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 3 }}>
+        {/* Next draw timer — only after animation completes */}
+        {isResult && animComplete && <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#9CA3AF', letterSpacing: 3 }}>
           PROCHAIN TIRAGE DANS {String(Math.floor(secs / 60)).padStart(2, '0')}:{String(secs % 60).padStart(2, '0')}
         </div>}
       </div>
