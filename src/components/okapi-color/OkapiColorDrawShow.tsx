@@ -235,7 +235,7 @@ export default function OkapiColorDrawShow({
   }, [drawKey, totalNumbers, isTv, onComplete]);
 
   return (
-    <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode}`}>
+    <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode} okapi-draw-show-${status}`}>
       <style>{`
         /* ── Shared base ─────────────────────────────────────────────────────── */
         .okapi-draw-show {
@@ -312,7 +312,15 @@ export default function OkapiColorDrawShow({
         .okapi-draw-show-tv .okapi-draw-ball     { font-size: 42px; }
 
         /* ── Mobile mode ─────────────────────────────────────────────────────── */
-        .okapi-draw-show-mobile { min-height: 480px; border-radius: 22px; }
+        .okapi-draw-show-mobile .okapi-draw-title-row { display: none; }
+        .okapi-draw-show-mobile {
+          min-height: 480px; border-radius: 22px;
+          max-height: 900px; overflow: hidden;
+          transition: max-height 0.6s cubic-bezier(0.4,0,0.2,1), opacity 0.5s ease, margin 0.5s ease;
+        }
+        .okapi-draw-show-mobile.okapi-draw-show-result {
+          max-height: 0; opacity: 0; pointer-events: none; margin: 0 !important;
+        }
         .okapi-draw-show-mobile .okapi-draw-content { padding: 18px; gap: 14px; }
         .okapi-draw-show-mobile .okapi-draw-kicker  { font-size: 15px; letter-spacing: 1.5px; }
         .okapi-draw-show-mobile .okapi-draw-message { font-size: 14px; letter-spacing: 1.5px; }
