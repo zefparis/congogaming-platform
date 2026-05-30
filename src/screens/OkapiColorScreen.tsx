@@ -272,7 +272,13 @@ export default function OkapiColorScreen() {
           <div className="text-[10px] text-zinc-500 mt-0.5">Tirage live toutes les {intervalMin} min</div>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11px] font-semibold" style={{ color: statusColor }}>{statusLabel}</span>
+          <button
+            onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{ color: statusColor, background: 'rgba(255,255,255,0.06)', border: `1px solid ${statusColor}44` }}
+          >
+            {statusLabel}
+          </button>
           <div className="text-right">
             <div className="text-[10px] text-zinc-500">Solde</div>
             <div className="text-sm font-bold" style={{ color: '#FFD700' }}>{balance.toLocaleString('fr-FR')} CDF</div>
@@ -290,7 +296,7 @@ export default function OkapiColorScreen() {
           {jackpot >= threshold && <span className="text-[10px] text-red-400 font-bold animate-pulse">DISPONIBLE !</span>}
         </div>
         <div className="font-display text-3xl mt-0.5" style={{ color: jackpot >= threshold ? '#ff5555' : '#FFD700' }}>
-          {jackpot.toLocaleString('fr-FR')} CDF
+          {threshold.toLocaleString('fr-FR')} CDF
         </div>
         {jackpot < threshold && (
           <div className="mt-2 w-full h-1 rounded-full bg-zinc-800">
@@ -299,7 +305,21 @@ export default function OkapiColorScreen() {
         )}
       </div>
 
+      {/* VOIR LE LIVE CTA — visible in OPEN/CLOSING */}
+      {(status === 'open' || status === 'closing') && (
+        <div className="mx-4 mt-3 flex">
+          <button
+            onClick={() => document.getElementById('live')?.scrollIntoView({ behavior: 'smooth' })}
+            className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold tracking-wide"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}
+          >
+            <span>📺</span> VOIR LE TIRAGE LIVE
+          </button>
+        </div>
+      )}
+
       {/* State-aware main section */}
+      <div id="live">
       <AnimatePresence mode="wait">
 
         {/* ── OPEN / CLOSING : selection grid ── */}
@@ -468,6 +488,7 @@ export default function OkapiColorScreen() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
 
       {/* Payout table */}
       <div className="mx-4 mt-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 overflow-hidden">

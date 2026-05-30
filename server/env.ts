@@ -37,7 +37,7 @@ const envSchema = z.object({
   OKAPI_COLOR_ENABLED: z
     .string()
     .transform((val) => val.toLowerCase() === 'true')
-    .default('false'),
+    .default('true'),
   OKAPI_COLOR_ADMIN_SECRET: z.string().optional(),
   OKAPI_COLOR_JACKPOT_CDF: z
     .string()
