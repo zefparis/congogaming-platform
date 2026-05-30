@@ -50,6 +50,7 @@ export default function OkapiColorDrawShow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [goldNumbers.join(',')],
   );
+  const totalNumbers = cleanRedNumbers.length + cleanGoldNumbers.length;
 
   // Always-current refs so the animation effect can read latest numbers
   // without those arrays being in the effect's dependency array.
@@ -127,6 +128,9 @@ export default function OkapiColorDrawShow({
 
     const reds  = redRef.current.slice(0, 6);
     const golds = goldRef.current.slice(0, 4);
+
+    // Both colour sets must be present before starting — otherwise wait for next poll
+    if (reds.length === 0 || golds.length === 0) return;
 
     const items: DrawItem[] = [
       ...reds.map((number, index) => ({ number, color: 'red' as const, index })),
@@ -226,8 +230,9 @@ export default function OkapiColorDrawShow({
       tl.kill();
       ballLayerRef.current?.querySelectorAll('.okapi-draw-ball, .okapi-trail-particle').forEach((b) => b.remove());
     };
+  // totalNumbers in deps: re-run when gold numbers arrive after reds (common on first poll)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawKey, isTv, onComplete]);
+  }, [drawKey, totalNumbers, isTv, onComplete]);
 
   return (
     <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode}`}>
