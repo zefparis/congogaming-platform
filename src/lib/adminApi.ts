@@ -458,6 +458,43 @@ export const adminApi = {
       revenue_today: number;
     }>('/api/admin/scratch/overview'),
 
+  okapiColorLive: () =>
+    request<{
+      enabled: boolean;
+      jackpotCdf: number;
+      jackpotThresholdCdf: number;
+      ticketPriceCdf: number;
+      currentDraw: { slotKey: string; status: string; drawAt: string; closeAt: string; secondsRemaining: number };
+      lastDraw: { drawNumber: number | null; numerosRouges: number[]; numerosOr: number[]; drawnAt: string; jackpotPaye: boolean; winnerCount: number; totalPaidCdf: number } | null;
+      publicStats: { ticketsCount: number; winnerCount: number; totalPaidCdf: number };
+    }>('/api/okapi-color/live'),
+
+  okapiColorLatestDraws: () =>
+    request<Array<{
+      id: string;
+      draw_number: number | null;
+      numeros_rouges: number[];
+      numeros_or: number[];
+      drawn_at: string;
+      jackpot_paye: boolean;
+    }>>('/api/okapi-color/latest-draws'),
+
+  okapiColorForceDraw: () => {
+    const secret = getAdminSecret() || FALLBACK_SECRET;
+    return request<{ tirageId: string; rouges: number[]; ors: number[]; winners: number; totalPaidCdf: number }>(
+      '/api/okapi-color/draw',
+      { method: 'POST', headers: { 'x-admin-secret': secret } },
+    );
+  },
+
+  okapiColorPurgePending: () => {
+    const secret = getAdminSecret() || FALLBACK_SECRET;
+    return request<{ scanned: number; refunded: number; total_refunded_cdf: number }>(
+      '/api/okapi-color/purge-pending',
+      { method: 'POST', headers: { 'x-admin-secret': secret } },
+    );
+  },
+
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
