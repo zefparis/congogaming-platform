@@ -475,14 +475,17 @@ export const adminApi = {
   okapiColorLatestDraws: () =>
     fetch(`${BASE}/api/okapi-color/latest-draws`, { cache: 'no-store' }).then(async r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json() as Promise<Array<{
-        id: string;
-        draw_number: number | null;
-        numeros_rouges: number[];
-        numeros_or: number[];
-        drawn_at: string;
-        jackpot_paye: boolean;
-      }>>;
+      const json = await r.json() as {
+        tirages?: Array<{
+          id: string;
+          draw_number: number | null;
+          numeros_rouges: number[];
+          numeros_or: number[];
+          drawn_at: string;
+          jackpot_paye: boolean;
+        }>;
+      };
+      return Array.isArray(json?.tirages) ? json.tirages : [];
     }),
 
   okapiColorForceDraw: () => {
