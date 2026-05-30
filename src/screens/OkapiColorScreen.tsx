@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Shuffle, Trash2, Loader2 } from 'lucide-react';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
+import OkapiColorDrawShow from '../components/okapi-color/OkapiColorDrawShow';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -142,11 +143,6 @@ export default function OkapiColorScreen() {
   // UI
   const [showPayouts, setShowPayouts] = useState(false);
 
-  // Ball animation
-  const [revRed,  setRevRed]  = useState<number[]>([]);
-  const [revGold, setRevGold] = useState<number[]>([]);
-  const prevSlotRef  = useRef('');
-  const prevStateRef = useRef<DrawStatus | ''>('');
   const prevStatusForNotifRef = useRef<DrawStatus | ''>('');
 
   const [showBetsOpen, setShowBetsOpen] = useState(false);
@@ -209,31 +205,6 @@ export default function OkapiColorScreen() {
     }
     prevStatusForNotifRef.current = st;
   }, [live?.currentDraw.status]);
-
-  // Ball reveal animation on DRAWING
-  useEffect(() => {
-    if (!live) return;
-    const st     = live.currentDraw.status;
-    const slotKey = live.lastDraw?.slotKey ?? live.currentDraw.slotKey;
-
-    if (st !== 'drawing') {
-      if (prevStateRef.current === 'drawing') { setRevRed([]); setRevGold([]); }
-      prevStateRef.current = st;
-      return;
-    }
-    if (slotKey === prevSlotRef.current) return;
-    prevSlotRef.current  = slotKey;
-    prevStateRef.current = 'drawing';
-
-    const rouges = live.lastDraw?.numerosRouges ?? [];
-    const ors    = live.lastDraw?.numerosOr    ?? [];
-    setRevRed([]); setRevGold([]);
-
-    const ts: ReturnType<typeof setTimeout>[] = [];
-    rouges.forEach((n, i) => ts.push(setTimeout(() => setRevRed((p) => [...p, n]),  600 + i * 1600)));
-    ors.forEach(   (n, i) => ts.push(setTimeout(() => setRevGold((p) => [...p, n]), 600 + rouges.length * 1600 + 600 + i * 1600)));
-    return () => ts.forEach(clearTimeout);
-  }, [live?.currentDraw.status, live?.lastDraw?.slotKey]);
 
   const status     = live?.currentDraw.status ?? 'open';
   const isBlocked  = status === 'closing' || status === 'drawing';
@@ -448,30 +419,14 @@ export default function OkapiColorScreen() {
         {/* ── DRAWING : ball animation ── */}
         {status === 'drawing' && (
           <motion.div key="drawing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="mx-4 mt-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-5">
-            <div className="text-center font-display text-xl tracking-widest mb-5" style={{ color: '#fbbf24' }}>
-              🎯 TIRAGE EN DIRECT
-            </div>
-            <div className="mb-4">
-              <div className="text-[10px] uppercase tracking-widest text-red-400 mb-2">Rouges</div>
-              <div className="flex flex-wrap gap-2">
-                {(live?.lastDraw?.numerosRouges ?? []).map((n) => revRed.includes(n) ? (
-                  <Ball key={n} n={n} color="red" size="lg" animated />
-                ) : (
-                  <div key={n} className="w-14 h-14 rounded-full border-2 border-dashed border-zinc-700 opacity-30" />
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-widest mb-2" style={{ color: '#fbbf24' }}>Or</div>
-              <div className="flex flex-wrap gap-2">
-                {(live?.lastDraw?.numerosOr ?? []).map((n) => revGold.includes(n) ? (
-                  <Ball key={n} n={n} color="gold" size="lg" animated />
-                ) : (
-                  <div key={n} className="w-14 h-14 rounded-full border-2 border-dashed opacity-30" style={{ borderColor: 'rgba(251,191,36,0.3)' }} />
-                ))}
-              </div>
-            </div>
+            className="mx-4 mt-6">
+            <OkapiColorDrawShow
+              redNumbers={live?.lastDraw?.numerosRouges ?? []}
+              goldNumbers={live?.lastDraw?.numerosOr ?? []}
+              status="drawing"
+              drawKey={live?.lastDraw?.slotKey ?? live?.currentDraw.slotKey ?? 'drawing'}
+              mode="mobile"
+            />
           </motion.div>
         )}
 
@@ -484,18 +439,13 @@ export default function OkapiColorScreen() {
               <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
                 Résultats {live.lastDraw.drawNumber ? `— Tirage #${live.lastDraw.drawNumber}` : ''}
               </div>
-              <div className="mb-3">
-                <div className="text-[10px] uppercase tracking-widest text-red-400 mb-1.5">Rouges</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(live.lastDraw.numerosRouges ?? []).map((n) => <Ball key={n} n={n} color="red" size="md" />)}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: '#fbbf24' }}>Or</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(live.lastDraw.numerosOr ?? []).map((n) => <Ball key={n} n={n} color="gold" size="md" />)}
-                </div>
-              </div>
+              <OkapiColorDrawShow
+                redNumbers={live.lastDraw.numerosRouges ?? []}
+                goldNumbers={live.lastDraw.numerosOr ?? []}
+                status="result"
+                drawKey={live.lastDraw.slotKey ?? live.currentDraw.slotKey}
+                mode="mobile"
+              />
               <div className="flex gap-4 mt-3 pt-3 border-t border-zinc-800">
                 <div>
                   <div className="text-[10px] text-zinc-500">Gagnants</div>

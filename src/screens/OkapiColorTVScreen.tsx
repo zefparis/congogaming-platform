@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import OkapiColorDrawShow from '../components/okapi-color/OkapiColorDrawShow';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,50 +61,9 @@ function buildQrUrl(playUrl: string): string {
   return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(playUrl)}&bgcolor=0a0a0a&color=ffffff&qzone=1`;
 }
 
-const RED_GRADIENT  = 'linear-gradient(135deg,#b91c1c,#ef4444)';
-const GOLD_GRADIENT = 'linear-gradient(135deg,#b45309,#fbbf24)';
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-function Ball({ n, color, visible, delay = 0 }: { n: number; color: 'red' | 'gold'; visible: boolean; delay?: number }) {
-  return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          key={`ball-${color}-${n}`}
-          initial={{ scale: 0, opacity: 0, y: -30 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 20, delay }}
-          style={{
-            width: 'clamp(40px,10vw,90px)', height: 'clamp(40px,10vw,90px)',
-            borderRadius: '50%',
-            background: color === 'red' ? RED_GRADIENT : GOLD_GRADIENT,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'Bebas Neue, sans-serif',
-            fontSize: 'clamp(18px,5vw,42px)', color: color === 'gold' ? '#000' : '#fff',
-            boxShadow: color === 'red'
-              ? '0 0 24px rgba(239,68,68,0.7), 0 4px 16px rgba(0,0,0,0.5)'
-              : '0 0 24px rgba(251,191,36,0.7), 0 4px 16px rgba(0,0,0,0.5)',
-          }}
-        >
-          {n}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function BallPlaceholder({ color }: { color: 'red' | 'gold' }) {
-  return (
-    <div style={{
-      width: 'clamp(40px,10vw,90px)', height: 'clamp(40px,10vw,90px)', borderRadius: '50%',
-      background: color === 'red' ? 'rgba(239,68,68,0.1)' : 'rgba(251,191,36,0.1)',
-      border: `2px dashed ${color === 'red' ? 'rgba(239,68,68,0.3)' : 'rgba(251,191,36,0.3)'}`,
-    }} />
-  );
-}
-
 function Countdown({ secs }: { secs: number }) {
   const m = String(Math.floor(secs / 60)).padStart(2, '0');
   const s = String(secs % 60).padStart(2, '0');
@@ -209,52 +169,30 @@ function ClosingScreen({ secs }: { secs: number }) {
   );
 }
 
-function DrawingScreen({ live, revealedRed, revealedGold }: { live: LiveData; revealedRed: number[]; revealedGold: number[] }) {
+function DrawingScreen({ live }: { live: LiveData }) {
   const rouges = live.lastDraw?.numerosRouges ?? [];
   const ors    = live.lastDraw?.numerosOr    ?? [];
   const dn     = live.lastDraw?.drawNumber;
+  const drawKey = live.lastDraw?.slotKey ?? live.currentDraw.slotKey;
 
   return (
     <motion.div
       key="drawing"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 'clamp(20px,5vw,48px)', padding: '0 clamp(12px,3vw,40px)' }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 'clamp(12px,2vw,24px)', padding: 'clamp(12px,2vw,22px) clamp(16px,4vw,48px)' }}
     >
       {dn && (
         <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,2.5vw,28px)', color: '#9CA3AF', letterSpacing: 6 }}>
           TIRAGE #{dn}
         </div>
       )}
-
-      {/* Boules rouges */}
-      <div>
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#ef4444', letterSpacing: 6, textAlign: 'center', marginBottom: 'clamp(8px,2vw,20px)' }}>
-          🔴 NUMÉROS ROUGES
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(8px,2vw,20px)', justifyContent: 'center' }}>
-          {rouges.map((n: number, i: number) => (
-            revealedRed.includes(n)
-              ? <Ball key={i} n={n} color="red" visible />
-              : <BallPlaceholder key={i} color="red" />
-          ))}
-          {rouges.length === 0 && [0,1,2,3,4,5].map((i: number) => <BallPlaceholder key={i} color="red" />)}
-        </div>
-      </div>
-
-      {/* Boules or */}
-      <div>
-        <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,2vw,22px)', color: '#fbbf24', letterSpacing: 6, textAlign: 'center', marginBottom: 'clamp(8px,2vw,20px)' }}>
-          🟡 NUMÉROS OR
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(8px,2vw,20px)', justifyContent: 'center' }}>
-          {ors.map((n: number, i: number) => (
-            revealedGold.includes(n)
-              ? <Ball key={i} n={n} color="gold" visible />
-              : <BallPlaceholder key={i} color="gold" />
-          ))}
-          {ors.length === 0 && [0,1,2,3].map((i: number) => <BallPlaceholder key={i} color="gold" />)}
-        </div>
-      </div>
+      <OkapiColorDrawShow
+        redNumbers={rouges}
+        goldNumbers={ors}
+        status="drawing"
+        drawKey={drawKey}
+        mode="tv"
+      />
     </motion.div>
   );
 }
@@ -264,6 +202,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   const rouges  = draw?.numerosRouges ?? [];
   const ors     = draw?.numerosOr     ?? [];
   const winners = draw?.winners       ?? [];
+  const drawKey = draw?.slotKey ?? live.currentDraw.slotKey;
 
   return (
     <motion.div
@@ -279,25 +218,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           </div>
         )}
 
-        {/* Rouges */}
-        <div>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#ef4444', letterSpacing: 4, marginBottom: 12 }}>🔴 ROUGES</div>
-          <div style={{ display: 'flex', gap: 'clamp(6px,1.2vw,12px)', flexWrap: 'wrap' }}>
-            {rouges.map((n: number, i: number) => (
-              <div key={i} style={{ width: 'clamp(32px,7vw,70px)', height: 'clamp(32px,7vw,70px)', borderRadius: '50%', background: RED_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,3.5vw,32px)', color: '#fff', boxShadow: '0 0 16px rgba(239,68,68,0.5)' }}>{n}</div>
-            ))}
-          </div>
-        </div>
-
-        {/* Or */}
-        <div>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(12px,1.8vw,18px)', color: '#fbbf24', letterSpacing: 4, marginBottom: 12 }}>🟡 OR</div>
-          <div style={{ display: 'flex', gap: 'clamp(6px,1.2vw,12px)', flexWrap: 'wrap' }}>
-            {ors.map((n: number, i: number) => (
-              <div key={i} style={{ width: 'clamp(32px,7vw,70px)', height: 'clamp(32px,7vw,70px)', borderRadius: '50%', background: GOLD_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(14px,3.5vw,32px)', color: '#000', boxShadow: '0 0 16px rgba(251,191,36,0.5)' }}>{n}</div>
-            ))}
-          </div>
-        </div>
+        <OkapiColorDrawShow redNumbers={rouges} goldNumbers={ors} status="result" drawKey={drawKey} mode="tv" />
 
         {/* Stats */}
         <div style={{ display: 'flex', gap: 40 }}>
@@ -372,11 +293,7 @@ function ResultScreen({ live, secs }: { live: LiveData; secs: number }) {
 export default function OkapiColorTVScreen() {
   const [live, setLive]           = useState<LiveData | null>(null);
   const [secs, setSecs]           = useState(0);
-  const [revealedRed, setRed]     = useState<number[]>([]);
-  const [revealedGold, setGold]   = useState<number[]>([]);
   const [error, setError]         = useState(false);
-  const prevSlotRef               = useRef('');
-  const prevStateRef              = useRef<DrawState | ''>('');
 
   const playUrl = buildPlayUrl();
   const qrUrl   = buildQrUrl(playUrl);
@@ -405,42 +322,6 @@ export default function OkapiColorTVScreen() {
     const id = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, []);
-
-  // Ball reveal animation — triggered when entering drawing state with a new slot
-  useEffect(() => {
-    if (!live) return;
-    const st      = live.currentDraw.status;
-    const slotKey = live.lastDraw?.slotKey ?? live.currentDraw.slotKey;
-
-    if (st !== 'drawing') {
-      // Reset balls when leaving drawing state
-      if (prevStateRef.current === 'drawing') {
-        setRed([]);
-        setGold([]);
-      }
-      prevStateRef.current = st;
-      return;
-    }
-
-    // Already animated this slot
-    if (slotKey === prevSlotRef.current) return;
-    prevSlotRef.current  = slotKey;
-    prevStateRef.current = 'drawing';
-
-    const rouges = live.lastDraw?.numerosRouges ?? [];
-    const ors    = live.lastDraw?.numerosOr    ?? [];
-    setRed([]);
-    setGold([]);
-
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    rouges.forEach((n, i) => {
-      timers.push(setTimeout(() => setRed(p => [...p, n]), 600 + i * 1800));
-    });
-    ors.forEach((n, i) => {
-      timers.push(setTimeout(() => setGold(p => [...p, n]), 600 + rouges.length * 1800 + 800 + i * 1800));
-    });
-    return () => timers.forEach(clearTimeout);
-  }, [live?.currentDraw.status, live?.lastDraw?.slotKey, live?.currentDraw.slotKey]);
 
   return (
     <div style={{
@@ -505,7 +386,7 @@ export default function OkapiColorTVScreen() {
         <AnimatePresence mode="wait">
           {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
           {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
-          {live.currentDraw.status === 'drawing' && <DrawingScreen key="drawing" live={live} revealedRed={revealedRed} revealedGold={revealedGold} />}
+          {live.currentDraw.status === 'drawing' && <DrawingScreen key="drawing" live={live} />}
           {live.currentDraw.status === 'result'  && <ResultScreen  key="result"  live={live} secs={secs} />}
         </AnimatePresence>
       )}
