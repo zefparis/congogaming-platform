@@ -114,7 +114,12 @@ export default function OkapiColorDrawShow({
       setShowRotateOverlay(status === 'drawing' && isPortrait);
     };
 
-    if (status !== 'drawing') {
+    // Keep landscape locked through BOTH drawing and result. The drawing window
+    // (25s) is shorter than the full animation (~24s mobile), so status flips to
+    // 'result' while balls are still flying. Unlocking on 'result' would rotate
+    // the viewport back to portrait mid-animation, triggering a full relayout that
+    // breaks getBoundingClientRect targets and aborts the remaining gold balls.
+    if (status !== 'drawing' && status !== 'result') {
       setShowRotateOverlay(false);
       try {
         screen.orientation?.unlock?.();
