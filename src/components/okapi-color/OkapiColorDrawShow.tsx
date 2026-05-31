@@ -172,6 +172,8 @@ export default function OkapiColorDrawShow({
     if (!hasRenderableDraw) return;
     if (!rootRef.current || !ballLayerRef.current) return;
     if (animatedSignatureRef.current === drawSignature) return;
+    // Don't replay animation on page load when landing on result
+    if (status === 'result' && animatedSignatureRef.current === '') return;
 
     const items: DrawItem[] = [
       ...cleanRedNumbers.map((number, index) => ({ number, color: 'red' as const, index })),
