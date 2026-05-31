@@ -171,6 +171,8 @@ export default function OkapiColorDrawShow({
     if (!rootRef.current || !ballLayerRef.current) return;
     if (animatedSignatureRef.current === drawSignature) return;
 
+    console.log('[ANIMATION START]', { status, drawKey, redCount: cleanRedNumbers.length, goldCount: cleanGoldNumbers.length, reds: cleanRedNumbers, golds: cleanGoldNumbers });
+
     const items: DrawItem[] = [
       ...cleanRedNumbers.map((number, index) => ({ number, color: 'red' as const, index })),
       ...cleanGoldNumbers.map((number, index) => ({ number, color: 'gold' as const, index: index + cleanRedNumbers.length })),
