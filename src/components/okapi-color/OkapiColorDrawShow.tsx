@@ -90,7 +90,6 @@ export default function OkapiColorDrawShow({
 
   const cleanGoldNumbers = useMemo(() => {
     const result = normalizeDrawNumbers(goldNumbers, GOLD_LIMIT, new Set(cleanRedNumbers));
-    console.log('[OkapiColorDrawShow] gold résolu', { raw: goldNumbers, rouge: cleanRedNumbers, kept: result, status, mode });
     if (import.meta.env.DEV && goldNumbers.length > 0 && result.length < goldNumbers.length) {
       console.warn('[OkapiColorDrawShow] certains numéros OR ont été exclus car ils chevauchent les numéros ROUGE. Vérifier les données en base.', { goldNumbers, cleanRedNumbers, kept: result });
     }
@@ -166,15 +165,11 @@ export default function OkapiColorDrawShow({
   }, [status, cleanRedNumbers, cleanGoldNumbers]);
 
   useEffect(() => {
-    if (status !== 'drawing') return;
+    if (status !== 'drawing' && status !== 'result') return;
     if (!drawKey) return;
     if (!hasRenderableDraw) return;
     if (!rootRef.current || !ballLayerRef.current) return;
     if (animatedSignatureRef.current === drawSignature) return;
-
-    // Strict mode: wait for the full business payload if backend is expected to return 6 red + 4 gold.
-    // If your business rule allows partial draws, replace this check with hasRenderableDraw only.
-    if (!hasCompleteDraw) return;
 
     const items: DrawItem[] = [
       ...cleanRedNumbers.map((number, index) => ({ number, color: 'red' as const, index })),
