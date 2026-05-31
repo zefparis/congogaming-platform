@@ -150,8 +150,10 @@ export default function OkapiColorDrawShow({
 
   useEffect(() => {
     if (status === 'open' || status === 'closing') {
-      timelineRef.current?.kill();
-      timelineRef.current = null;
+      if (timelineRef.current?.isActive()) {
+        timelineRef.current.kill();
+        timelineRef.current = null;
+      }
       animatedSignatureRef.current = '';
       setHits({});
       ballLayerRef.current?.querySelectorAll('.okapi-draw-ball, .okapi-trail-particle').forEach((node) => node.remove());
@@ -162,7 +164,7 @@ export default function OkapiColorDrawShow({
       if (timelineRef.current?.isActive()) return;
       setHits(buildHitMap(cleanRedNumbers, cleanGoldNumbers));
     }
-  }, [status, cleanRedNumbers, cleanGoldNumbers]);
+  }, [status]);
 
   useEffect(() => {
     if (status !== 'drawing' && status !== 'result') return;
@@ -170,8 +172,6 @@ export default function OkapiColorDrawShow({
     if (!hasRenderableDraw) return;
     if (!rootRef.current || !ballLayerRef.current) return;
     if (animatedSignatureRef.current === drawSignature) return;
-
-    console.log('[ANIMATION START]', { status, drawKey, redCount: cleanRedNumbers.length, goldCount: cleanGoldNumbers.length, reds: cleanRedNumbers, golds: cleanGoldNumbers });
 
     const items: DrawItem[] = [
       ...cleanRedNumbers.map((number, index) => ({ number, color: 'red' as const, index })),
@@ -205,7 +205,9 @@ export default function OkapiColorDrawShow({
         const layer = ballLayerRef.current;
         const target = cellRefs.current[item.number];
 
-        if (!root || !layer || !target) return;
+        if (!root || !layer || !target) {
+          return;
+        }
 
         const rootBox = root.getBoundingClientRect();
         const targetBox = target.getBoundingClientRect();

@@ -425,7 +425,7 @@ export default function OkapiColorScreen() {
               redNumbers={live?.lastDraw?.numerosRouges ?? []}
               goldNumbers={live?.lastDraw?.numerosOr ?? []}
               status={status}
-              drawKey={live?.lastDraw?.slotKey ?? live?.currentDraw.slotKey ?? 'drawing'}
+              drawKey={live?.lastDraw?.slotKey ?? ''}
               mode="mobile"
             />
             {/* Result-specific content */}

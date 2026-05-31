@@ -176,7 +176,7 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   const rouges   = draw?.numerosRouges ?? [];
   const ors      = draw?.numerosOr     ?? [];
   const winners  = draw?.winners       ?? [];
-  const drawKey  = draw?.slotKey ?? live.currentDraw.slotKey;
+  const drawKey  = draw?.slotKey ?? '';
   const isResult = live.currentDraw.status === 'result';
 
   // animComplete: controls when the winners column is rendered.
