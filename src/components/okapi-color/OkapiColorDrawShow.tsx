@@ -66,7 +66,6 @@ export default function OkapiColorDrawShow({
   redNumbers,
   goldNumbers,
   status,
-  drawKey,
   mode,
   onComplete,
 }: OkapiColorDrawShowProps) {
@@ -101,7 +100,6 @@ export default function OkapiColorDrawShow({
   }, [cleanRedNumbers, cleanGoldNumbers]);
 
   const hasRenderableDraw = cleanRedNumbers.length > 0 || cleanGoldNumbers.length > 0;
-  const hasCompleteDraw = cleanRedNumbers.length === RED_LIMIT && cleanGoldNumbers.length === GOLD_LIMIT;
 
   onCompleteRef.current = onComplete;
 
@@ -388,12 +386,14 @@ export default function OkapiColorDrawShow({
       tl.kill();
       ballLayerRef.current?.querySelectorAll('.okapi-draw-ball, .okapi-trail-particle').forEach((node) => node.remove());
     };
-  // cleanRedNumbers / cleanGoldNumbers intentionally NOT in deps:
-  // their values are already encoded in drawSignature (stable string).
-  // Array references change on every parent render; including them would
-  // trigger the cleanup → kill the running timeline mid-flight.
+  // IMPORTANT: status is NOT in deps. The drawing window (25s) is shorter than
+  // the full animation (~35s for 10 balls), so status flips to 'result' mid-flight.
+  // If status were a dep, that transition would run the cleanup → tl.kill() and
+  // abort the animation, leaving only a few balls visible. By depending only on
+  // drawSignature, the effect re-runs solely when a NEW draw's numbers arrive.
+  // status is read inside the guard (fresh at signature-change time).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, drawKey, drawSignature, isTv]);
+  }, [drawSignature, isTv]);
 
   return (
     <div ref={rootRef} className={`okapi-draw-show okapi-draw-show-${mode} okapi-draw-show-${status}`}>
