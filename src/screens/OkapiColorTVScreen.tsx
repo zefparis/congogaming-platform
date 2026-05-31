@@ -176,7 +176,6 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
   const rouges   = draw?.numerosRouges ?? [];
   const ors      = draw?.numerosOr     ?? [];
   const winners  = draw?.winners       ?? [];
-  const drawKey  = draw?.slotKey ?? '';
   const isResult = live.currentDraw.status === 'result';
 
   // animComplete: controls when the winners column is rendered.
@@ -189,7 +188,9 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
     // Fresh result with no prior drawing animation → show winners immediately
     if (st === 'result' && prevStatusRef.current !== 'drawing') setAnimComplete(true);
     // New draw cycle → reset
-    if (st === 'open' || st === 'closing') setAnimComplete(false);
+    if (st === 'open' || st === 'closing') {
+      setAnimComplete(false);
+    }
     prevStatusRef.current = st;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.currentDraw.status]);
@@ -211,7 +212,7 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           redNumbers={rouges}
           goldNumbers={ors}
           status={live.currentDraw.status as 'drawing' | 'result'}
-          drawKey={drawKey}
+          drawKey=""
           mode="tv"
           onComplete={() => setAnimComplete(true)}
         />
