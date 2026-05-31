@@ -11,3 +11,17 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+type OrientationLockType =
+  | 'any'
+  | 'landscape'
+  | 'landscape-primary'
+  | 'landscape-secondary'
+  | 'natural'
+  | 'portrait'
+  | 'portrait-primary'
+  | 'portrait-secondary';
+
+interface ScreenOrientation {
+  lock(orientation: OrientationLockType): Promise<void>;
+}
