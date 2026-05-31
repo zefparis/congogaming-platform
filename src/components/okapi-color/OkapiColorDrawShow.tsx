@@ -89,7 +89,11 @@ export default function OkapiColorDrawShow({
   }, [redNumbers]);
 
   const cleanGoldNumbers = useMemo(() => {
-    return normalizeDrawNumbers(goldNumbers, GOLD_LIMIT, new Set(cleanRedNumbers));
+    const result = normalizeDrawNumbers(goldNumbers, GOLD_LIMIT, new Set(cleanRedNumbers));
+    if (import.meta.env.DEV && goldNumbers.length > 0 && result.length < goldNumbers.length) {
+      console.warn('[OkapiColorDrawShow] certains numéros OR ont été exclus car ils chevauchent les numéros ROUGE. Vérifier les données en base.', { goldNumbers, cleanRedNumbers, kept: result });
+    }
+    return result;
   }, [goldNumbers, cleanRedNumbers]);
 
   const drawSignature = useMemo(() => {
@@ -227,7 +231,6 @@ export default function OkapiColorDrawShow({
 
         const ball = document.createElement('div');
         ball.className = `okapi-draw-ball okapi-draw-ball-${item.color}`;
-        ball.textContent = String(item.number);
         ball.style.width = `${ballSize}px`;
         ball.style.height = `${ballSize}px`;
         ball.style.marginLeft = `${-ballSize / 2}px`;
