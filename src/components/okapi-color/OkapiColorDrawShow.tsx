@@ -90,6 +90,7 @@ export default function OkapiColorDrawShow({
 
   const cleanGoldNumbers = useMemo(() => {
     const result = normalizeDrawNumbers(goldNumbers, GOLD_LIMIT, new Set(cleanRedNumbers));
+    console.log('[OkapiColorDrawShow] gold résolu', { raw: goldNumbers, rouge: cleanRedNumbers, kept: result, status, mode });
     if (import.meta.env.DEV && goldNumbers.length > 0 && result.length < goldNumbers.length) {
       console.warn('[OkapiColorDrawShow] certains numéros OR ont été exclus car ils chevauchent les numéros ROUGE. Vérifier les données en base.', { goldNumbers, cleanRedNumbers, kept: result });
     }
