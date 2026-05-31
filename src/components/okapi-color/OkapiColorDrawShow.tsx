@@ -15,7 +15,6 @@ type OkapiColorDrawShowProps = {
   redNumbers: number[];
   goldNumbers: number[];
   status: DrawStatus;
-  drawKey: string;
   mode: 'tv' | 'mobile';
   onComplete?: () => void;
 };

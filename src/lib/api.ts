@@ -116,6 +116,9 @@ export const api = {
       jackpotCdf: number;
       jackpotThresholdCdf: number;
       drawIntervalSeconds: number;
+      closeBeforeSeconds: number;
+      resultDisplaySeconds: number;
+      drawingWindowSeconds: number;
       currentDraw: {
         slotKey: string;
         drawNumber: number | null;

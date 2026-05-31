@@ -15,6 +15,12 @@ import {
   calculateOkapiColorHits,
   calculateOkapiColorPayout,
   OKAPI_COLOR_CONFIG,
+  buildRecoveryLockKey,
+  buildJackpotDecrementEventKey,
+  buildJackpotResolveEventKey,
+  resolveOkapiColorAdminSecret,
+  resolveDrawSlotKey,
+  getDrawingWindowSecs,
 } from '../okapi-color.js';
 
 // ===========================================================
@@ -290,5 +296,111 @@ describe('Sécurité - isolation user_id', () => {
     });
     // Zod strip : user_id doit être absent du résultat
     assert.ok(!('user_id' in (parsed.data ?? {})), 'user_id leaked from body');
+  });
+});
+
+// ===========================================================
+// 7. Recovery — lock stable par slot (jamais Date.now())
+// ===========================================================
+describe('Recovery - lock key stable', () => {
+  it('le lock de recovery est dérivé du slotKey', () => {
+    assert.equal(buildRecoveryLockKey('2026-05-31T09:10'), 'oc:recover:2026-05-31T09:10');
+  });
+
+  it('le même slot produit toujours le même lock (déterministe)', () => {
+    const a = buildRecoveryLockKey('2026-05-31T09:10');
+    const b = buildRecoveryLockKey('2026-05-31T09:10');
+    assert.equal(a, b);
+  });
+
+  it('le lock ne contient pas de timestamp Date.now()', () => {
+    const key = buildRecoveryLockKey('2026-05-31T09:10');
+    // Un timestamp epoch (>= 10 chiffres consécutifs) ne doit jamais apparaître.
+    assert.ok(!/\d{10,}/.test(key), `lock key looks time-based: ${key}`);
+  });
+
+  it('des slots différents produisent des locks différents', () => {
+    assert.notEqual(
+      buildRecoveryLockKey('2026-05-31T09:10'),
+      buildRecoveryLockKey('2026-05-31T09:20'),
+    );
+  });
+});
+
+// ===========================================================
+// 8. Jackpot — clés d'événement idempotentes stables
+// ===========================================================
+describe('Jackpot - event keys idempotents', () => {
+  it('clé de décrément stable par tirage + ticket', () => {
+    assert.equal(
+      buildJackpotDecrementEventKey('tir-1', 'tic-1'),
+      'okapi-color:draw:tir-1:jackpot-decrement:tic-1',
+    );
+  });
+
+  it('décrément: même (tirage,ticket) => même clé (no double décrément à la relance)', () => {
+    assert.equal(
+      buildJackpotDecrementEventKey('tir-1', 'tic-1'),
+      buildJackpotDecrementEventKey('tir-1', 'tic-1'),
+    );
+  });
+
+  it('décrément: tickets différents => clés différentes', () => {
+    assert.notEqual(
+      buildJackpotDecrementEventKey('tir-1', 'tic-1'),
+      buildJackpotDecrementEventKey('tir-1', 'tic-2'),
+    );
+  });
+
+  it('résolution jackpot_attente: clé stable par ticket', () => {
+    assert.equal(buildJackpotResolveEventKey('tic-9'), 'okapi-color:jackpot-resolve:tic-9');
+  });
+});
+
+// ===========================================================
+// 9. Secret admin — cloisonné sur OKAPI_COLOR_ADMIN_SECRET
+// ===========================================================
+describe('Secret admin - cloisonnement Okapi Color', () => {
+  it('utilise OKAPI_COLOR_ADMIN_SECRET', () => {
+    assert.equal(resolveOkapiColorAdminSecret({ OKAPI_COLOR_ADMIN_SECRET: 'oc-secret' }), 'oc-secret');
+  });
+
+  it('retourne une chaîne vide si non configuré (jamais de fallback LOTO)', () => {
+    assert.equal(resolveOkapiColorAdminSecret({}), '');
+  });
+});
+
+// ===========================================================
+// 10. Slot explicite — resolveDrawSlotKey
+// ===========================================================
+describe('Slot - resolveDrawSlotKey', () => {
+  it('utilise exactement le slotKey fourni (string)', () => {
+    assert.equal(resolveDrawSlotKey({ slotKey: '2026-05-31T09:10' }), '2026-05-31T09:10');
+  });
+
+  it('stringifie un slotKey numérique fourni', () => {
+    assert.equal(resolveDrawSlotKey({ slotKey: 12345 }), '12345');
+  });
+
+  it('sans slotKey: retombe sur le slot précédent (format ISO sortable)', () => {
+    const key = resolveDrawSlotKey({}, new Date('2026-05-31T09:15:00Z'));
+    assert.match(key, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  });
+
+  it('sans slotKey: deux appels au même instant donnent le même slot', () => {
+    const now = new Date('2026-05-31T09:15:00Z');
+    assert.equal(resolveDrawSlotKey({}, now), resolveDrawSlotKey({}, now));
+  });
+});
+
+// ===========================================================
+// 11. Timings — drawing window >= durée animation TV (~35s)
+// ===========================================================
+describe('Timings - drawing window', () => {
+  it('la fenêtre drawing couvre l\'animation TV (>= 35s)', () => {
+    assert.ok(
+      getDrawingWindowSecs() >= 35,
+      `drawing window trop court: ${getDrawingWindowSecs()}s (animation TV ~35s)`,
+    );
   });
 });

@@ -21,6 +21,9 @@ interface LiveData {
   jackpotCdf: number;
   jackpotThresholdCdf: number;
   drawIntervalSeconds: number;
+  closeBeforeSeconds?: number;
+  resultDisplaySeconds?: number;
+  drawingWindowSeconds?: number;
   currentDraw: { slotKey: string; status: DrawStatus; drawAt: string; closeAt: string; secondsRemaining: number };
   lastDraw: {
     drawNumber: number | null; slotKey: string | null;
@@ -248,8 +251,14 @@ export default function OkapiColorScreen() {
   const statusColor = status === 'open' ? '#00A86B' : status === 'closing' ? '#ef4444' : status === 'drawing' ? '#fbbf24' : '#9CA3AF';
   const statusLabel = { open: '● EN DIRECT', closing: '● FERMETURE', drawing: '● TIRAGE', result: '● RÉSULTATS' }[status];
 
-  // During result: approximate time until betting reopens (7.5 min = 450s before draw)
-  const secsUntilOpen = status === 'result' && secs > 450 ? secs - 450 : 0;
+  // During result: time until betting reopens = time until the result window ends.
+  // Result ends at drawn_at + resultDisplaySeconds. Since secs counts down to the
+  // next draw (drawn_at + interval), reopen happens when secs falls below
+  // (interval - resultDisplay). Falls back to interval-130 if the API is older.
+  const intervalSeconds = live?.drawIntervalSeconds ?? 600;
+  const resultDisplaySeconds = live?.resultDisplaySeconds ?? 130;
+  const reopenThreshold = Math.max(0, intervalSeconds - resultDisplaySeconds);
+  const secsUntilOpen = status === 'result' && secs > reopenThreshold ? secs - reopenThreshold : 0;
   const openMinStr = String(Math.floor(secsUntilOpen / 60)).padStart(2, '0');
   const openSecStr = String(secsUntilOpen % 60).padStart(2, '0');
 
@@ -425,7 +434,6 @@ export default function OkapiColorScreen() {
               redNumbers={live?.lastDraw?.numerosRouges ?? []}
               goldNumbers={live?.lastDraw?.numerosOr ?? []}
               status={status}
-              drawKey=""
               mode="mobile"
             />
             {/* Result-specific content */}

@@ -212,7 +212,6 @@ function DrawResultScreen({ live, secs }: { live: LiveData; secs: number }) {
           redNumbers={rouges}
           goldNumbers={ors}
           status={live.currentDraw.status as 'drawing' | 'result'}
-          drawKey=""
           mode="tv"
           onComplete={() => setAnimComplete(true)}
         />

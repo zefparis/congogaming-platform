@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { executerTirageFlash } from './routes/flash.js';
-import { getOkapiColorSlotBoundaries } from './routes/okapi-color.js';
+import { getOkapiColorSlotBoundaries, getOkapiColorSlotKey, getIntervalSecs, buildRecoveryLockKey } from './routes/okapi-color.js';
 import { executerTirageLoto } from './routes/loto.js';
 import { executerTirageOkapiColor } from './routes/okapi-color.js';
 import { acquireJobLock } from './lib/jobLock.js';
@@ -75,24 +75,50 @@ function msUntilNextOkapiColorSlot(): number {
 
 async function recoverMissedOkapiColorDraw(reason: 'boot' | 'safety-net') {
   try {
-    // Cherche des tickets pending vieux de plus d'un intervalle
-    const { drawAt: prevDraw } = getOkapiColorSlotBoundaries(
-      new Date(Date.now() - (msUntilNextOkapiColorSlot() || 600_000)),
-    );
-    const cutoffIso = new Date(prevDraw.getTime() - 5_000).toISOString();
-    const { count, error } = await supabaseAdmin
+    // Slot courant : ses tickets sont encore en cours de pari (open/closing)
+    // et ne doivent JAMAIS être tirés par la récupération.
+    const currentSlotKey = getOkapiColorSlotKey(new Date());
+
+    // Tous les slots passés ayant encore des tickets pending = orphelins.
+    const { data: pendingRows, error } = await supabaseAdmin
       .from('okapi_color_tickets')
-      .select('id', { count: 'exact', head: true })
+      .select('slot_key')
       .eq('status', 'pending')
-      .lt('draw_at', cutoffIso);
+      .not('slot_key', 'is', null)
+      .neq('slot_key', currentSlotKey)
+      .limit(5000);
     if (error) { console.error(`[OKAPI-COLOR RECOVERY/${reason}]`, error.message); return; }
-    if (!count || count === 0) return;
-    const slotKey = `oc:recover:${Date.now()}`;
-    const acquired = await acquireJobLock('okapi_color_draw', slotKey);
-    if (!acquired) return;
-    console.log(`[OKAPI-COLOR RECOVERY/${reason}] ${count} orphan ticket(s) — catch-up draw`);
-    const result = await executerTirageOkapiColor();
-    console.log(`[OKAPI-COLOR RECOVERY/${reason}] Done`, result);
+
+    const orphanSlots = Array.from(
+      new Set((pendingRows ?? []).map((r) => r.slot_key as string).filter(Boolean)),
+    );
+    if (orphanSlots.length === 0) {
+      if (reason === 'boot') console.log('[OKAPI-COLOR RECOVERY/boot] Aucun slot orphelin');
+      return;
+    }
+
+    let recoveredSlots = 0;
+    let settledTickets = 0;
+
+    for (const slotKey of orphanSlots) {
+      // Lock STABLE par slot (jamais Date.now()) : déduplique entre boot,
+      // safety-net et instances multiples.
+      const acquired = await acquireJobLock('okapi_color_draw', buildRecoveryLockKey(slotKey));
+      if (!acquired) continue;
+
+      try {
+        // Slot explicite + forceResume : reprend un tirage existant ou en crée
+        // un, et règle uniquement les tickets pending de CE slot.
+        const result = await executerTirageOkapiColor({ slotKey, reason: 'recovery', forceResume: true });
+        recoveredSlots += 1;
+        settledTickets += result.processed;
+        console.log(`[OKAPI-COLOR RECOVERY/${reason}] slot=${slotKey} processed=${result.processed} resumed=${result.resumed ?? false}`);
+      } catch (err) {
+        console.error(`[OKAPI-COLOR RECOVERY/${reason}] slot=${slotKey} failed:`, err);
+      }
+    }
+
+    console.log(`[OKAPI-COLOR RECOVERY/${reason}] ${recoveredSlots} slot(s) récupéré(s), ${settledTickets} ticket(s) réglé(s)`);
   } catch (err) {
     console.error(`[OKAPI-COLOR RECOVERY/${reason}] Error:`, err);
   }
@@ -100,6 +126,7 @@ async function recoverMissedOkapiColorDraw(reason: 'boot' | 'safety-net') {
 
 function scheduleNextOkapiColorDraw() {
   const ms = msUntilNextOkapiColorSlot();
+  console.log(`[OKAPI-COLOR SCHEDULER] Next draw in ${Math.round(ms / 1000)}s`);
   setTimeout(async () => {
     try {
       const { slotKey } = getOkapiColorSlotBoundaries();
@@ -271,13 +298,15 @@ export function startCrons() {
     console.log('[LOTO CRON] Désactivé (CONGO_LOTO_ENABLED=false)');
   }
 
-  // Okapi Color — tirage toutes les 30 minutes si feature activée.
-  // Même architecture que Flash : self-rescheduling, slot lock, safety-net.
+  // Okapi Color — intervalle configurable via OKAPI_COLOR_DRAW_INTERVAL_SECONDS
+  // (défaut 600s = 10 min). Même architecture que Flash : self-rescheduling,
+  // slot lock, safety-net.
   if (env.OKAPI_COLOR_ENABLED) {
     scheduleNextOkapiColorDraw();
     void recoverMissedOkapiColorDraw('boot');
     setInterval(() => { void recoverMissedOkapiColorDraw('safety-net'); }, 60_000).unref();
-    console.log('[OKAPI-COLOR SCHEDULER] Tirage toutes les 30 min activé');
+    const ocIntervalMin = Math.round(getIntervalSecs() / 60);
+    console.log(`[OKAPI-COLOR SCHEDULER] Tirage toutes les ${ocIntervalMin} min (${getIntervalSecs()}s) activé`);
   } else {
     console.log('[OKAPI-COLOR SCHEDULER] Désactivé (OKAPI_COLOR_ENABLED=false)');
   }

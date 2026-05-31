@@ -64,6 +64,11 @@ const envSchema = z.object({
     .transform((val) => Number(val))
     .pipe(z.number().int().nonnegative())
     .optional(),
+  OKAPI_COLOR_DRAWING_WINDOW_SECONDS: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().positive())
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

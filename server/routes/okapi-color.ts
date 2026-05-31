@@ -128,9 +128,7 @@ export function calculateOkapiColorPayout(
 
   // 2 rouges
   if (redHits === 2) {
-    if (goldHits >= 3) return { gainsCdf: 1_000, jackpotPending: false };
-    if (goldHits === 2) return { gainsCdf: 1_000, jackpotPending: false };
-    if (goldHits >= 1) return { gainsCdf: 500,   jackpotPending: false };
+    if (goldHits >= 2) return { gainsCdf: 1_000, jackpotPending: false };
     return { gainsCdf: 500, jackpotPending: false };
   }
 
@@ -141,9 +139,48 @@ export function calculateOkapiColorPayout(
 // State machine — intervalles configurables (défaut : 10 min)
 // Slot aligné sur UTC. Tirage à la fin du slot.
 // =============================================================
-function getIntervalMs()       { return (env.OKAPI_COLOR_DRAW_INTERVAL_SECONDS     ?? 600) * 1000; }
-function getCloseBeforeMs()    { return (env.OKAPI_COLOR_CLOSE_BEFORE_SECONDS      ??  40) * 1000; }
-function getResultDisplaySecs(){ return  env.OKAPI_COLOR_RESULT_DISPLAY_SECONDS    ?? 130; }
+export function getIntervalSecs()    { return  env.OKAPI_COLOR_DRAW_INTERVAL_SECONDS     ?? 600; }
+function getIntervalMs()       { return getIntervalSecs() * 1000; }
+export function getCloseBeforeSecs() { return  env.OKAPI_COLOR_CLOSE_BEFORE_SECONDS      ??  40; }
+function getCloseBeforeMs()    { return getCloseBeforeSecs() * 1000; }
+export function getResultDisplaySecs(){ return  env.OKAPI_COLOR_RESULT_DISPLAY_SECONDS    ?? 130; }
+// Drawing window must be >= the TV ball animation (~35s). Defaults to 40s so the
+// status stays 'drawing' until the animation finishes, then flips to 'result'.
+export function getDrawingWindowSecs() { return env.OKAPI_COLOR_DRAWING_WINDOW_SECONDS ?? 40; }
+
+// -------------------------------------------------------------
+// Idempotency / lock key builders (pure — unit-testable)
+// -------------------------------------------------------------
+export function buildRecoveryLockKey(slotKey: string): string {
+  return `oc:recover:${slotKey}`;
+}
+export function buildJackpotDecrementEventKey(tirageId: string, ticketId: string): string {
+  return `okapi-color:draw:${tirageId}:jackpot-decrement:${ticketId}`;
+}
+export function buildJackpotResolveEventKey(ticketId: string): string {
+  return `okapi-color:jackpot-resolve:${ticketId}`;
+}
+
+// Admin secret cloisonné : Okapi Color utilise SON propre secret, jamais
+// celui du Loto. Helper pur pour pouvoir le tester sans booter le serveur.
+export function resolveOkapiColorAdminSecret(e: { OKAPI_COLOR_ADMIN_SECRET?: string } = env): string {
+  return e.OKAPI_COLOR_ADMIN_SECRET ?? '';
+}
+
+// Résout le slot à tirer. Si slotKey est fourni explicitement, il est utilisé
+// tel quel (récupération/manuel). Sinon on retombe sur le slot qui vient de se
+// fermer (slot précédent), comportement cron historique.
+export function resolveDrawSlotKey(
+  options: { slotKey?: string | number } = {},
+  now: Date = new Date(),
+): string {
+  if (options.slotKey != null && String(options.slotKey).length > 0) {
+    return String(options.slotKey);
+  }
+  const iv         = getIntervalMs();
+  const prevSlotMs = Math.floor(now.getTime() / iv) * iv - iv;
+  return formatSlotKey(new Date(prevSlotMs));
+}
 
 function formatSlotKey(d: Date): string {
   const yyyy = d.getUTCFullYear();
@@ -180,10 +217,11 @@ export function computeOkapiColorState(
   secsSinceLastDraw: number = Infinity,
 ): { state: OkapiColorDrawState; slotKey: string; drawAt: Date; closeAt: Date; secondsRemaining: number } {
   const { slotKey, drawAt, closeAt } = getOkapiColorSlotBoundaries(now);
-  const resultSecs = getResultDisplaySecs();
+  const resultSecs  = getResultDisplaySecs();
+  const drawingSecs = getDrawingWindowSecs();
 
   let state: OkapiColorDrawState;
-  if      (secsSinceLastDraw <= 25)          state = 'drawing';
+  if      (secsSinceLastDraw <= drawingSecs) state = 'drawing';
   else if (secsSinceLastDraw <= resultSecs)  state = 'result';
   else if (now.getTime() >= closeAt.getTime()) state = 'closing';
   else                                       state = 'open';
@@ -205,59 +243,116 @@ export type TirageOkapiColorResult = {
   winners:        number;
   jackpotPaid:    boolean;
   totalPaidCdf:   number;
+  resumed?:       boolean;
+  alreadyComplete?: boolean;
 };
 
-export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult> {
-  const rouges = drawUniqueNumbers(
-    OKAPI_COLOR_CONFIG.redDrawCount,
-    1,
-    OKAPI_COLOR_CONFIG.numbersRange,
-  );
-  const ors = drawUniqueNumbers(
-    OKAPI_COLOR_CONFIG.goldDrawCount,
-    1,
-    OKAPI_COLOR_CONFIG.numbersRange,
-    new Set(rouges),
-  );
+export type DrawReason = 'cron' | 'manual' | 'recovery';
 
-  const ts = Date.now();
-  const hash_pre = crypto
-    .createHash('sha256')
-    .update(JSON.stringify({ rouges, ors, ts }))
-    .digest('hex');
+export interface ExecuterTirageOptions {
+  // Slot exact à tirer. Si fourni, il est utilisé tel quel (récupération /
+  // manuel) — on ne recalcule jamais le slot depuis `now`.
+  slotKey?:     string | number;
+  reason?:      DrawReason;
+  // Si un tirage existe déjà pour le slot, reprendre le settlement des tickets
+  // encore pending au lieu de lever une erreur.
+  forceResume?: boolean;
+}
 
-  const drawAt  = new Date();
-  // The slot being drawn is the one that JUST ENDED (previous slot)
-  const iv          = getIntervalMs();
-  const prevSlotMs  = Math.floor(drawAt.getTime() / iv) * iv - iv;
-  const slotKey     = formatSlotKey(new Date(prevSlotMs));
+// Décrément (ou crédit) jackpot idempotent : la RPC insère un event_key unique
+// et n'applique le delta qu'une seule fois. Une relance (resume après crash)
+// avec la même event_key est un no-op → jamais de double décrément.
+async function applyJackpotDeltaIdempotent(
+  eventKey: string,
+  tirageId: string,
+  deltaCdf: number,
+): Promise<void> {
+  const { error } = await supabaseAdmin.rpc('okapi_color_apply_jackpot_delta_idempotent', {
+    p_event_key: eventKey,
+    p_tirage_id: tirageId,
+    p_delta_cdf: deltaCdf,
+  });
+  if (error) throw new Error(error.message);
+}
 
+export async function executerTirageOkapiColor(
+  options: ExecuterTirageOptions = {},
+): Promise<TirageOkapiColorResult> {
+  const forceResume = options.forceResume ?? false;
+  const now         = new Date();
+  // Slot explicite si fourni, sinon slot qui vient de se fermer (comportement cron).
+  const slotKey     = resolveDrawSlotKey(options, now);
+
+  // Un tirage existe-t-il déjà pour ce slot ?
   const { data: existingTirage, error: existingErr } = await supabaseAdmin
     .from('okapi_color_tirages')
-    .select('id')
+    .select('id, numeros_rouges, numeros_or, jackpot_paye')
     .eq('slot_key', slotKey)
     .maybeSingle();
   if (existingErr) {
     throw new Error(existingErr.message);
   }
-  if (existingTirage) {
-    throw new Error('Ce slot Okapi Color a déjà été tiré. Attendez le prochain créneau.');
-  }
 
-  const { data: tirage, error: tirErr } = await supabaseAdmin
-    .from('okapi_color_tirages')
-    .insert({
-      numeros_rouges: rouges,
-      numeros_or:     ors,
-      hash_pre,
-      slot_key:       slotKey,
-      draw_at:        drawAt.toISOString(),
-      channel:        'public',
-    })
-    .select('*')
-    .single();
-  if (tirErr || !tirage) {
-    throw new Error(tirErr?.message || 'Tirage insert failed');
+  let tirageId: string;
+  let rouges:   number[];
+  let ors:      number[];
+  let resumed   = false;
+
+  if (existingTirage) {
+    // Combien de tickets restent à régler sur ce slot ?
+    const { count: pendingForSlot, error: pendCountErr } = await supabaseAdmin
+      .from('okapi_color_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .eq('slot_key', slotKey);
+    if (pendCountErr) throw new Error(pendCountErr.message);
+
+    // Tirage déjà fait ET tout est réglé → no-op propre (pas d'erreur brutale).
+    if (!forceResume && (pendingForSlot ?? 0) === 0) {
+      return {
+        tirageId:        existingTirage.id,
+        rouges:          existingTirage.numeros_rouges,
+        ors:             existingTirage.numeros_or,
+        processed:       0,
+        winners:         0,
+        jackpotPaid:     existingTirage.jackpot_paye,
+        totalPaidCdf:    0,
+        resumed:         false,
+        alreadyComplete: true,
+      };
+    }
+
+    // Reprise : on REUTILISE les numéros déjà tirés (jamais de nouveau RNG).
+    tirageId = existingTirage.id;
+    rouges   = existingTirage.numeros_rouges;
+    ors      = existingTirage.numeros_or;
+    resumed  = true;
+  } else {
+    // Nouveau tirage.
+    rouges = drawUniqueNumbers(OKAPI_COLOR_CONFIG.redDrawCount, 1, OKAPI_COLOR_CONFIG.numbersRange);
+    ors    = drawUniqueNumbers(OKAPI_COLOR_CONFIG.goldDrawCount, 1, OKAPI_COLOR_CONFIG.numbersRange, new Set(rouges));
+
+    const hash_pre = crypto
+      .createHash('sha256')
+      .update(JSON.stringify({ rouges, ors, ts: now.getTime() }))
+      .digest('hex');
+
+    const { data: tirage, error: tirErr } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .insert({
+        numeros_rouges: rouges,
+        numeros_or:     ors,
+        hash_pre,
+        slot_key:       slotKey,
+        draw_at:        now.toISOString(),
+        channel:        'public',
+      })
+      .select('id')
+      .single();
+    if (tirErr || !tirage) {
+      throw new Error(tirErr?.message || 'Tirage insert failed');
+    }
+    tirageId = tirage.id;
   }
 
   // --- Lire le pot actuel ---
@@ -268,10 +363,11 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
     .single();
   const potActuel = Number(jackpotRow?.pot_cdf ?? 0);
   let jackpotDispo = potActuel >= OKAPI_COLOR_CONFIG.jackpotCdf;
-  let jackpotPaid  = false;
+  let jackpotPaid  = existingTirage?.jackpot_paye ?? false;
   let totalPaidCdf = 0;
 
   // --- Résoudre les jackpots en attente (FIFO par created_at) ---
+  // Idempotent par statut : un ticket déjà payé n'est plus 'jackpot_attente'.
   if (jackpotDispo) {
     const { data: enAttente } = await supabaseAdmin
       .from('okapi_color_tickets')
@@ -289,12 +385,14 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
         p_nb_or:             0,
         p_gains_cdf:         OKAPI_COLOR_CONFIG.jackpotCdf,
         p_jackpot_en_attente: false,
-        p_tirage_id:         tirage.id,
+        p_tirage_id:         tirageId,
         p_idempotency_key:   `okapi-color:payout:${ticket.id}`,
       });
-      await supabaseAdmin.rpc('increment_okapi_color_jackpot', {
-        delta: -OKAPI_COLOR_CONFIG.jackpotCdf,
-      });
+      await applyJackpotDeltaIdempotent(
+        buildJackpotResolveEventKey(ticket.id),
+        tirageId,
+        -OKAPI_COLOR_CONFIG.jackpotCdf,
+      );
       jackpotPaid   = true;
       totalPaidCdf += OKAPI_COLOR_CONFIG.jackpotCdf;
 
@@ -307,8 +405,9 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
     }
   }
 
-  // --- Traiter les tickets pending ---
-  // Traiter uniquement les tickets du slot concerné (pas tous les pending)
+  // --- Traiter les tickets pending DU SLOT uniquement ---
+  // Un ticket déjà settled (gagnant/perdant/jackpot_attente) n'est jamais
+  // retraité car on filtre sur status='pending'.
   const { data: pending, error: pendErr } = await supabaseAdmin
     .from('okapi_color_tickets')
     .select('id, user_id, numeros')
@@ -345,16 +444,18 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
         p_nb_or:              goldHits,
         p_gains_cdf:          gainsCdf,
         p_jackpot_en_attente: false,
-        p_tirage_id:          tirage.id,
+        p_tirage_id:          tirageId,
         p_idempotency_key:    `okapi-color:payout:${t.id}`,
       });
-      // Si 6 rouges payés : décrémenter le pot
+      // Si 6 rouges payés : décrémenter le pot (idempotent par ticket+tirage).
       if (redHits === 6) {
         jackpotPaid   = true;
         totalPaidCdf += gainsCdf;
-        await supabaseAdmin.rpc('increment_okapi_color_jackpot', {
-          delta: -OKAPI_COLOR_CONFIG.jackpotCdf,
-        });
+        await applyJackpotDeltaIdempotent(
+          buildJackpotDecrementEventKey(tirageId, t.id),
+          tirageId,
+          -OKAPI_COLOR_CONFIG.jackpotCdf,
+        );
         const { data: potRow } = await supabaseAdmin
           .from('okapi_color_jackpot')
           .select('pot_cdf')
@@ -376,7 +477,7 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
           total_bons:          redHits + goldHits,
           gains_cdf:           gainsCdf,
           jackpot_en_attente:  jackpotPending,
-          tirage_id:           tirage.id,
+          tirage_id:           tirageId,
           settled_at:          status === 'perdant' ? new Date().toISOString() : null,
         })
         .eq('id', t.id);
@@ -385,14 +486,14 @@ export async function executerTirageOkapiColor(): Promise<TirageOkapiColorResult
     processed++;
   }
 
-  if (jackpotPaid) {
+  if (jackpotPaid && !(existingTirage?.jackpot_paye)) {
     await supabaseAdmin
       .from('okapi_color_tirages')
       .update({ jackpot_paye: true })
-      .eq('id', tirage.id);
+      .eq('id', tirageId);
   }
 
-  return { tirageId: tirage.id, rouges, ors, processed, winners, jackpotPaid, totalPaidCdf };
+  return { tirageId, rouges, ors, processed, winners, jackpotPaid, totalPaidCdf, resumed };
 }
 
 // =============================================================
@@ -428,12 +529,6 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       .eq('id', 1)
       .maybeSingle();
     const jackpot_cdf = Number(jackpotRow?.pot_cdf ?? 0);
-
-    // Tickets en attente (slot actuel)
-    const { count: pendingCount } = await supabaseAdmin
-      .from('okapi_color_tickets')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending');
 
     // Gagnants du dernier tirage (anonymisés)
     let last_draw = null;
@@ -497,7 +592,10 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         ticketPriceCdf:     OKAPI_COLOR_CONFIG.ticketPriceCdf,
         jackpotCdf:         jackpot_cdf,
         jackpotThresholdCdf: OKAPI_COLOR_CONFIG.jackpotCdf,
-        drawIntervalSeconds: env.OKAPI_COLOR_DRAW_INTERVAL_SECONDS ?? 600,
+        drawIntervalSeconds: getIntervalSecs(),
+        closeBeforeSeconds:  getCloseBeforeSecs(),
+        resultDisplaySeconds: getResultDisplaySecs(),
+        drawingWindowSeconds: getDrawingWindowSecs(),
         currentDraw: {
           slotKey,
           drawNumber:       null,
@@ -727,13 +825,13 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Admin only — lancer un tirage
   // ----------------------------------------------------------
   app.post('/api/okapi-color/draw', async (req, reply) => {
-    const adminSecret = env.LOTO_ADMIN_SECRET || '';
+    const adminSecret = resolveOkapiColorAdminSecret();
     const provided    = req.headers['x-admin-secret'];
     if (!adminSecret || provided !== adminSecret) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     try {
-      const result = await executerTirageOkapiColor();
+      const result = await executerTirageOkapiColor({ reason: 'manual' });
       return reply.send(result);
     } catch (e: any) {
       return reply.code(500).send({ error: e?.message || 'Tirage failed' });
@@ -745,7 +843,7 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Admin only — annuler et rembourser les tickets bloqués
   // ----------------------------------------------------------
   app.post('/api/okapi-color/purge-pending', async (req, reply) => {
-    const adminSecret = env.LOTO_ADMIN_SECRET || '';
+    const adminSecret = resolveOkapiColorAdminSecret();
     const provided    = req.headers['x-admin-secret'];
     if (!adminSecret || provided !== adminSecret) {
       return reply.code(401).send({ error: 'Unauthorized' });
