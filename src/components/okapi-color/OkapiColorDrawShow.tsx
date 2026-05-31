@@ -304,14 +304,24 @@ export default function OkapiColorDrawShow({
         .okapi-trail-particle-gold { background: radial-gradient(circle at 35% 30%, rgba(255,252,180,0.95), rgba(251,191,36,0.6) 50%, transparent); }
 
         /* ── TV mode ─────────────────────────────────────────────────────────── */
-        .okapi-draw-show-tv { flex: 1; min-height: 0; border-radius: 34px; }
-        .okapi-draw-show-tv .okapi-draw-content  { padding: clamp(22px,3vw,44px);   gap: clamp(18px,2.2vw,30px); }
+        /* show-tv is a flex column so content can fill the available height    */
+        .okapi-draw-show-tv { flex: 1; min-height: 0; border-radius: 34px; display: flex; flex-direction: column; }
+        /* override shared height:100% — let flex:1 handle sizing instead       */
+        .okapi-draw-show-tv .okapi-draw-content  { flex: 1; min-height: 0; height: auto; padding: clamp(22px,3vw,44px); gap: clamp(18px,2.2vw,30px); }
         .okapi-draw-show-tv .okapi-draw-kicker   { font-size: clamp(18px,2.6vw,36px); letter-spacing: 7px; }
         .okapi-draw-show-tv .okapi-draw-message  { font-size: clamp(18px,2.6vw,34px); letter-spacing: 5px; }
-        .okapi-draw-show-tv .okapi-draw-grid     { grid-template-columns: repeat(8, minmax(0,1fr)); gap: clamp(10px,1.35vw,20px); }
-        .okapi-draw-show-tv .okapi-draw-cell     { border-radius: 22px; font-size: clamp(34px,5.3vw,78px); }
+        /* grid fills remaining height; 3 rows share height equally → no overflow */
+        .okapi-draw-show-tv .okapi-draw-grid     { flex: 1; min-height: 0; grid-template-columns: repeat(8, minmax(0,1fr)); grid-template-rows: repeat(3, minmax(0,1fr)); gap: clamp(8px,1vw,16px); }
+        /* aspect-ratio:auto — cells fill grid rows, not forced-square           */
+        .okapi-draw-show-tv .okapi-draw-cell     { border-radius: 22px; font-size: clamp(20px,3.5vw,56px); aspect-ratio: auto; }
         .okapi-draw-show-tv .okapi-draw-badge    { position: absolute; top: 10px; right: 12px; font-family: system-ui,sans-serif; font-weight: 900; font-size: clamp(10px,1.1vw,16px); letter-spacing: 0.08em; opacity: 0.82; }
         .okapi-draw-show-tv .okapi-draw-ball     { font-size: 42px; }
+        /* Narrow viewport (≤900px): 4 cols × 6 rows — bigger cells on mobile   */
+        @media (max-width: 900px) {
+          .okapi-draw-show-tv { border-radius: 22px; }
+          .okapi-draw-show-tv .okapi-draw-grid { grid-template-columns: repeat(4, minmax(0,1fr)); grid-template-rows: repeat(6, minmax(0,1fr)); }
+          .okapi-draw-show-tv .okapi-draw-cell { font-size: clamp(22px,5.5vw,38px); }
+        }
 
         /* ── Mobile mode ─────────────────────────────────────────────────────── */
         .okapi-draw-show-mobile .okapi-draw-title-row { display: none; }
