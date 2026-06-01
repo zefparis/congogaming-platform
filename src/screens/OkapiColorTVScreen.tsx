@@ -338,7 +338,7 @@ export default function OkapiColorTVScreen() {
       {/* Background video — large screen only */}
       {isLargeScreen && !videoFailed && (
         <video
-          style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.40, pointerEvents: 'none', zIndex: 0 }}
+          style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.60, pointerEvents: 'none', zIndex: 0 }}
           src="/videos/backgroundtv.mp4"
           autoPlay
           muted
@@ -350,7 +350,7 @@ export default function OkapiColorTVScreen() {
       )}
       {/* Dark overlay above video, below UI */}
       {isLargeScreen && !videoFailed && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', pointerEvents: 'none', zIndex: 1 }} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: 1 }} />
       )}
 
       {/* Decorative bg circles */}
