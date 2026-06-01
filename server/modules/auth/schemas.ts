@@ -15,7 +15,7 @@ export const CongoPhoneSchema = z
 
 export const PinSchema = z
   .string()
-  .regex(/^\d{4,6}$/, 'PIN invalide');
+  .regex(/^\d{4}$/, 'PIN invalide');
 
 export const RegisterSchema = z.object({
   phone: CongoPhoneSchema,

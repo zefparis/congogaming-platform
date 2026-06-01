@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
-import crypto from 'node:crypto';
+import crypto, { timingSafeEqual } from 'node:crypto';
 import { recordLedgerEntry } from '../lib/ledger.js';
+import { env } from '../env.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { LotoTicketBodySchema } from '../lib/validation.js';
 import { COMING_SOON_PAYLOAD, isCongoLotoEnabled } from '../lib/featureFlags.js';
@@ -48,6 +49,19 @@ async function recordLotoTransaction(opts: {
 const TICKET_PRICE_CDF = 2000;
 const JACKPOT_CONTRIB_CDF = 1000;
 const DEFAULT_JACKPOT_CDF = 5_000_000;
+
+async function applyLotoJackpotDeltaIdempotent(
+  eventKey: string,
+  tirageId: string,
+  deltaCdf: number,
+): Promise<void> {
+  const { error } = await supabaseAdmin.rpc('apply_loto_jackpot_delta_idempotent', {
+    p_event_key: eventKey,
+    p_tirage_id: tirageId,
+    p_delta_cdf: deltaCdf,
+  });
+  if (error) throw new Error(error.message);
+}
 
 const PRIZE_TABLE: Record<number, number> = {
   5: 500_000,
@@ -102,7 +116,7 @@ export async function executerTirageLoto(): Promise<ExecuterTirageLotoResult> {
     .update(JSON.stringify({ numeros, complementaire, ts }))
     .digest('hex');
 
-  const jackpot = Number(process.env.LOTO_JACKPOT_CDF || DEFAULT_JACKPOT_CDF);
+  const jackpot = env.LOTO_JACKPOT_CDF ?? DEFAULT_JACKPOT_CDF;
 
   const { data: tirage, error: tirErr } = await supabaseAdmin
     .from('loto_tirages')
@@ -120,7 +134,7 @@ export async function executerTirageLoto(): Promise<ExecuterTirageLotoResult> {
     .eq('id', 1)
     .single();
   const potActuel = Number(jackpotRow?.pot_cdf ?? 0);
-  const SEUIL = Number(process.env.LOTO_JACKPOT_CDF ?? DEFAULT_JACKPOT_CDF);
+  const SEUIL = env.LOTO_JACKPOT_CDF ?? DEFAULT_JACKPOT_CDF;
   let jackpotDispo = potActuel >= SEUIL;
   let jackpotPaye = false;
 
@@ -151,7 +165,11 @@ export async function executerTirageLoto(): Promise<ExecuterTirageLotoResult> {
         p_tirage_id: tirage.id,
         p_idempotency_key: `loto:payout:${ticket.id}`,
       });
-      await supabaseAdmin.rpc('increment_jackpot', { delta: -SEUIL });
+      await applyLotoJackpotDeltaIdempotent(
+        `loto:draw:${tirage.id}:jackpot-resolve:${ticket.id}`,
+        tirage.id,
+        -SEUIL,
+      );
       await recordLotoTransaction({
         user_id: ticket.user_id,
         type: 'loto_payout',
@@ -215,7 +233,11 @@ export async function executerTirageLoto(): Promise<ExecuterTirageLotoResult> {
       });
       if (isSix) {
         jackpotPaye = true;
-        await supabaseAdmin.rpc('increment_jackpot', { delta: -SEUIL });
+        await applyLotoJackpotDeltaIdempotent(
+          `loto:draw:${tirage.id}:jackpot-decrement:${t.id}`,
+          tirage.id,
+          -SEUIL,
+        );
       }
     } else {
       await supabaseAdmin
@@ -376,9 +398,11 @@ const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   // POST admin tirage
   app.post('/api/loto/tirage', async (req, reply) => {
-    const adminSecret = process.env.LOTO_ADMIN_SECRET || '';
-    const provided = req.headers['x-admin-secret'];
-    if (!adminSecret || provided !== adminSecret) {
+    const secret = env.LOTO_ADMIN_SECRET || '';
+    const provided = String(req.headers['x-admin-secret'] || '');
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    if (!secret || a.length !== b.length || !timingSafeEqual(a, b)) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     try {

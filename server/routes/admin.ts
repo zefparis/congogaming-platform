@@ -4,6 +4,9 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
 import { tryNormalizeDrcPhone } from '../lib/phone.js';
+import { recordLedgerEntry } from '../lib/ledger.js';
+import { acquireJobLock } from '../lib/jobLock.js';
+import { env } from '../env.js';
 
 // ---- Token / auth ----
 //
@@ -22,7 +25,7 @@ interface AdminTokenPayload {
 }
 
 function adminSecret(): string {
-  const s = process.env.LOTO_ADMIN_SECRET || '';
+  const s = env.LOTO_ADMIN_SECRET || '';
   if (!s) throw new Error('LOTO_ADMIN_SECRET not configured');
   return s;
 }
@@ -786,11 +789,20 @@ export default async function adminRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'Ce joueur n\'est pas un filleul de cet utilisateur' });
       }
 
-      const { error: balErr } = await supabaseAdmin.rpc('adjust_balance', {
-        p_user_id: referrerId,
-        p_delta: amt,
-      });
-      if (balErr) return reply.code(500).send({ error: balErr.message });
+      try {
+        await recordLedgerEntry({
+          user_id: referrerId,
+          direction: 'credit',
+          amount: amt,
+          currency: 'CDF',
+          reason: 'referral_reward_admin',
+          reference_type: 'referral_reward',
+          reference_id: referred_id,
+          idempotency_key: `referral:${trigger_event || 'admin_manual'}:${referrerId}`,
+        });
+      } catch (ledgerErr: any) {
+        return reply.code(500).send({ error: ledgerErr?.message || 'Balance error' });
+      }
 
       const { error: rewErr } = await supabaseAdmin
         .from('referral_rewards')
@@ -1452,51 +1464,18 @@ export default async function adminRoutes(app: FastifyInstance) {
   );
 
   app.post('/api/admin/okapi-color/draw', async (req, reply) => {
-    const { executerTirageOkapiColor } = await import('./okapi-color.js');
+    const { executerTirageOkapiColor, getOkapiColorSlotBoundaries } = await import('./okapi-color.js');
+    const { prevSlot } = getOkapiColorSlotBoundaries();
+    const acquired = await acquireJobLock('okapi_color_draw', `admin:oc:${prevSlot}`);
+    if (!acquired) {
+      return reply.code(409).send({ error: 'Draw already in progress for this slot', slot_key: prevSlot });
+    }
     try {
-      const result = await executerTirageOkapiColor();
+      const result = await executerTirageOkapiColor({ reason: 'manual' });
       return reply.send(result);
     } catch (e: any) {
       return reply.code(500).send({ error: e?.message || 'Draw failed' });
     }
-  });
-
-  app.post('/api/admin/okapi-color/purge-pending', async (req, reply) => {
-    const { data: claimed, error: claimErr } = await supabaseAdmin
-      .from('okapi_color_tickets')
-      .update({ status: 'cancelled', gains_cdf: 0, jackpot_en_attente: false })
-      .eq('status', 'pending')
-      .select('id, user_id, prix_cdf');
-    if (claimErr) return reply.code(500).send({ error: claimErr.message });
-
-    const { recordLedgerEntry } = await import('../lib/ledger.js');
-    const tickets = claimed ?? [];
-    let refunded = 0, totalRefundedCdf = 0;
-    const failures: Array<{ ticket_id: string; error: string }> = [];
-
-    for (const t of tickets) {
-      const price = Number(t.prix_cdf || 0);
-      if (price <= 0) continue;
-      try {
-        const result = await recordLedgerEntry({
-          user_id: String(t.user_id),
-          direction: 'credit',
-          amount: price,
-          currency: 'CDF',
-          reason: 'okapi_color_ticket_cancel_refund',
-          reference_type: 'okapi_color_ticket',
-          reference_id: String(t.id),
-          idempotency_key: `okapi-color:ticket:${t.id}:cancel:refund`,
-        });
-        if (result.applied || result.duplicate) {
-          refunded++;
-          totalRefundedCdf += price;
-        }
-      } catch (err: any) {
-        failures.push({ ticket_id: String(t.id), error: err?.message || 'refund failed' });
-      }
-    }
-    return reply.send({ scanned: tickets.length, refunded, total_refunded_cdf: totalRefundedCdf, failures });
   });
 
   app.get('/api/admin/okapi-color/draws', async (_req, reply) => {

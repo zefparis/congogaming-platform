@@ -69,6 +69,10 @@ const envSchema = z.object({
     .transform((val) => Number(val))
     .pipe(z.number().int().positive())
     .optional(),
+  REFERRAL_PROGRAM_ENABLED: z
+    .string()
+    .transform((val) => val.toLowerCase() !== 'false')
+    .default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

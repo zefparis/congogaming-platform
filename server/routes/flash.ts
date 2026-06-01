@@ -1,13 +1,27 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import crypto from 'node:crypto';
+import crypto, { timingSafeEqual } from 'node:crypto';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { FlashTicketBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
+import { env } from '../env.js';
 
 const PRIX_FLASH = 1000;
 const JACKPOT_CONTRIBUTION = 500; // 50% du ticket
-const FLASH_SEUIL = Number(process.env.FLASH_JACKPOT_CDF ?? 250_000);
+const FLASH_SEUIL = env.FLASH_JACKPOT_CDF ?? 250_000;
+
+async function applyFlashJackpotDeltaIdempotent(
+  eventKey: string,
+  tirageId: string,
+  deltaCdf: number,
+): Promise<void> {
+  const { error } = await supabaseAdmin.rpc('apply_flash_jackpot_delta_idempotent', {
+    p_event_key: eventKey,
+    p_tirage_id: tirageId,
+    p_delta_cdf: deltaCdf,
+  });
+  if (error) throw new Error(error.message);
+}
 
 function calculGainsFlash(nbBons: number, jackpotDispo: boolean): number {
   if (nbBons === 5) return jackpotDispo ? FLASH_SEUIL : 0;
@@ -95,7 +109,11 @@ export async function executerTirageFlash(): Promise<ExecuterTirageFlashResult> 
         p_tirage_id: tirage.id,
         p_idempotency_key: `flash:payout:${ticket.id}`,
       });
-      await supabaseAdmin.rpc('increment_flash_jackpot', { delta: -FLASH_SEUIL });
+      await applyFlashJackpotDeltaIdempotent(
+        `flash:draw:${tirage.id}:jackpot-resolve:${ticket.id}`,
+        tirage.id,
+        -FLASH_SEUIL,
+      );
       jackpotPaye = true;
 
       // Le pot redescend : recalcule pour les suivants
@@ -146,7 +164,11 @@ export async function executerTirageFlash(): Promise<ExecuterTirageFlashResult> 
       });
       if (isFive) {
         jackpotPaye = true;
-        await supabaseAdmin.rpc('increment_flash_jackpot', { delta: -FLASH_SEUIL });
+        await applyFlashJackpotDeltaIdempotent(
+          `flash:draw:${tirage.id}:jackpot-decrement:${t.id}`,
+          tirage.id,
+          -FLASH_SEUIL,
+        );
       }
     } else {
       await supabaseAdmin
@@ -296,9 +318,11 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   // POST admin tirage
   app.post('/api/flash/tirage', async (req, reply) => {
-    const adminSecret = process.env.FLASH_ADMIN_SECRET || '';
-    const provided = req.headers['x-admin-secret'];
-    if (!adminSecret || provided !== adminSecret) {
+    const secret = env.FLASH_ADMIN_SECRET || '';
+    const provided = String(req.headers['x-admin-secret'] || '');
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    if (!secret || a.length !== b.length || !timingSafeEqual(a, b)) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     try {
@@ -322,9 +346,11 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
    * tickets.
    */
   app.post('/api/flash/purge-pending', async (req, reply) => {
-    const adminSecret = process.env.FLASH_ADMIN_SECRET || '';
-    const provided = req.headers['x-admin-secret'];
-    if (!adminSecret || provided !== adminSecret) {
+    const secret = env.FLASH_ADMIN_SECRET || '';
+    const provided = String(req.headers['x-admin-secret'] || '');
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    if (!secret || a.length !== b.length || !timingSafeEqual(a, b)) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     try {

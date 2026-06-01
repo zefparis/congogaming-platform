@@ -131,6 +131,7 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
         reference_id: bet_id || round_id,
         idempotency_key: `okapi:bet:${round_id}:${user_id}`,
       })
+      if (ledger.duplicate) return reply.code(409).send({ error: 'Already bet this round' })
       balance = ledger.balance
     }
     catch (e) { return reply.code(400).send({ error: e instanceof Error ? e.message : 'Balance error' }) }

@@ -13,8 +13,9 @@
 
 import type { FastifyBaseLogger } from 'fastify';
 import { supabaseAdmin } from './supabase.js';
+import { env } from '../env.js';
 
-const ENABLED = String(process.env.REFERRAL_PROGRAM_ENABLED ?? 'true').toLowerCase() !== 'false';
+const ENABLED = env.REFERRAL_PROGRAM_ENABLED;
 
 export function isReferralProgramEnabled(): boolean {
   return ENABLED;
