@@ -3,7 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Phone, Lock, Clock } from 'lucide-react';
 import NumPad from '../components/NumPad';
+import { useTranslation } from 'react-i18next';
 import { AuthApiError, detectOperator, loginUser, validateCongoPhone, getSession } from '../lib/auth';
+import { displayError } from '../lib/errors';
 
 function formatRemaining(seconds: number): string {
   if (seconds <= 0) return '0s';
@@ -14,6 +16,7 @@ function formatRemaining(seconds: number): string {
 }
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
@@ -48,7 +51,7 @@ export default function LoginScreen() {
   const onPhoneDelete = () => setPhone((prev) => prev.slice(0, -1));
 
   const goPin = () => {
-    if (!validateCongoPhone(phone)) return setErr('Numéro RDC invalide');
+    if (!validateCongoPhone(phone)) return setErr(t('login.invalid_phone'));
     setStep('pin');
     setErr(null);
   };
@@ -88,7 +91,7 @@ export default function LoginScreen() {
         setLockedUntil(until);
         setNow(Date.now());
       }
-      setErr(e.message || 'Erreur');
+      setErr(displayError(t, e instanceof AuthApiError ? e.code : undefined, e.message));
       setPin('');
     } finally {
       setLoading(false);
@@ -107,7 +110,7 @@ export default function LoginScreen() {
             user ? nav('/home') : nav('/');
           }}
         />
-        <div className="text-zinc-500 text-xs uppercase tracking-widest">Connexion</div>
+        <div className="text-zinc-500 text-xs uppercase tracking-widest">{t('login.page_label')}</div>
       </div>
 
       {step === 'phone' ? (
@@ -115,14 +118,14 @@ export default function LoginScreen() {
           <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex items-center gap-3">
             <Phone className="w-6 h-6 text-gold" />
             <div className="flex-1">
-              <div className="text-xs text-zinc-500">Numéro</div>
+              <div className="text-xs text-zinc-500">{t('login.phone_label')}</div>
               <input
                 type="text"
                 value={phone}
                 readOnly
                 inputMode="none"
                 placeholder="09XXXXXXXX"
-                aria-label="Numéro de téléphone"
+                aria-label={t('login.phone_aria')}
                 className="w-full bg-transparent border-0 outline-none font-display text-3xl tracking-widest text-white placeholder:text-zinc-700 caret-transparent select-none"
               />
             </div>
@@ -137,11 +140,11 @@ export default function LoginScreen() {
             onClick={goPin}
             className="mt-5 h-14 rounded-2xl bg-gold text-black font-display text-2xl tracking-wider"
           >
-            CONTINUER
+            {t('login.continue')}
           </motion.button>
           <p className="mt-6 text-center text-sm text-zinc-400">
-            Pas de compte ?{' '}
-            <Link to="/register" className="text-gold font-semibold">Créer un compte</Link>
+            {t('login.no_account')}{' '}
+            <Link to="/register" className="text-gold font-semibold">{t('login.create_account')}</Link>
           </p>
         </>
       ) : (
@@ -149,7 +152,7 @@ export default function LoginScreen() {
           <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex items-center gap-3">
             <Lock className="w-6 h-6 text-gold" />
             <div className="flex-1">
-              <div className="text-xs text-zinc-500">Code PIN</div>
+              <div className="text-xs text-zinc-500">{t('login.pin_label')}</div>
               <div className="flex gap-3 mt-2">
                 {[0, 1, 2, 3].map((i) => (
                   <div
@@ -168,12 +171,12 @@ export default function LoginScreen() {
             <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-3">
               <Clock className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
               <div className="text-sm">
-                <div className="text-amber-300 font-semibold">Compte temporairement verrouillé</div>
+                <div className="text-amber-300 font-semibold">{t('login.locked_title')}</div>
                 <div className="text-amber-200/90 mt-0.5">
-                  Pour votre sécurité, votre compte est verrouillé après plusieurs tentatives.
+                  {t('login.locked_message')}
                 </div>
                 <div className="mt-1 text-amber-100">
-                  Réessayez dans <span className="font-display tracking-wider">{formatRemaining(remainingSeconds)}</span>
+                  {t('login.retry_in')} <span className="font-display tracking-wider">{formatRemaining(remainingSeconds)}</span>
                 </div>
               </div>
             </div>
@@ -186,11 +189,11 @@ export default function LoginScreen() {
                 onClick={goToResetPin}
                 className="mt-2 text-gold font-semibold text-sm underline underline-offset-4"
               >
-                Changer mon PIN
+                {t('login.change_pin')}
               </button>
             </div>
           )}
-          {loading && <div className="mt-3 text-gold text-sm">Connexion…</div>}
+          {loading && <div className="mt-3 text-gold text-sm">{t('login.connecting')}</div>}
           <div className="mt-5">
             <NumPad onDigit={onPinDigit} onDelete={onPinDelete} />
           </div>
@@ -201,11 +204,11 @@ export default function LoginScreen() {
               disabled={loading || isLocked}
               className="w-full mt-6 py-5 bg-amber-600 text-white font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
             >
-              {isLocked ? `VERROUILLÉ • ${formatRemaining(remainingSeconds)}` : 'VALIDER'}
+              {isLocked ? t('login.locked_button', { time: formatRemaining(remainingSeconds) }) : t('login.validate')}
             </motion.button>
           )}
           <button onClick={() => { setStep('phone'); setPin(''); }} className="mt-4 text-zinc-400 text-sm">
-            ← Modifier le numéro
+            {t('login.back_to_phone')}
           </button>
         </>
       )}

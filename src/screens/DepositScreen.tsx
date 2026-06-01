@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import NumPad from '../components/NumPad';
+import { useTranslation } from 'react-i18next';
+import { displayError } from '../lib/errors';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
 
@@ -33,7 +35,10 @@ function detectProvider(phone: string): DetectedOperator | null {
   return null;
 }
 
+const MIN_AMOUNT_CODES: Record<number, string> = { 10: 'MIN_AMOUNT_ORANGE', 17: 'MIN_AMOUNT_AIRTEL', 19: 'MIN_AMOUNT_AFRICELL' };
+
 export default function DepositScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const session = getSession();
   const [amount, setAmount] = useState('');
@@ -56,18 +61,18 @@ export default function DepositScreen() {
     const minAmount = MIN_AMOUNTS[providerId] ?? 100;
     if (!amt || amt < minAmount) {
       setState('error');
-      setMsg(`Montant minimum : ${minAmount.toLocaleString('fr-FR')} CDF`);
+      setMsg(t(`errors.${MIN_AMOUNT_CODES[providerId] ?? 'MIN_AMOUNT_GENERIC'}`));
       return;
     }
-    if (!/^0[89]\d{8}$/.test(phone)) { setState('error'); setMsg('Numéro invalide'); return; }
+    if (!/^0[89]\d{8}$/.test(phone)) { setState('error'); setMsg(t('deposit.invalid_number')); return; }
     setState('pending');
-    setMsg('Demande envoyée. Confirmez sur votre téléphone…');
+    setMsg(t('deposit.request_sent'));
     try {
       const r = await api.deposit({ amount: amt, provider_id: providerId, phone });
       if ((r as any)?.pending) {
         // Provider was unreachable / breaker open. Server has the
         // tx in PENDING and will reconcile asynchronously.
-        setMsg('Demande enregistrée. Vous recevrez la confirmation de l\'opérateur sous peu.');
+        setMsg(t('deposit.request_registered'));
       }
       // Poll status — extended to ~60s so we cover the reconciliation
       // window when the provider is slow to confirm.
@@ -77,22 +82,22 @@ export default function DepositScreen() {
         try {
           const s = await api.status(r.order_id);
           if (s.status === 2) {
-            setState('success'); setMsg('Dépôt réussi !');
+            setState('success'); setMsg(t('deposit.success'));
             await refreshBalance(session.id);
             return;
           }
-          if (s.status === 3) { setState('error'); setMsg('Transaction échouée'); return; }
+          if (s.status === 3) { setState('error'); setMsg(t('deposit.failed')); return; }
         } catch {}
         if (tries < 20) setTimeout(poll, 3000);
         else {
           setState('pending');
-          setMsg('Toujours en cours… Le solde sera mis à jour automatiquement dès la confirmation.');
+          setMsg(t('deposit.still_pending'));
           await refreshBalance(session.id).catch(() => {});
         }
       };
       setTimeout(poll, 3000);
     } catch (e: any) {
-      setState('error'); setMsg(e.message || 'Erreur');
+      setState('error'); setMsg(displayError(t, e.code, e.message));
     }
   };
 
@@ -114,7 +119,7 @@ export default function DepositScreen() {
       </header>
 
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
-        <div className="text-xs text-zinc-500 uppercase tracking-widest">Numéro</div>
+        <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('deposit.phone_label')}</div>
         <input
           inputMode="numeric"
           value={phone}
@@ -159,7 +164,7 @@ export default function DepositScreen() {
                 fontWeight: 700,
               }}
             >
-              {detectedOperator.name} détecté
+              {t('deposit.detected', { operator: detectedOperator.name })}
             </span>
             <span
               style={{
@@ -168,19 +173,19 @@ export default function DepositScreen() {
                 marginLeft: 'auto',
               }}
             >
-              ✓ automatique
+              {t('deposit.automatic')}
             </span>
           </div>
         )}
         {phone.length === 10 && !detectedOperator && (
           <div style={{ color: '#FF4444', fontSize: 12, marginTop: 6 }}>
-            Numéro non reconnu — vérifiez votre numéro
+            {t('deposit.invalid_number')}
           </div>
         )}
       </div>
 
       <div className="mt-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
-        <div className="text-xs text-zinc-500 uppercase tracking-widest">Montant (CDF)</div>
+        <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('deposit.amount_label')}</div>
         <div className="font-display text-5xl text-white mt-1">
           {amount ? Number(amount).toLocaleString('fr-FR') : <span className="text-zinc-700">0</span>}
         </div>
@@ -197,7 +202,7 @@ export default function DepositScreen() {
         </div>
         {detectedOperator?.id === 19 && Number(amount) > 0 && Number(amount) < 2250 && (
           <div style={{ color: '#FF8C00', fontSize: 12, marginTop: 8 }}>
-            Montant minimum Africell : 2 250 CDF
+            {t('deposit.min_africell')}
           </div>
         )}
       </div>
@@ -225,7 +230,7 @@ export default function DepositScreen() {
         disabled={state === 'pending'}
         className="mt-4 w-full h-16 rounded-2xl bg-congogreen text-white font-display text-3xl tracking-widest disabled:opacity-60"
       >
-        CONFIRMER
+        {t('deposit.confirm')}
       </motion.button>
     </div>
   );

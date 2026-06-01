@@ -685,14 +685,12 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     const parsed = OkapiColorTicketBodySchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Corps invalide', detail: parsed.error.errors });
+      return reply.code(400).send({ code: 'INVALID_BODY', error: 'INVALID_BODY', detail: parsed.error.errors });
     }
     const { numeros } = parsed.data;
 
     if (!isValidOkapiColorNumbers(numeros)) {
-      return reply.code(400).send({
-        error: 'numeros invalides : 6 entiers distincts entre 1 et 24',
-      });
+      return reply.code(400).send({ code: 'INVALID_NUMBERS', error: 'INVALID_NUMBERS' });
     }
 
     // Refuser les achats pendant CLOSING et DRAWING
@@ -708,7 +706,7 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     const { state: drawState } = computeOkapiColorState(new Date(), secsSinceLastDraw);
     if (drawState === 'closing' || drawState === 'drawing') {
       return reply.code(423).send({
-        error: 'Tirage en cours — paris fermés. Réessayez dans quelques secondes.',
+        error: 'DRAW_IN_PROGRESS',
         code:  'DRAW_IN_PROGRESS',
       });
     }
@@ -719,9 +717,9 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       .select('balance_cdf')
       .eq('id', user_id)
       .single();
-    if (userErr || !user) return reply.code(404).send({ error: 'User not found' });
+    if (userErr || !user) return reply.code(404).send({ code: 'USER_NOT_FOUND', error: 'USER_NOT_FOUND' });
     if (Number(user.balance_cdf) < OKAPI_COLOR_CONFIG.ticketPriceCdf) {
-      return reply.code(400).send({ error: 'Solde insuffisant' });
+      return reply.code(400).send({ code: 'INSUFFICIENT_BALANCE', error: 'INSUFFICIENT_BALANCE' });
     }
 
     const ticket_id = crypto.randomUUID();
@@ -755,7 +753,7 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         idempotency_key: `toctou_refund_${ticket_id}`,
       });
       return reply.code(423).send({
-        error: 'Tirage en cours — paris fermés. Réessayez dans quelques secondes.',
+        error: 'DRAW_IN_PROGRESS',
         code:  'DRAW_IN_PROGRESS',
       });
     }

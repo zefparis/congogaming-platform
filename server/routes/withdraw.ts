@@ -14,7 +14,7 @@ export default async function withdrawRoutes(app: FastifyInstance) {
     const { amount, provider_id, phone } = parsed.data;
 
     if (!phoneMatchesProvider(phone, provider_id)) {
-      return reply.code(400).send({ error: 'Ce numéro ne correspond pas à l\'opérateur sélectionné' });
+      return reply.code(400).send({ code: 'PHONE_OPERATOR_MISMATCH', error: 'PHONE_OPERATOR_MISMATCH' });
     }
 
     const order_id = newOrderId();
@@ -35,8 +35,8 @@ export default async function withdrawRoutes(app: FastifyInstance) {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Balance error';
       app.log.warn({ err: message, user_id, amount }, 'withdrawal debit failed');
-      if (message.includes('Insufficient')) return reply.code(400).send({ error: 'Insufficient balance' });
-      return reply.code(500).send({ error: 'Balance error' });
+      if (message.includes('Insufficient')) return reply.code(400).send({ code: 'INSUFFICIENT_BALANCE', error: 'INSUFFICIENT_BALANCE' });
+      return reply.code(500).send({ code: 'BALANCE_ERROR', error: 'BALANCE_ERROR' });
     }
 
     const { error: insertErr } = await supabaseAdmin.from('transactions').insert({
@@ -100,7 +100,7 @@ export default async function withdrawRoutes(app: FastifyInstance) {
       pending: true,
       balance: newBalance,
       code: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
-      message: 'Demande enregistrée — paiement en cours de traitement',
+      message: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
     });
   });
 }

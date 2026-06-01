@@ -112,7 +112,7 @@ export default async function transactionsRoutes(app: FastifyInstance) {
       });
     } catch (e: any) {
       req.log.error({ err: e?.message }, 'me/stats failed');
-      return reply.code(500).send({ error: 'Erreur statistiques' });
+      return reply.code(500).send({ code: 'STATS_ERROR', error: 'STATS_ERROR' });
     }
   });
 }

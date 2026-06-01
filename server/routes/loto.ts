@@ -308,7 +308,7 @@ const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     const parsed = LotoTicketBodySchema.safeParse(req.body);
     const numeros = parsed.success ? parsed.data.numeros : undefined;
     if (!isValidLotoNumbers(numeros)) {
-      return reply.code(400).send({ error: 'numeros invalides : 6 entiers distincts entre 1 et 49' });
+      return reply.code(400).send({ code: 'INVALID_NUMBERS', error: 'INVALID_NUMBERS' });
     }
 
     // Sécurité lancement : seuil minimum de tickets cumulés
@@ -320,7 +320,7 @@ const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       if ((count ?? 0) < MIN) {
         return reply
           .code(503)
-          .send({ error: 'Lancement en cours', message: 'Le loto ouvre bientôt, revenez dans quelques jours !' });
+          .send({ code: 'SERVICE_STARTING', error: 'SERVICE_STARTING' });
       }
     }
 
@@ -329,9 +329,9 @@ const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       .select('balance_cdf')
       .eq('id', user_id)
       .single();
-    if (userErr || !user) return reply.code(404).send({ error: 'User not found' });
+    if (userErr || !user) return reply.code(404).send({ code: 'USER_NOT_FOUND', error: 'USER_NOT_FOUND' });
     if (Number(user.balance_cdf) < TICKET_PRICE_CDF) {
-      return reply.code(400).send({ error: 'Solde insuffisant' });
+      return reply.code(400).send({ code: 'INSUFFICIENT_BALANCE', error: 'INSUFFICIENT_BALANCE' });
     }
 
     // Debit

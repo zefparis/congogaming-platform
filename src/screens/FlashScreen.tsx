@@ -12,6 +12,8 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { displayError } from '../lib/errors';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
 import GainsModal from '../components/GainsModal';
@@ -57,6 +59,7 @@ function formatMMSS(ms: number) {
 }
 
 export default function FlashScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const session = getSession();
 
@@ -148,11 +151,11 @@ export default function FlashScreen() {
   const submit = async () => {
     if (!session || !isFull || state === 'pending') return;
     setState('pending');
-    setMsg('Validation du ticket…');
+    setMsg(t('flash.validating'));
     try {
       await api.flashTicket(session.id, selected);
       setState('success');
-      setMsg('Ticket Flash enregistré !');
+      setMsg(t('flash.ticket_registered'));
       setPlayedNums(selected);
       setSelected([]);
       const newBal = await refreshBalance(session.id);
@@ -163,7 +166,7 @@ export default function FlashScreen() {
         .catch(() => {});
     } catch (e: any) {
       setState('error');
-      setMsg(e.message || 'Erreur');
+      setMsg(displayError(t, e?.code, e?.message));
     }
   };
 
@@ -188,7 +191,7 @@ export default function FlashScreen() {
           }}
         />
         <h1 className="font-display text-2xl text-gold tracking-wider ml-auto flex items-center gap-1">
-          <Zap className="w-5 h-5" /> LOTO FLASH
+          <Zap className="w-5 h-5" /> {t('flash.title')}
         </h1>
         <button
           type="button"
@@ -203,7 +206,7 @@ export default function FlashScreen() {
             cursor: 'pointer',
           }}
         >
-          ℹ️ Gains
+          {t('flash.gains_button')}
         </button>
       </header>
       <GainsModal open={showGains} onClose={() => setShowGains(false)} type="flash" />
@@ -217,12 +220,12 @@ export default function FlashScreen() {
           marginTop: 8,
         }}
       >
-        💰 Solde : {balance.toLocaleString('fr-FR')} CDF
+        {t('flash.balance_display', { amount: balance.toLocaleString('fr-FR') })}
       </div>
 
       <div className="mt-2 flex justify-end">
         <span className="inline-flex items-center gap-1 bg-congogreen text-white text-[10px] uppercase tracking-widest font-semibold px-3 py-1 rounded-full animate-pulse">
-          <Zap className="w-3 h-3" /> Tirage toutes les 30 min
+          <Zap className="w-3 h-3" /> {t('flash.draw_interval')}
         </span>
       </div>
 
@@ -230,7 +233,7 @@ export default function FlashScreen() {
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
         <div className="flex items-center justify-between">
           <div className="text-xs uppercase tracking-widest text-zinc-500">
-            Prochain tirage dans
+            {t('flash.next_draw')}
           </div>
         </div>
         <div className="font-display text-5xl text-gold mt-1 tracking-widest">
@@ -241,7 +244,7 @@ export default function FlashScreen() {
           {potCdf < FLASH_SEUIL ? (
             <div>
               <div className="text-xs text-zinc-300">
-                Pot Flash :{' '}
+                {t('flash.pot_label')}{' '}
                 <span className="text-gold font-semibold">
                   {potCdf.toLocaleString('fr-FR')}
                 </span>{' '}
@@ -272,7 +275,7 @@ export default function FlashScreen() {
               className="animate-flicker font-display tracking-wider"
               style={{ color: '#FFD700', fontSize: '1.1rem' }}
             >
-              ⚡ JACKPOT FLASH DISPONIBLE ! — {potCdf.toLocaleString('fr-FR')} CDF
+              {t('flash.jackpot_available', { amount: potCdf.toLocaleString('fr-FR') })}
             </div>
           )}
         </div>
@@ -281,7 +284,7 @@ export default function FlashScreen() {
       {/* Dernier tirage */}
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
         <div className="flex items-center justify-between">
-          <div className="text-xs uppercase tracking-widest text-zinc-500">Dernier tirage</div>
+          <div className="text-xs uppercase tracking-widest text-zinc-500">{t('flash.last_draw')}</div>
           {tirage && (
             <div className="text-[10px] text-zinc-500">
               {new Date(tirage.drawn_at).toLocaleTimeString('fr-FR', {
@@ -298,7 +301,7 @@ export default function FlashScreen() {
             ))}
           </div>
         ) : (
-          <div className="mt-2 text-sm text-zinc-400">Aucun tirage encore</div>
+          <div className="mt-2 text-sm text-zinc-400">{t('flash.no_draw')}</div>
         )}
       </div>
 
@@ -306,7 +309,7 @@ export default function FlashScreen() {
       <div className="mt-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
         <div className="flex items-center justify-between">
           <div className="text-xs uppercase tracking-widest text-zinc-500">
-            Choisissez 5 numéros (1-20)
+            {t('flash.choose_numbers')}
           </div>
           <div className="font-display text-xl text-gold">{selected.length}/5</div>
         </div>
@@ -337,7 +340,7 @@ export default function FlashScreen() {
             onClick={quickPick}
             className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2"
           >
-            <Shuffle className="w-4 h-4" /> QUICK PICK
+            <Shuffle className="w-4 h-4" /> {t('flash.quick_pick')}
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -345,7 +348,7 @@ export default function FlashScreen() {
             disabled={selected.length === 0}
             className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Trash2 className="w-4 h-4" /> EFFACER
+            <Trash2 className="w-4 h-4" /> {t('flash.clear')}
           </motion.button>
         </div>
       </div>
@@ -382,7 +385,7 @@ export default function FlashScreen() {
         disabled={!isFull || state === 'pending'}
         className="mt-4 w-full h-16 rounded-2xl bg-gradient-to-r from-gold via-yellow-300 to-gold text-black font-display text-2xl tracking-widest disabled:opacity-50 disabled:from-zinc-700 disabled:via-zinc-700 disabled:to-zinc-700 disabled:text-zinc-400"
       >
-        JOUER — {TICKET_PRICE.toLocaleString('fr-FR')} CDF
+        {t('flash.play_button', { price: TICKET_PRICE.toLocaleString('fr-FR') })}
       </motion.button>
 
       {/* Mes tickets accordion */}
@@ -392,7 +395,7 @@ export default function FlashScreen() {
           className="w-full flex items-center justify-between p-4"
         >
           <div className="text-xs uppercase tracking-widest text-zinc-400">
-            Mes tickets Flash ({tickets.length})
+            {t('flash.my_tickets', { count: tickets.length })}
           </div>
           {showTickets ? (
             <ChevronUp className="w-4 h-4 text-zinc-400" />
@@ -411,38 +414,37 @@ export default function FlashScreen() {
             >
               <div className="px-4 pb-4 space-y-2">
                 {tickets.length === 0 && (
-                  <div className="text-sm text-zinc-500">Aucun ticket pour le moment.</div>
+                  <div className="text-sm text-zinc-500">{t('flash.no_tickets')}</div>
                 )}
-                {tickets.map((t) => (
+                {tickets.map((ticket) => (
                   <div
-                    key={t.id}
+                    key={ticket.id}
                     className="rounded-xl bg-zinc-950 border border-zinc-800 p-3"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-[10px] text-zinc-500">
-                        {new Date(t.created_at).toLocaleString('fr-FR')}
+                        {new Date(ticket.created_at).toLocaleString('fr-FR')}
                       </div>
-                      <StatusBadge status={t.status} />
+                      <StatusBadge status={ticket.status} />
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {t.numeros.map((n) => (
+                      {ticket.numeros.map((n) => (
                         <Ball key={n} n={n} variant="gold" small />
                       ))}
                     </div>
-                    {t.jackpot_en_attente && (
+                    {ticket.jackpot_en_attente && (
                       <div className="mt-2 text-[10px] text-zinc-400">
-                        Versé dès que le pot atteint {FLASH_SEUIL.toLocaleString('fr-FR')} CDF
+                        {t('flash.jackpot_pending_note', { amount: FLASH_SEUIL.toLocaleString('fr-FR') })}
                       </div>
                     )}
-                    {t.gains_cdf > 0 && !t.jackpot_en_attente && (
+                    {ticket.gains_cdf > 0 && !ticket.jackpot_en_attente && (
                       <div className="mt-2 text-sm text-congogreen font-semibold">
-                        + {t.gains_cdf.toLocaleString('fr-FR')} CDF
+                        + {ticket.gains_cdf.toLocaleString('fr-FR')} CDF
                       </div>
                     )}
-                    {t.status !== 'pending' && !t.jackpot_en_attente && (
+                    {ticket.status !== 'pending' && !ticket.jackpot_en_attente && (
                       <div className="mt-1 text-[10px] text-zinc-500">
-                        {t.nb_bons} numéro{t.nb_bons > 1 ? 's' : ''} correct
-                        {t.nb_bons > 1 ? 's' : ''}
+                        {t('flash.correct_numbers', { count: ticket.nb_bons })}
                       </div>
                     )}
                   </div>
@@ -490,11 +492,12 @@ function StatusBadge({
     perdant: 'bg-zinc-700/30 border-zinc-700 text-zinc-400',
     jackpot_attente: 'bg-orange-500/15 border-orange-500/40 text-orange-300',
   } as const;
+  const { t } = useTranslation();
   const label = {
-    pending: 'En attente',
-    gagnant: 'Gagnant',
-    perdant: 'Perdant',
-    jackpot_attente: '⚡ Jackpot en attente',
+    pending: t('flash.status_pending'),
+    gagnant: t('flash.status_winner'),
+    perdant: t('flash.status_loser'),
+    jackpot_attente: t('flash.status_jackpot'),
   }[status];
   return (
     <span

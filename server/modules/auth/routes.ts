@@ -29,37 +29,26 @@ type AuthErrorPayload = {
   attemptsRemaining?: number;
 };
 
-function formatLockedMessage(retryAfterSeconds: number): string {
-  if (retryAfterSeconds >= 60) {
-    const minutes = Math.ceil(retryAfterSeconds / 60);
-    return `Compte temporairement verrouillé. Réessayez dans ${minutes} minute${minutes > 1 ? 's' : ''}.`;
-  }
-  return `Compte temporairement verrouillé. Réessayez dans ${retryAfterSeconds} seconde${retryAfterSeconds > 1 ? 's' : ''}.`;
-}
-
 function toAuthError(error: unknown): AuthErrorPayload {
   if (error instanceof AuthLockedError) {
     return {
       status: 429,
       code: 'ACCOUNT_TEMP_LOCKED',
-      message: formatLockedMessage(error.retryAfterSeconds),
+      message: 'ACCOUNT_TEMP_LOCKED',
       lockedUntil: error.lockedUntil.toISOString(),
       retryAfterSeconds: error.retryAfterSeconds,
     };
   }
   if (error instanceof InvalidCredentialsError) {
-    const msg = error.attemptsRemaining > 0
-      ? `Identifiants invalides. ${error.attemptsRemaining} tentative${error.attemptsRemaining > 1 ? 's' : ''} restante${error.attemptsRemaining > 1 ? 's' : ''} avant verrouillage.`
-      : 'Identifiants invalides';
-    return { status: 401, code: 'INVALID_CREDENTIALS', message: msg, attemptsRemaining: error.attemptsRemaining };
+    return { status: 401, code: 'INVALID_CREDENTIALS', message: 'INVALID_CREDENTIALS', attemptsRemaining: error.attemptsRemaining };
   }
   const msg = error instanceof Error ? error.message : String(error);
-  if (msg === 'PHONE_ALREADY_REGISTERED') return { status: 409, message: 'Numéro déjà inscrit' };
-  if (msg === 'INVALID_CREDENTIALS') return { status: 401, message: 'Identifiants invalides' };
-  if (msg === 'ACCOUNT_BLOCKED') return { status: 403, message: 'Compte bloqué' };
-  if (msg === 'ACCOUNT_TEMP_LOCKED') return { status: 429, code: 'ACCOUNT_TEMP_LOCKED', message: 'Compte temporairement verrouillé' };
-  if (msg === 'PIN_RESET_REQUIRED') return { status: 409, code: 'PIN_RESET_REQUIRED', message: 'Veuillez réinitialiser votre PIN.' };
-  return { status: 500, message: 'Erreur auth' };
+  if (msg === 'PHONE_ALREADY_REGISTERED') return { status: 409, code: 'PHONE_ALREADY_REGISTERED', message: 'PHONE_ALREADY_REGISTERED' };
+  if (msg === 'INVALID_CREDENTIALS') return { status: 401, code: 'INVALID_CREDENTIALS', message: 'INVALID_CREDENTIALS' };
+  if (msg === 'ACCOUNT_BLOCKED') return { status: 403, code: 'ACCOUNT_BLOCKED', message: 'ACCOUNT_BLOCKED' };
+  if (msg === 'ACCOUNT_TEMP_LOCKED') return { status: 429, code: 'ACCOUNT_TEMP_LOCKED', message: 'ACCOUNT_TEMP_LOCKED' };
+  if (msg === 'PIN_RESET_REQUIRED') return { status: 409, code: 'PIN_RESET_REQUIRED', message: 'PIN_RESET_REQUIRED' };
+  return { status: 500, code: 'AUTH_ERROR', message: 'AUTH_ERROR' };
 }
 
 const authRoutes: FastifyPluginAsync = async (app) => {
@@ -111,18 +100,18 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   }, async (req, reply) => {
     const parsed = ResetPinSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Format PIN invalide', code: 'INVALID_PIN_FORMAT' });
+      return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
     }
     try {
       await resetPinByPhone({ phone: parsed.data.phone, newPin: parsed.data.newPin });
-      return reply.send({ ok: true, message: 'PIN mis à jour' });
+      return reply.send({ ok: true });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg === 'INVALID_PIN_FORMAT') return reply.code(400).send({ error: 'Format PIN invalide', code: 'INVALID_PIN_FORMAT' });
-      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'Utilisateur introuvable', code: 'USER_NOT_FOUND' });
-      if (msg === 'PIN_RESET_NOT_REQUIRED') return reply.code(409).send({ error: 'Réinitialisation PIN non requise', code: 'PIN_RESET_NOT_REQUIRED' });
+      if (msg === 'INVALID_PIN_FORMAT') return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
+      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'USER_NOT_FOUND', code: 'USER_NOT_FOUND' });
+      if (msg === 'PIN_RESET_NOT_REQUIRED') return reply.code(409).send({ error: 'PIN_RESET_NOT_REQUIRED', code: 'PIN_RESET_NOT_REQUIRED' });
       req.log.error({ err: msg }, 'reset-pin failed');
-      return reply.code(500).send({ error: 'Erreur reset PIN', code: 'RESET_PIN_FAILED' });
+      return reply.code(500).send({ error: 'RESET_PIN_FAILED', code: 'RESET_PIN_FAILED' });
     }
   });
 
@@ -148,7 +137,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   }, async (req, reply) => {
     const parsed = ChangePinSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'PIN invalide (4 chiffres)', code: 'INVALID_PIN_FORMAT' });
+      return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
     }
     try {
       await changePin({
@@ -156,16 +145,16 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         currentPin: parsed.data.currentPin,
         newPin: parsed.data.newPin,
       });
-      return reply.send({ ok: true, message: 'PIN mis à jour avec succès' });
+      return reply.send({ ok: true });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg === 'CURRENT_PIN_INVALID') return reply.code(401).send({ error: 'PIN actuel incorrect', code: 'CURRENT_PIN_INVALID' });
-      if (msg === 'PIN_SAME_AS_CURRENT') return reply.code(400).send({ error: 'Le nouveau PIN doit être différent', code: 'PIN_SAME_AS_CURRENT' });
-      if (msg === 'INVALID_PIN_FORMAT') return reply.code(400).send({ error: 'Format PIN invalide', code: 'INVALID_PIN_FORMAT' });
-      if (msg === 'PIN_RESET_REQUIRED') return reply.code(409).send({ error: 'Réinitialisation requise', code: 'PIN_RESET_REQUIRED' });
-      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'Utilisateur introuvable', code: 'USER_NOT_FOUND' });
+      if (msg === 'CURRENT_PIN_INVALID') return reply.code(401).send({ error: 'CURRENT_PIN_INVALID', code: 'CURRENT_PIN_INVALID' });
+      if (msg === 'PIN_SAME_AS_CURRENT') return reply.code(400).send({ error: 'PIN_SAME_AS_CURRENT', code: 'PIN_SAME_AS_CURRENT' });
+      if (msg === 'INVALID_PIN_FORMAT') return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
+      if (msg === 'PIN_RESET_REQUIRED') return reply.code(409).send({ error: 'PIN_RESET_REQUIRED', code: 'PIN_RESET_REQUIRED' });
+      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'USER_NOT_FOUND', code: 'USER_NOT_FOUND' });
       req.log.error({ err: msg }, 'change-pin failed');
-      return reply.code(500).send({ error: 'Erreur changement PIN' });
+      return reply.code(500).send({ error: 'CHANGE_PIN_FAILED', code: 'CHANGE_PIN_FAILED' });
     }
   });
 
@@ -179,19 +168,19 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   }, async (req, reply) => {
     const parsed = ProfileSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Pseudo invalide (2 à 24 caractères)', code: 'DISPLAY_NAME_INVALID' });
+      return reply.code(400).send({ error: 'DISPLAY_NAME_INVALID', code: 'DISPLAY_NAME_INVALID' });
     }
     try {
       const user = await updateDisplayName(req.user.id, parsed.data.display_name);
       return reply.send({ user });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg === 'DISPLAY_NAME_TAKEN') return reply.code(409).send({ error: 'Ce pseudo est déjà utilisé', code: 'DISPLAY_NAME_TAKEN' });
-      if (msg === 'DISPLAY_NAME_INVALID_LENGTH') return reply.code(400).send({ error: 'Pseudo : 2 à 24 caractères', code: 'DISPLAY_NAME_INVALID' });
-      if (msg === 'DISPLAY_NAME_INVALID_CHARS') return reply.code(400).send({ error: 'Pseudo : lettres, chiffres, espaces, _ . - uniquement', code: 'DISPLAY_NAME_INVALID' });
-      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'Utilisateur introuvable', code: 'USER_NOT_FOUND' });
+      if (msg === 'DISPLAY_NAME_TAKEN') return reply.code(409).send({ error: 'DISPLAY_NAME_TAKEN', code: 'DISPLAY_NAME_TAKEN' });
+      if (msg === 'DISPLAY_NAME_INVALID_LENGTH') return reply.code(400).send({ error: 'DISPLAY_NAME_INVALID', code: 'DISPLAY_NAME_INVALID' });
+      if (msg === 'DISPLAY_NAME_INVALID_CHARS') return reply.code(400).send({ error: 'DISPLAY_NAME_INVALID_CHARS', code: 'DISPLAY_NAME_INVALID_CHARS' });
+      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'USER_NOT_FOUND', code: 'USER_NOT_FOUND' });
       req.log.error({ err: msg }, 'update display_name failed');
-      return reply.code(500).send({ error: 'Erreur mise à jour profil' });
+      return reply.code(500).send({ error: 'PROFILE_UPDATE_FAILED', code: 'PROFILE_UPDATE_FAILED' });
     }
   });
 };

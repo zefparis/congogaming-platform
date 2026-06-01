@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { displayError } from '../lib/errors';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import { api } from '../lib/api';
 import { getSession, refreshBalance } from '../lib/auth';
@@ -43,6 +45,7 @@ const cellRect = (i: number) => {
 };
 
 export default function ScratchScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const session = getSession();
   const userId = session?.id ?? '';
@@ -194,11 +197,11 @@ export default function ScratchScreen() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = 'bold 22px Arial';
-    ctx.fillText('GRATTEZ', CANVAS / 2, CANVAS / 2 - 10);
+    ctx.fillText(t('scratch.scratch_prompt'), CANVAS / 2, CANVAS / 2 - 10);
     ctx.font = 'bold 12px Arial';
     ctx.fillStyle = 'rgba(255,215,0,0.65)';
-    ctx.fillText('avec votre doigt', CANVAS / 2, CANVAS / 2 + 14);
-  }, []);
+    ctx.fillText(t('scratch.with_finger'), CANVAS / 2, CANVAS / 2 + 14);
+  }, [t]);
 
   // Draw both layers AFTER the ticket is purchased and the canvases are
   // mounted/laid out. A requestAnimationFrame tick gives the browser a
@@ -451,7 +454,7 @@ export default function ScratchScreen() {
       setTicketId(r.ticket_id);
       setGrid(r.grid as Sym[]);
     } catch (e: any) {
-      alert(e?.message ?? 'Erreur');
+      alert(displayError(t, e?.code, e?.message));
     } finally {
       setBusy(false);
     }
@@ -505,10 +508,10 @@ export default function ScratchScreen() {
             gap: 6,
             padding: 4,
           }}
-          aria-label="Retour"
+          aria-label={t('scratch.back')}
         >
           <ArrowLeft size={18} />
-          <span style={{ fontSize: 13 }}>Retour</span>
+          <span style={{ fontSize: 13 }}>{t('scratch.back')}</span>
         </button>
         <h1
           style={{
@@ -520,7 +523,7 @@ export default function ScratchScreen() {
             textShadow: '0 0 14px rgba(255,215,0,0.35)',
           }}
         >
-          SCRATCH CARD
+          {t('scratch.title')}
         </h1>
         <div
           style={{
@@ -606,7 +609,7 @@ export default function ScratchScreen() {
                   fontWeight: 700,
                 }}
               >
-                MISE
+                {t('scratch.bet_label')}
               </span>
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {b.toLocaleString('fr-FR')}
@@ -689,7 +692,7 @@ export default function ScratchScreen() {
                 border: '1px solid rgba(255,215,0,0.6)',
               }}
             >
-              JUSQU'À ×50
+              {t('scratch.win_up_to')}
             </span>
           </div>
           {/* Inner canvas frame */}
@@ -769,7 +772,7 @@ export default function ScratchScreen() {
                   fontWeight: 900,
                 }}
               >
-                GRATTEZ
+                {t('scratch.scratch_prompt')}
               </div>
               <div
                 style={{
@@ -782,7 +785,7 @@ export default function ScratchScreen() {
                   textShadow: '0 2px 0 rgba(255,255,255,0.35), 0 0 16px rgba(255,255,255,0.4)',
                 }}
               >
-                & GAGNEZ
+                {t('scratch.and_win')}
               </div>
               <div
                 style={{
@@ -793,7 +796,7 @@ export default function ScratchScreen() {
                   letterSpacing: 0.5,
                 }}
               >
-                Choisis ta mise puis achète ton ticket
+                {t('scratch.choose_bet')}
               </div>
             </div>
           )}
@@ -850,7 +853,7 @@ export default function ScratchScreen() {
             transition: 'transform 200ms ease, box-shadow 200ms ease, filter 200ms ease',
           }}
         >
-          {balance < bet ? 'SOLDE INSUFFISANT' : `ACHETER — ${bet.toLocaleString('fr-FR')} CDF`}
+          {balance < bet ? t('scratch.insufficient_balance') : t('scratch.buy_button', { amount: bet.toLocaleString('fr-FR') })}
         </button>
       )}
       {ticketId && !result && (
@@ -862,7 +865,7 @@ export default function ScratchScreen() {
             fontSize: 13,
           }}
         >
-          Grattez les 9 cases pour révéler votre résultat
+          {t('scratch.reveal_prompt')}
         </p>
       )}
 
@@ -904,7 +907,7 @@ export default function ScratchScreen() {
                     letterSpacing: '0.04em',
                   }}
                 >
-                  GAGNÉ {result.win.toLocaleString('fr-FR')} CDF !
+                  {t('scratch.won', { amount: result.win.toLocaleString('fr-FR') })}
                 </div>
                 <p
                   style={{
@@ -914,7 +917,7 @@ export default function ScratchScreen() {
                     marginTop: 10,
                   }}
                 >
-                  +{result.win.toLocaleString('fr-FR')} CDF ajouté à votre solde !
+                  {t('scratch.added_to_balance', { amount: result.win.toLocaleString('fr-FR') })}
                 </p>
                 <p
                   style={{
@@ -923,14 +926,14 @@ export default function ScratchScreen() {
                     marginTop: 8,
                   }}
                 >
-                  Mise : {result.bet.toLocaleString('fr-FR')} CDF
+                  {t('scratch.bet_placed', { amount: result.bet.toLocaleString('fr-FR') })}
                 </p>
               </>
             ) : (
               <>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>🥲</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>
-                  Pas de chance...
+                  {t('scratch.no_luck')}
                 </div>
                 <p
                   style={{
@@ -939,7 +942,7 @@ export default function ScratchScreen() {
                     marginTop: 8,
                   }}
                 >
-                  Retentez votre chance !
+                  {t('scratch.try_again')}
                 </p>
               </>
             )}
@@ -959,7 +962,7 @@ export default function ScratchScreen() {
                 background: 'linear-gradient(135deg, #FFD700, #FF8C00)',
               }}
             >
-              REJOUER
+              {t('scratch.play_again')}
             </button>
           </div>
         </div>

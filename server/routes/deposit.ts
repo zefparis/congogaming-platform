@@ -6,6 +6,7 @@ import { normalizePhoneForProvider, phoneMatchesProvider } from '../lib/phone.js
 import { onDepositSucceeded } from '../lib/referral.js';
 
 const MIN_AMOUNTS: Record<number, number> = { 10: 100, 17: 100, 19: 2250 };
+const MIN_AMOUNT_CODES: Record<number, string> = { 10: 'MIN_AMOUNT_ORANGE', 17: 'MIN_AMOUNT_AIRTEL', 19: 'MIN_AMOUNT_AFRICELL' };
 
 export default async function depositRoutes(app: FastifyInstance) {
   app.post('/api/deposit', { preHandler: app.requireAuth }, async (req, reply) => {
@@ -15,10 +16,11 @@ export default async function depositRoutes(app: FastifyInstance) {
     const user_id = req.user.id;
     const { amount, provider_id, phone } = parsed.data;
     const minAmount = MIN_AMOUNTS[provider_id] ?? 100;
-    if (amount < minAmount) return reply.code(400).send({ error: `Montant minimum ${minAmount} CDF pour cet opérateur` });
+    const minCode = MIN_AMOUNT_CODES[provider_id] ?? 'MIN_AMOUNT_GENERIC';
+    if (amount < minAmount) return reply.code(400).send({ code: minCode, error: minCode });
 
     if (!phoneMatchesProvider(phone, provider_id)) {
-      return reply.code(400).send({ error: 'Ce numéro ne correspond pas à l\'opérateur sélectionné' });
+      return reply.code(400).send({ code: 'PHONE_OPERATOR_MISMATCH', error: 'PHONE_OPERATOR_MISMATCH' });
     }
 
     // Responsible-gaming guard: self-exclusion + daily/weekly/monthly caps.
@@ -28,20 +30,15 @@ export default async function depositRoutes(app: FastifyInstance) {
     });
     if (limitErr) {
       app.log.error({ err: limitErr.message, user_id }, 'check_deposit_allowed RPC failed');
-      return reply.code(500).send({ error: 'Erreur vérification limites' });
+      return reply.code(500).send({ code: 'LIMITS_CHECK_FAILED', error: 'LIMITS_CHECK_FAILED' });
     }
     const limitRow = Array.isArray(limitCheck) ? limitCheck[0] : limitCheck;
     if (limitRow && limitRow.allowed === false) {
       const reason = String(limitRow.reason || 'LIMIT_EXCEEDED');
-      const messages: Record<string, string> = {
-        SELF_EXCLUDED: 'Auto-exclusion active jusqu\'au ' + (limitRow.retry_after ? new Date(limitRow.retry_after).toLocaleString('fr-FR') : 'date à venir'),
-        DAILY_LIMIT_EXCEEDED: 'Limite de dépôt journalière atteinte',
-        WEEKLY_LIMIT_EXCEEDED: 'Limite de dépôt hebdomadaire atteinte',
-        MONTHLY_LIMIT_EXCEEDED: 'Limite de dépôt mensuelle atteinte',
-      };
+      const errorCode = reason === 'SELF_EXCLUDED' ? 'SELF_EXCLUSION_ACTIVE' : (reason || 'DEPOSIT_BLOCKED');
       return reply.code(403).send({
-        error: messages[reason] || 'Dépôt bloqué',
-        code: reason,
+        error: errorCode,
+        code: errorCode,
         retry_after: limitRow.retry_after ?? null,
       });
     }
@@ -58,7 +55,7 @@ export default async function depositRoutes(app: FastifyInstance) {
     });
     if (insertErr) {
       app.log.error({ err: insertErr.message, user_id, order_id }, 'insert transaction failed');
-      return reply.code(500).send({ error: 'DB insert failed' });
+      return reply.code(500).send({ code: 'DB_ERROR', error: 'DB_ERROR' });
     }
 
     const normalizedPhone = normalizePhoneForProvider(phone, provider_id);
@@ -99,7 +96,7 @@ export default async function depositRoutes(app: FastifyInstance) {
       status: 1,
       pending: true,
       code: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
-      message: 'Demande enregistrée — confirmation en cours',
+      message: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
     });
   });
 }

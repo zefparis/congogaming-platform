@@ -241,7 +241,7 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     const parsed = FlashTicketBodySchema.safeParse(req.body);
     const numeros = parsed.success ? parsed.data.numeros : undefined;
     if (!isValidFlashNumbers(numeros)) {
-      return reply.code(400).send({ error: 'numeros invalides : 5 entiers distincts entre 1 et 20' });
+      return reply.code(400).send({ code: 'INVALID_NUMBERS', error: 'INVALID_NUMBERS' });
     }
 
     // Sécurité lancement : seuil minimum de tickets cumulés
@@ -253,7 +253,7 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       if ((count ?? 0) < MIN) {
         return reply
           .code(503)
-          .send({ error: 'Lancement en cours', message: 'Le loto Flash ouvre bientôt, revenez dans quelques jours !' });
+          .send({ code: 'SERVICE_STARTING', error: 'SERVICE_STARTING' });
       }
     }
 
@@ -262,9 +262,9 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       .select('balance_cdf')
       .eq('id', user_id)
       .single();
-    if (userErr || !user) return reply.code(404).send({ error: 'User not found' });
+    if (userErr || !user) return reply.code(404).send({ code: 'USER_NOT_FOUND', error: 'USER_NOT_FOUND' });
     if (Number(user.balance_cdf) < PRIX_FLASH) {
-      return reply.code(400).send({ error: 'Solde insuffisant' });
+      return reply.code(400).send({ code: 'INSUFFICIENT_BALANCE', error: 'INSUFFICIENT_BALANCE' });
     }
 
     const ticket_id = crypto.randomUUID();

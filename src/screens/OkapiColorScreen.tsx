@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Shuffle, Trash2, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { displayError } from '../lib/errors';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
 import OkapiColorDrawShow from '../components/okapi-color/OkapiColorDrawShow';
@@ -88,14 +90,18 @@ const STATUS_STYLE: Record<TicketStatus, string> = {
   cancelled:      'bg-zinc-700/30 border-zinc-700 text-zinc-500',
   jackpot_attente:'bg-red-500/15 border-red-500/40 text-red-400',
 };
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  pending: 'En attente', gagnant: 'Gagnant ✓', perdant: 'Perdant',
-  cancelled: 'Annulé', jackpot_attente: '🔴 Jackpot',
-};
 function StatusBadge({ status }: { status: TicketStatus }) {
+  const { t } = useTranslation();
+  const label: Record<TicketStatus, string> = {
+    pending:        t('okapi_color.status_pending'),
+    gagnant:        t('okapi_color.status_winner'),
+    perdant:        t('okapi_color.status_loser'),
+    cancelled:      t('okapi_color.status_cancelled'),
+    jackpot_attente: t('okapi_color.status_jackpot'),
+  };
   return (
     <span className={`text-[10px] uppercase tracking-widest font-semibold px-2 py-1 rounded-full border ${STATUS_STYLE[status]}`}>
-      {STATUS_LABEL[status]}
+      {label[status]}
     </span>
   );
 }
@@ -129,6 +135,7 @@ function TicketCard({ t }: { t: MyTicket }) {
 // Main component
 // ---------------------------------------------------------------------------
 export default function OkapiColorScreen() {
+  const { t } = useTranslation();
   const nav     = useNavigate();
   const session = getSession();
 
@@ -239,18 +246,23 @@ export default function OkapiColorScreen() {
     setBuyState('pending'); setBuyMsg('');
     try {
       await api.okapiColorBuyTicket(selected);
-      setBuyState('success'); setBuyMsg('Ticket enregistré !');
+      setBuyState('success'); setBuyMsg(t('okapi_color.ticket_registered'));
       setSelected([]);
       const newBal = await refreshBalance(session.id);
       setBalance(newBal);
       api.okapiColorMyCurrentTickets().then((r) => setMyTickets(r.tickets)).catch(() => {});
     } catch (e: any) {
-      setBuyState('error'); setBuyMsg(e.message || 'Erreur');
+      setBuyState('error'); setBuyMsg(displayError(t, e?.code, e?.message));
     }
   };
 
   const statusColor = status === 'open' ? '#00A86B' : status === 'closing' ? '#ef4444' : status === 'drawing' ? '#fbbf24' : '#9CA3AF';
-  const statusLabel = { open: '● EN DIRECT', closing: '● FERMETURE', drawing: '● TIRAGE', result: '● RÉSULTATS' }[status];
+  const statusLabel = {
+    open:    t('okapi_color.status_live'),
+    closing: t('okapi_color.status_closing'),
+    drawing: t('okapi_color.status_drawing'),
+    result:  t('okapi_color.status_result'),
+  }[status];
 
   // During result: time until betting reopens = time until the result window ends.
   // Result ends at drawn_at + resultDisplaySeconds. Since secs counts down to the
@@ -272,8 +284,8 @@ export default function OkapiColorScreen() {
           <ArrowLeft className="w-5 h-5 text-zinc-300" />
         </button>
         <div>
-          <div className="font-display text-lg tracking-widest leading-none" style={{ color: '#FFD700' }}>OKAPI COLOR</div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">Tirage live toutes les {intervalMin} min</div>
+          <div className="font-display text-lg tracking-widest leading-none" style={{ color: '#FFD700' }}>{t('okapi_color.header_title')}</div>
+          <div className="text-[10px] text-zinc-500 mt-0.5">{t('okapi_color.draw_interval', { count: intervalMin })}</div>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <button
@@ -284,7 +296,7 @@ export default function OkapiColorScreen() {
             {statusLabel}
           </button>
           <div className="text-right">
-            <div className="text-[10px] text-zinc-500">Solde</div>
+            <div className="text-[10px] text-zinc-500">{t('okapi_color.balance_label')}</div>
             <div className="text-sm font-bold" style={{ color: '#FFD700' }}>{balance.toLocaleString('fr-FR')} CDF</div>
           </div>
         </div>
@@ -306,7 +318,7 @@ export default function OkapiColorScreen() {
               className="font-display tracking-widest text-sm"
               style={{ color: '#00A86B' }}
             >
-              ✅ PARIS OUVERTS — JOUEZ MAINTENANT !
+              {t('okapi_color.bets_open')}
             </motion.div>
             <button onClick={() => setShowBetsOpen(false)} className="text-zinc-500 text-lg leading-none ml-3">×</button>
           </motion.div>
@@ -319,15 +331,15 @@ export default function OkapiColorScreen() {
         borderColor: jackpotAvailable ? 'rgba(239,68,68,0.4)' : 'rgba(255,140,0,0.2)',
       }}>
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-500">Jackpot</span>
-          {jackpotAvailable && <span className="text-[10px] text-red-400 font-bold animate-pulse">DISPONIBLE !</span>}
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500">{t('okapi_color.jackpot_label')}</span>
+          {jackpotAvailable && <span className="text-[10px] text-red-400 font-bold animate-pulse">{t('okapi_color.jackpot_available_badge')}</span>}
         </div>
         <div className="font-display text-3xl mt-0.5" style={{ color: jackpotAvailable ? '#ff5555' : '#FFD700' }}>
           {jackpotPrizeCdf.toLocaleString('fr-FR')} CDF
         </div>
         {potCdf > 0 && (
           <div className="text-[10px] text-zinc-500 mt-1">
-            Pot actuel : {potCdf.toLocaleString('fr-FR')} CDF
+            {t('okapi_color.jackpot_pot_actuel', { amount: potCdf.toLocaleString('fr-FR') })}
           </div>
         )}
         {!jackpotAvailable && (
@@ -344,7 +356,7 @@ export default function OkapiColorScreen() {
           className="flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold tracking-wide"
           style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444' }}
         >
-          <span>📺</span> VOIR LE TIRAGE LIVE
+          {t('okapi_color.see_live')}
         </button>
       </div>
 
@@ -361,16 +373,16 @@ export default function OkapiColorScreen() {
               {status === 'closing' ? (
                 <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 0.7, repeat: Infinity }}
                   className="font-display text-xl text-red-400 tracking-widest">
-                  ⚠ PARIS FERMÉS — TIRAGE IMMINENT
+                  {t('okapi_color.bets_closed')}
                 </motion.div>
               ) : (
                 <>
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Prochain tirage dans</div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">{t('okapi_color.next_draw')}</div>
                   <div className="font-display text-5xl tracking-wider" style={{ color: secs < 60 ? '#ef4444' : '#fff' }}>
                     {minStr}:{secStr}
                   </div>
                   <div className="text-[10px] text-zinc-600 mt-1">
-                    Votre ticket jouera le prochain tirage ({live?.publicStats.ticketsCount ?? 0} ticket{(live?.publicStats.ticketsCount ?? 0) !== 1 ? 's' : ''} joués)
+                    {t('okapi_color.tickets_in_play', { count: live?.publicStats.ticketsCount ?? 0 })}
                   </div>
                 </>
               )}
@@ -379,7 +391,7 @@ export default function OkapiColorScreen() {
             {/* Number grid */}
             <div className="mx-4 mt-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-500">Choisis 6 numéros (1–24)</span>
+                <span className="text-[10px] uppercase tracking-widest text-zinc-500">{t('okapi_color.choose_numbers')}</span>
                 <span className="font-display text-lg" style={{ color: '#FFD700' }}>{selected.length}/6</span>
               </div>
               <div className="grid grid-cols-6 gap-1.5">
@@ -397,11 +409,11 @@ export default function OkapiColorScreen() {
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <motion.button whileTap={{ scale: 0.97 }} onClick={quickPick} disabled={isBlocked}
                   className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2 text-zinc-200 disabled:opacity-40">
-                  <Shuffle className="w-4 h-4" /> QUICK PICK
+                  <Shuffle className="w-4 h-4" /> {t('okapi_color.quick_pick')}
                 </motion.button>
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setSelected([]); setBuyState('idle'); }} disabled={selected.length === 0}
                   className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2 text-zinc-200 disabled:opacity-40">
-                  <Trash2 className="w-4 h-4" /> EFFACER
+                  <Trash2 className="w-4 h-4" /> {t('okapi_color.clear')}
                 </motion.button>
               </div>
             </div>
@@ -420,7 +432,7 @@ export default function OkapiColorScreen() {
                 style={isFull && !isBlocked && buyState !== 'pending'
                   ? { background: 'linear-gradient(135deg,#b91c1c,#ef4444)', boxShadow: '0 0 20px rgba(239,68,68,0.35)' }
                   : { background: '#27272a' }}>
-                {buyState === 'pending' ? <Loader2 className="w-5 h-5 animate-spin" /> : `JOUER — ${price.toLocaleString('fr-FR')} CDF`}
+                {buyState === 'pending' ? <Loader2 className="w-5 h-5 animate-spin" /> : t('okapi_color.play_button', { price: price.toLocaleString('fr-FR') })}
               </motion.button>
             </div>
           </motion.div>
@@ -441,23 +453,23 @@ export default function OkapiColorScreen() {
             {status === 'result' && live?.lastDraw && (
             <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
               <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
-                Résultats {live.lastDraw.drawNumber ? `— Tirage #${live.lastDraw.drawNumber}` : ''}
+                {t('okapi_color.results_title')}{live.lastDraw.drawNumber ? ` — ${t('okapi_color.draw_number_label', { number: live.lastDraw.drawNumber })}` : ''}
               </div>
               <div className="flex gap-4 mt-3 pt-3 border-t border-zinc-800">
                 <div>
-                  <div className="text-[10px] text-zinc-500">Gagnants</div>
+                  <div className="text-[10px] text-zinc-500">{t('okapi_color.winners_label')}</div>
                   <div className="font-display text-lg">{live.lastDraw.winnerCount}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-zinc-500">Distribué</div>
+                  <div className="text-[10px] text-zinc-500">{t('okapi_color.distributed_label')}</div>
                   <div className="font-display text-lg text-emerald-400">{live.lastDraw.totalPaidCdf.toLocaleString('fr-FR')} CDF</div>
                 </div>
                 <div className="ml-auto text-right">
-                  <div className="text-[10px] text-zinc-500">Prochain tirage</div>
+                  <div className="text-[10px] text-zinc-500">{t('okapi_color.next_draw_label')}</div>
                   <div className="font-display text-lg">{minStr}:{secStr}</div>
                   {secsUntilOpen > 0 && (
                     <div className="text-[10px] mt-0.5" style={{ color: '#fbbf24' }}>
-                      Paris dans {openMinStr}:{openSecStr}
+                      {t('okapi_color.bets_in', { time: `${openMinStr}:${openSecStr}` })}
                     </div>
                   )}
                 </div>
@@ -469,7 +481,7 @@ export default function OkapiColorScreen() {
             {status === 'result' && myTickets.length > 0 && (
               <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
                 <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
-                  Vos tickets ({myTickets.length})
+                  {t('okapi_color.your_tickets', { count: myTickets.length })}
                 </div>
                 <div className="space-y-2">
                   {myTickets.map((t) => <TicketCard key={t.id} t={t} />)}
@@ -484,7 +496,7 @@ export default function OkapiColorScreen() {
               }}
                 className="w-full h-14 rounded-2xl font-display text-xl tracking-widest text-white"
                 style={{ background: 'linear-gradient(135deg,#b91c1c,#ef4444)', boxShadow: '0 0 16px rgba(239,68,68,0.3)' }}>
-                PRÉPARER LE PROCHAIN TICKET →
+                {t('okapi_color.prepare_next')}
               </motion.button>
             )}
           </motion.div>
@@ -495,7 +507,7 @@ export default function OkapiColorScreen() {
       {/* Payout table */}
       <div className="mx-4 mt-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 overflow-hidden">
         <button onClick={() => setShowPayouts((v) => !v)} className="w-full flex items-center justify-between p-4">
-          <span className="text-[10px] uppercase tracking-widest text-zinc-400">Table des gains</span>
+          <span className="text-[10px] uppercase tracking-widest text-zinc-400">{t('okapi_color.payout_table')}</span>
           <span className="text-zinc-500 text-lg">{showPayouts ? '−' : '+'}</span>
         </button>
         <AnimatePresence initial={false}>
@@ -508,7 +520,7 @@ export default function OkapiColorScreen() {
                     <span className="text-xs font-semibold" style={{ color: '#FFD700' }}>{row.gain}</span>
                   </div>
                 ))}
-                <p className="text-[10px] text-zinc-600 pt-1 text-center">Ticket {price.toLocaleString('fr-FR')} CDF — Taux de retour ~62 %</p>
+                <p className="text-[10px] text-zinc-600 pt-1 text-center">{t('okapi_color.payout_return', { price: price.toLocaleString('fr-FR') })}</p>
               </div>
             </motion.div>
           )}
@@ -518,7 +530,7 @@ export default function OkapiColorScreen() {
       {/* My tickets for current slot (outside RESULT) */}
       {status !== 'result' && myTickets.length > 0 && (
         <div className="mx-4 mt-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">Vos tickets ce tirage ({myTickets.length})</div>
+          <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">{t('okapi_color.your_tickets_draw', { count: myTickets.length })}</div>
           <div className="space-y-2">
             {myTickets.map((t) => <TicketCard key={t.id} t={t} />)}
           </div>
@@ -529,14 +541,14 @@ export default function OkapiColorScreen() {
       {live?.recentDraws && live.recentDraws.length > 0 && (
         <div className="mx-4 mt-4 mb-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4">
           <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3">
-            Derniers tirages ({live.recentDraws.length})
+            {t('okapi_color.recent_draws', { count: live.recentDraws.length })}
           </div>
           <div className="space-y-2">
             {live.recentDraws.slice(0, 10).map((d, i) => (
               <div key={i} className="rounded-xl bg-zinc-950 border border-zinc-800 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-mono text-zinc-500">
-                    {d.drawNumber ? `Tirage #${d.drawNumber}` : d.slotKey ?? '—'}
+                    {d.drawNumber ? t('okapi_color.draw_number', { number: d.drawNumber }) : d.slotKey ?? '—'}
                   </span>
                   <span className="text-[10px] text-zinc-600">
                     {new Date(d.drawnAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
