@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, User, Ticket, Zap, Mountain } from 'lucide-react';
+import { Home, User, Zap, Mountain } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 type NavItem = {
@@ -11,7 +11,6 @@ type NavItem = {
 
 const items: NavItem[] = [
   { to: '/', icon: Home, label: 'Accueil' },
-  { to: '/loto', icon: Ticket, label: 'Loto' },
   { to: '/flash', icon: Zap, label: 'Flash' },
   { to: '/scratch', emoji: '🎫', label: 'Scratch' },
   { to: '/climb', icon: Mountain, label: 'Climb' },
@@ -21,7 +20,7 @@ const items: NavItem[] = [
 export default function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-bg/95 backdrop-blur border-t border-zinc-900 z-30">
-      <ul className="grid grid-cols-6 pb-[env(safe-area-inset-bottom)]">
+      <ul className="grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
         {items.map(({ to, icon: Icon, emoji, label }) => (
           <li key={to}>
             <NavLink

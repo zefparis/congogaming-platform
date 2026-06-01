@@ -33,7 +33,6 @@ export default function HomeScreen() {
   const nav = useNavigate();
   const session = getSession();
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
-  const [lotoPot, setLotoPot] = useState<number>(0);
   const [flashPot, setFlashPot] = useState<number>(0);
   const [flashData, setFlashData] = useState<FlashLatest | null>(null);
   const [okapiColorPot, setOkapiColorPot] = useState<number>(0);
@@ -41,7 +40,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
-    api.lotoLatest().then((r) => setLotoPot(Number(r.pot_cdf || 0))).catch(() => {});
     api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
     api
       .flashLatest()
@@ -411,143 +409,6 @@ export default function HomeScreen() {
               style={ctaStyle}
             >
               GRIMPER MAINTENANT →
-            </motion.button>
-          </div>
-        </div>
-
-        {/* LOTO CONGO — premium hero card with okapi casino background */}
-        <div
-          onClick={() => nav('/loto')}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 16,
-            minHeight: 280,
-            cursor: 'pointer',
-          }}
-        >
-          <img
-            src="/images/loto-okapi.png"
-            alt="Loto Congo"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center 45%',
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 55%)',
-            }}
-          />
-          {/* Top section: title + jackpot badge, pinned to top */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              padding: 16,
-              zIndex: 3,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'Bebas Neue',
-                fontSize: 38,
-                color: '#FFFFFF',
-                lineHeight: 1,
-                letterSpacing: 2,
-                textShadow:
-                  '0 2px 12px rgba(0,0,0,1), 0 0 40px rgba(0,0,0,0.9)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-              }}
-            >
-              <img
-                src="/images/okapi/drapeau.PNG"
-                alt="DRC Flag"
-                style={{
-                  display: 'inline-block',
-                  animation: 'flag-float 2s ease-in-out infinite',
-                  borderRadius: 3,
-                  flexShrink: 0,
-                  width: 36,
-                  height: 24,
-                  objectFit: 'contain',
-                }}
-              />
-              LOTO CONGO
-            </div>
-            {lotoPot >= 5_000_000 ? (
-              <div
-                className="pulse-red"
-                style={{
-                  color: '#FF3333',
-                  fontSize: 16,
-                  fontWeight: '800',
-                  letterSpacing: '1px',
-                  marginTop: 10,
-                }}
-              >
-                🔥 Jackpot disponible
-              </div>
-            ) : (
-              <div
-                className="pulse-red"
-                style={{
-                  color: '#FF3333',
-                  fontSize: 16,
-                  fontWeight: '800',
-                  letterSpacing: '1px',
-                  marginTop: 80,
-                }}
-              >
-                🏆 Jackpot en cours
-              </div>
-            )}
-          </div>
-
-          {/* Bottom section: button, pinned to bottom */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              padding: 16,
-              zIndex: 3,
-            }}
-          >
-            <motion.button
-              whileHover={{ filter: 'brightness(1.1)' }}
-              whileTap={{ scale: 0.98, filter: 'brightness(1.1)' }}
-              onClick={(e) => { e.stopPropagation(); nav('/loto'); }}
-              style={{
-                background: 'rgba(255,255,255,0.18)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.4)',
-                color: '#FFFFFF',
-                fontFamily: 'Bebas Neue',
-                fontWeight: '800',
-                fontSize: 15,
-                borderRadius: '14px',
-                width: '100%',
-                padding: '14px 0',
-                letterSpacing: '2px',
-                textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-                cursor: 'pointer',
-              }}
-            >
-              JOUER MAINTENANT →
             </motion.button>
           </div>
         </div>

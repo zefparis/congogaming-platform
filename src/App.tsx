@@ -103,7 +103,7 @@ function KycRoute() {
 
 function AppRoutes() {
   const location = useLocation();
-  const showNav = ['/', '/loto', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
+  const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
   return (
     <>
       <AnimatePresence mode="wait">
