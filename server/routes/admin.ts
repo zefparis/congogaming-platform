@@ -1465,10 +1465,10 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   app.post('/api/admin/okapi-color/draw', async (req, reply) => {
     const { executerTirageOkapiColor, getOkapiColorSlotBoundaries } = await import('./okapi-color.js');
-    const { prevSlot } = getOkapiColorSlotBoundaries();
-    const acquired = await acquireJobLock('okapi_color_draw', `admin:oc:${prevSlot}`);
+    const { slotKey } = getOkapiColorSlotBoundaries();
+    const acquired = await acquireJobLock('okapi_color_draw', `admin:oc:${slotKey}`);
     if (!acquired) {
-      return reply.code(409).send({ error: 'Draw already in progress for this slot', slot_key: prevSlot });
+      return reply.code(409).send({ error: 'Draw already in progress for this slot', slot_key: slotKey });
     }
     try {
       const result = await executerTirageOkapiColor({ reason: 'manual' });
