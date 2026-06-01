@@ -272,7 +272,6 @@ export default function HomeScreen() {
               height: '100%',
               objectFit: 'cover',
               objectPosition: 'center center',
-              opacity: 0.75,
             }}
           />
 
@@ -282,7 +281,7 @@ export default function HomeScreen() {
               position: 'absolute',
               inset: 0,
               background:
-                'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.05) 100%)',
+                'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 55%)',
             }}
           />
 
@@ -369,7 +368,6 @@ export default function HomeScreen() {
               height: '100%',
               objectFit: 'cover',
               objectPosition: 'center center',
-              opacity: 0.85,
             }}
           />
           <div
@@ -377,7 +375,7 @@ export default function HomeScreen() {
               position: 'absolute',
               inset: 0,
               background:
-                'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.05) 100%)',
+                'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 55%)',
             }}
           />
 
@@ -688,7 +686,6 @@ export default function HomeScreen() {
                 height: '100%',
                 objectFit: 'cover',
                 objectPosition: 'right center',
-                opacity: 0.85,
                 zIndex: 0,
               }}
             />
@@ -698,7 +695,7 @@ export default function HomeScreen() {
               style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(to right, rgba(10,2,2,0.92) 0%, rgba(10,2,2,0.65) 55%, rgba(10,2,2,0.15) 100%)',
+                background: 'linear-gradient(to right, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.40) 55%, rgba(0,0,0,0.05) 100%)',
                 zIndex: 1,
               }}
             />
@@ -757,7 +754,6 @@ export default function HomeScreen() {
               height: '100%',
               objectFit: 'cover',
               objectPosition: 'left center',
-              opacity: 0.9,
               zIndex: 0,
             }}
           />
@@ -768,7 +764,7 @@ export default function HomeScreen() {
               position: 'absolute',
               inset: 0,
               background:
-                'linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.1) 100%)',
+                'linear-gradient(to right, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.38) 50%, rgba(0,0,0,0.05) 100%)',
             }}
           />
 
