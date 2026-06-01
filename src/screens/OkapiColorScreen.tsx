@@ -210,7 +210,8 @@ export default function OkapiColorScreen() {
   }, [live?.currentDraw.status]);
 
   const status     = live?.currentDraw.status ?? 'open';
-  const isBlocked  = status === 'closing' || status === 'drawing';
+  const isBlocked  = status === 'closing' || status === 'drawing'
+    || (live != null && Date.now() >= new Date(live.currentDraw.closeAt).getTime());
   const isFull     = selected.length === 6;
   const jackpotPrizeCdf = live?.jackpotThresholdCdf ?? 250_000;
   const potCdf           = live?.jackpotCdf ?? 0;

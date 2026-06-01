@@ -738,6 +738,28 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       idempotency_key: `okapi-color:ticket:${ticket_id}:buy`,
     });
 
+    // Re-check state after ledger debit (closes the ~200ms TOCTOU window)
+    const secsSinceLastDraw2 = lastT?.drawn_at
+      ? (Date.now() - new Date(lastT.drawn_at).getTime()) / 1000
+      : Infinity;
+    const { state: drawState2 } = computeOkapiColorState(new Date(), secsSinceLastDraw2);
+    if (drawState2 === 'closing' || drawState2 === 'drawing') {
+      await recordLedgerEntry({
+        user_id,
+        direction:       'credit',
+        amount:          OKAPI_COLOR_CONFIG.ticketPriceCdf,
+        currency:        'CDF',
+        reason:          'refund_toctou_closing',
+        reference_type:  'okapi_color_ticket',
+        reference_id:    ticket_id,
+        idempotency_key: `toctou_refund_${ticket_id}`,
+      });
+      return reply.code(423).send({
+        error: 'Tirage en cours — paris fermés. Réessayez dans quelques secondes.',
+        code:  'DRAW_IN_PROGRESS',
+      });
+    }
+
     // Attacher le ticket au slot courant (calculé côté serveur)
     const { slotKey: ticketSlotKey, drawAt: ticketDrawAt } = getOkapiColorSlotBoundaries();
 
