@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Phone, Lock, Clock } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { useTranslation } from 'react-i18next';
-import { AuthApiError, detectOperator, linkAgent, loginUser, validateCongoPhone, getSession } from '../lib/auth';
+import { AuthApiError, detectOperator, loginUser, validateCongoPhone, getSession } from '../lib/auth';
 import { displayError } from '../lib/errors';
 
 function formatRemaining(seconds: number): string {
@@ -18,11 +18,6 @@ function formatRemaining(seconds: number): string {
 export default function LoginScreen() {
   const { t } = useTranslation();
   const nav = useNavigate();
-  const [searchParams] = useSearchParams();
-  const agentRef = (() => {
-    const ref = searchParams.get('ref')?.toUpperCase() ?? '';
-    return /^AG-[A-Z0-9]{6}$/.test(ref) ? ref : null;
-  })();
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [step, setStep] = useState<'phone' | 'pin'>('phone');
@@ -75,7 +70,6 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await loginUser(phone, pin);
-      if (agentRef) await linkAgent(agentRef);
       // KYC is scoped to /jouer (PredictStreet) only — see
       // `PredictStreetRoute` in App.tsx. Always land returning users
       // on home; the KYC scan is triggered on the FIFA card tap.

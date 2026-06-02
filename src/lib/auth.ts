@@ -95,13 +95,6 @@ export async function registerUser(phone: string, pin: string, referralCode?: st
   return user;
 }
 
-export async function linkAgent(agentRef: string): Promise<{ linked: boolean }> {
-  return authRequest<{ ok: boolean; linked: boolean }>('/api/auth/link-agent', {
-    method: 'POST',
-    body: JSON.stringify({ agentRef }),
-  }).then(r => ({ linked: r.linked })).catch(() => ({ linked: false }));
-}
-
 export async function loginUser(phone: string, pin: string): Promise<SessionUser> {
   const { user } = await authRequest<{ user: SessionUser }>('/api/auth/login', {
     method: 'POST',

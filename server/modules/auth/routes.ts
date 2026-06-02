@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { CongoPhoneSchema, LoginSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
-import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, linkAgentRef, loginUser, registerUser, resetPinByPhone, updateDisplayName } from './service.js';
+import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, loginUser, registerUser, resetPinByPhone, updateDisplayName } from './service.js';
 
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
 
@@ -161,23 +161,6 @@ const authRoutes: FastifyPluginAsync = async (app) => {
 
   const ProfileSchema = z.object({
     display_name: z.union([z.string().min(2).max(24), z.null()]),
-  });
-
-  app.post('/api/auth/link-agent', {
-    preHandler: app.requireAuth,
-    config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
-  }, async (req, reply) => {
-    const { agentRef } = (req.body as any) || {};
-    if (!agentRef || !/^AG-[A-Z0-9]{6}$/i.test(String(agentRef).trim())) {
-      return reply.code(400).send({ error: 'Format agentRef invalide' });
-    }
-    try {
-      const result = await linkAgentRef(req.user.id, String(agentRef).trim());
-      return reply.send({ ok: true, linked: result.linked });
-    } catch (error) {
-      req.log.error({ err: error }, 'link-agent failed');
-      return reply.code(500).send({ error: 'LINK_AGENT_FAILED' });
-    }
   });
 
   app.patch('/api/auth/me/profile', {
