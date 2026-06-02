@@ -4,6 +4,7 @@ import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { OkapiColorTicketBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
+import { recordAgentCommission } from '../lib/agent.js';
 import { env } from '../env.js';
 
 // =============================================================
@@ -798,6 +799,7 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     // Référral (best-effort)
     await onWagerPlaced(app.log, user_id, OKAPI_COLOR_CONFIG.ticketPriceCdf, 'okapi_color', ticket.id);
+    await recordAgentCommission(user_id, ticket.id, 'okapi_color', OKAPI_COLOR_CONFIG.ticketPriceCdf);
 
     return reply.code(201).send({
       ticket_id:   ticket.id,

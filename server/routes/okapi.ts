@@ -6,6 +6,7 @@ import { recordLedgerEntry } from '../lib/ledger.js'
 import { getSupabase } from '../lib/supabase.js'
 import { OkapiBetBodySchema, OkapiCashoutBodySchema } from '../lib/validation.js'
 import { onWagerPlaced } from '../lib/referral.js'
+import { recordAgentCommission } from '../lib/agent.js'
 
 type WSLike = {
   send: (data: string) => void
@@ -181,6 +182,7 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
 
     // Best-effort referral tier check; bet_id ensures idempotency.
     await onWagerPlaced(app.log, user_id, amount_cdf, 'okapi', bet_id)
+    await recordAgentCommission(user_id, bet_id, 'okapi', amount_cdf)
 
     return reply.send({ bet_id, balance })
   })

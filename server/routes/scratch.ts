@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { generateGrid } from '../lib/scratchEngine.js';
 import { ScratchBuyBodySchema, ScratchClaimBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
+import { recordAgentCommission } from '../lib/agent.js';
 
 const ALLOWED_BETS = new Set([500, 1000, 2000, 5000]);
 
@@ -70,6 +71,7 @@ export default async function scratchRoutes(app: FastifyInstance) {
 
         // Best-effort referral tier check; ticket id ensures idempotency.
         await onWagerPlaced(req.log, user_id, Number(bet), 'scratch', String(ticket.id));
+        await recordAgentCommission(user_id, String(ticket.id), 'scratch', Number(bet));
 
         return reply.send({
           ticket_id: ticket.id,

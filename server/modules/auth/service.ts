@@ -68,7 +68,7 @@ export async function updateDisplayName(userId: string, raw: string | null): Pro
   return sanitizeUser(data);
 }
 
-export async function registerUser(input: { phone: string; pin: string; referralCode?: string | null }): Promise<AuthUser> {
+export async function registerUser(input: { phone: string; pin: string; referralCode?: string | null; agentRef?: string | null }): Promise<AuthUser> {
   const pinHash = await argon2.hash(input.pin, {
     type: argon2.argon2id,
     memoryCost: 19_456,
@@ -88,6 +88,19 @@ export async function registerUser(input: { phone: string; pin: string; referral
     // We silently ignore an invalid code rather than blocking registration.
   }
 
+  // Resolve agent QR code to agent UUID (silently ignored if invalid/suspended).
+  let agentRefId: string | null = null;
+  const agentCode = input.agentRef?.trim().toUpperCase();
+  if (agentCode) {
+    const { data: agentRow } = await supabaseAdmin
+      .from('agents')
+      .select('id')
+      .eq('qr_code', agentCode)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (agentRow?.id) agentRefId = String(agentRow.id);
+  }
+
   // Generate a unique referral code for this new user (RPC handles uniqueness).
   const { data: codeRow, error: codeErr } = await supabaseAdmin.rpc('generate_referral_code');
   if (codeErr) throw new Error(codeErr.message);
@@ -104,7 +117,8 @@ export async function registerUser(input: { phone: string; pin: string; referral
       auth_failed_count: 0,
       auth_locked_until: null,
       referral_code: newReferralCode,
-      referred_by: referredBy,
+      referred_by:   referredBy,
+      agent_ref:     agentRefId,
     })
     .select('id, phone, display_name, balance_cdf, kyc_status, blocked, referral_code')
     .single();

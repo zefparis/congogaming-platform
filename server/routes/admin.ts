@@ -1564,4 +1564,154 @@ export default async function adminRoutes(app: FastifyInstance) {
       .header('Content-Disposition', `attachment; filename="transactions-${Date.now()}.csv"`);
     return reply.send(header + rows.join('\n') + '\n');
   });
+
+  // ================================================================
+  // AGENTS
+  // ================================================================
+
+  function generateAgentCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return 'AG-' + Array.from({ length: 6 }, () =>
+      chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+
+  // GET /api/admin/agents — list all agents with stats
+  app.get('/api/admin/agents', async (_req, reply) => {
+    const { data, error } = await supabaseAdmin
+      .from('agents')
+      .select('*, agent_commissions(count)')
+      .order('created_at', { ascending: false });
+    if (error) return reply.code(500).send({ error: error.message });
+    return reply.send({ agents: data || [] });
+  });
+
+  // POST /api/admin/agents — create a new agent
+  app.post('/api/admin/agents', { preHandler: requireSuperAdmin }, async (req, reply) => {
+    const { display_name, zone, commission_rate } = (req.body as any) || {};
+    if (!display_name?.trim()) {
+      return reply.code(400).send({ error: 'display_name requis' });
+    }
+    let qr_code = '';
+    for (let i = 0; i < 10; i++) {
+      const candidate = generateAgentCode();
+      const { data: exists } = await supabaseAdmin
+        .from('agents').select('id').eq('qr_code', candidate).maybeSingle();
+      if (!exists) { qr_code = candidate; break; }
+    }
+    if (!qr_code) return reply.code(500).send({ error: 'Could not generate unique QR code' });
+
+    const { data, error } = await supabaseAdmin
+      .from('agents')
+      .insert({
+        display_name: String(display_name).trim(),
+        qr_code,
+        zone:            zone ? String(zone).trim() : null,
+        commission_rate: commission_rate != null ? Number(commission_rate) : 0.05,
+      })
+      .select()
+      .single();
+    if (error) return reply.code(500).send({ error: error.message });
+    await audit(req, 'agent_create', null, null, null, { qr_code, display_name });
+    return reply.code(201).send(data);
+  });
+
+  // PATCH /api/admin/agents/:id — update status / zone / commission_rate
+  app.patch<{ Params: { id: string } }>(
+    '/api/admin/agents/:id',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const { id } = req.params;
+      const { status, zone, commission_rate } = (req.body as any) || {};
+      const updates: Record<string, unknown> = {};
+      if (status        !== undefined) updates.status          = status;
+      if (zone          !== undefined) updates.zone            = zone;
+      if (commission_rate !== undefined) updates.commission_rate = Number(commission_rate);
+      if (!Object.keys(updates).length) {
+        return reply.code(400).send({ error: 'Nothing to update' });
+      }
+      const { data, error } = await supabaseAdmin
+        .from('agents').update(updates).eq('id', id).select().single();
+      if (error) return reply.code(500).send({ error: error.message });
+      await audit(req, 'agent_update', null, null, null, { id, ...updates });
+      return reply.send(data);
+    },
+  );
+
+  // GET /api/admin/agents/:id/commissions — paginated commission list
+  app.get<{ Params: { id: string } }>(
+    '/api/admin/agents/:id/commissions',
+    async (req, reply) => {
+      const { id } = req.params;
+      const { data, error } = await supabaseAdmin
+        .from('agent_commissions')
+        .select('*')
+        .eq('agent_id', id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) return reply.code(500).send({ error: error.message });
+      return reply.send({ commissions: data || [] });
+    },
+  );
+
+  // POST /api/admin/agents/:id/pay — mark all pending commissions as paid
+  app.post<{ Params: { id: string } }>(
+    '/api/admin/agents/:id/pay',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const { id } = req.params;
+      const { error } = await supabaseAdmin
+        .from('agent_commissions')
+        .update({ status: 'paid' })
+        .eq('agent_id', id)
+        .eq('status', 'pending');
+      if (error) return reply.code(500).send({ error: error.message });
+      await audit(req, 'agent_pay', null, null, null, { agent_id: id });
+      return reply.send({ ok: true });
+    },
+  );
+
+  // ----------------------------------------------------------------
+  // GET /api/agents/:qrCode — PUBLIC stats for AgentDashboard
+  // Not under /api/admin/ — no admin auth required
+  // ----------------------------------------------------------------
+  app.get<{ Params: { qrCode: string } }>(
+    '/api/agents/:qrCode',
+    async (req, reply) => {
+      const { qrCode } = req.params;
+      const { data: agent, error } = await supabaseAdmin
+        .from('agents')
+        .select('id, display_name, qr_code, zone, status, total_earned_cdf, created_at')
+        .eq('qr_code', qrCode.toUpperCase())
+        .eq('status', 'active')
+        .single();
+      if (error || !agent) return reply.code(404).send({ error: 'Agent introuvable' });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data: todayRows } = await supabaseAdmin
+        .from('agent_commissions')
+        .select('commission_cdf, status')
+        .eq('agent_id', agent.id)
+        .gte('created_at', today.toISOString());
+
+      const rows = todayRows || [];
+      const today_earned_cdf  = rows.reduce((s, c) => s + Number(c.commission_cdf), 0);
+      const pending_cdf       = rows.filter(c => c.status === 'pending')
+        .reduce((s, c) => s + Number(c.commission_cdf), 0);
+
+      const { data: recentRows } = await supabaseAdmin
+        .from('agent_commissions')
+        .select('ticket_type, ticket_amount_cdf, commission_cdf, status, created_at')
+        .eq('agent_id', agent.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      return reply.send({
+        agent,
+        today_earned_cdf,
+        pending_cdf,
+        recent: recentRows || [],
+      });
+    },
+  );
 }

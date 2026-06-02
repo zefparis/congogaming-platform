@@ -4,6 +4,7 @@ import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { FlashTicketBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
+import { recordAgentCommission } from '../lib/agent.js';
 import { env } from '../env.js';
 
 const PRIX_FLASH = 1000;
@@ -309,6 +310,7 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     // Best-effort referral tier check; ticket id ensures idempotency.
     await onWagerPlaced(app.log, user_id, PRIX_FLASH, 'flash', ticket.id);
+    await recordAgentCommission(user_id, ticket.id, 'flash', PRIX_FLASH);
 
     return reply.send({
       ticket_id: ticket.id,

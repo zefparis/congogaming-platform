@@ -30,6 +30,13 @@ export const RegisterSchema = z.object({
     .regex(/^[A-Z0-9]{6,12}$/, 'Code parrain invalide')
     .optional()
     .nullable(),
+  agentRef: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^AG-[A-Z0-9]{6}$/, 'Code agent invalide')
+    .optional()
+    .nullable(),
 });
 
 export const LoginSchema = z.object({

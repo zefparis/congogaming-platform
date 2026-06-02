@@ -137,6 +137,30 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return (await res.text()) as any;
 }
 
+export interface Agent {
+  id: string;
+  user_id: string | null;
+  display_name: string;
+  qr_code: string;
+  zone: string | null;
+  status: 'active' | 'suspended';
+  commission_rate: number;
+  total_earned_cdf: number;
+  created_at: string;
+}
+
+export interface AgentCommission {
+  id: string;
+  agent_id: string;
+  user_id: string;
+  ticket_id: string;
+  ticket_type: string;
+  ticket_amount_cdf: number;
+  commission_cdf: number;
+  status: 'pending' | 'paid';
+  created_at: string;
+}
+
 export const adminApi = {
   authenticate: (secret: string, phone?: string) =>
     request<{ token: string; expires_at: number; role?: 'admin' | 'super_admin' }>('/api/admin/auth', {
@@ -523,6 +547,21 @@ export const adminApi = {
       '/api/admin/okapi-color/jackpot/credit',
       { method: 'POST', body: JSON.stringify({ delta_cdf }) },
     ),
+
+  agentsList: () =>
+    request<{ agents: Agent[] }>('/api/admin/agents'),
+
+  agentCreate: (body: { display_name: string; zone?: string; commission_rate?: number }) =>
+    request<Agent>('/api/admin/agents', { method: 'POST', body: JSON.stringify(body) }),
+
+  agentUpdate: (id: string, body: { status?: string; zone?: string; commission_rate?: number }) =>
+    request<Agent>(`/api/admin/agents/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  agentCommissions: (id: string) =>
+    request<{ commissions: AgentCommission[] }>(`/api/admin/agents/${id}/commissions`),
+
+  agentPay: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/agents/${id}/pay`, { method: 'POST' }),
 
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
     const qs = new URLSearchParams();

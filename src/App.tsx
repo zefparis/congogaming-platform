@@ -13,6 +13,7 @@ import AccountScreen from './screens/AccountScreen';
 import LotoScreen from './screens/LotoScreen';
 import OkapiColorScreen from './screens/OkapiColorScreen';
 import OkapiColorTVScreen from './screens/OkapiColorTVScreen';
+import AgentDashboard from './screens/AgentDashboard';
 import FlashScreen from './screens/FlashScreen';
 import ScratchScreen from './screens/ScratchScreen';
 import LegalScreen from './screens/LegalScreen';
@@ -153,6 +154,7 @@ function AppShell() {
   // the 430px mobile shell, and must not show the player BottomNav.
   const isAdmin = location.pathname.startsWith('/admin');
   const isTV    = location.pathname.startsWith('/tv');
+  const isAgent = location.pathname.startsWith('/agent');
   if (isAdmin) {
     return (
       <Routes>
@@ -164,6 +166,13 @@ function AppShell() {
     return (
       <Routes>
         <Route path="/tv/okapi-color" element={<OkapiColorTVScreen />} />
+      </Routes>
+    );
+  }
+  if (isAgent) {
+    return (
+      <Routes>
+        <Route path="/agent/:qrCode" element={<AgentDashboard />} />
       </Routes>
     );
   }
