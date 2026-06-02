@@ -168,8 +168,9 @@ export function resolveOkapiColorAdminSecret(e: { OKAPI_COLOR_ADMIN_SECRET?: str
 }
 
 // Résout le slot à tirer. Si slotKey est fourni explicitement, il est utilisé
-// tel quel (récupération/manuel). Sinon on retombe sur le slot qui vient de se
-// fermer (slot précédent), comportement cron historique.
+// tel quel (récupération/manuel). Sinon on utilise le slot courant (identifié
+// par son heure de tirage = floor(now/iv)*iv), qui correspond au slot qui vient
+// de se fermer quand le worker se déclenche exactement à la frontière de slot.
 export function resolveDrawSlotKey(
   options: { slotKey?: string | number } = {},
   now: Date = new Date(),
@@ -177,9 +178,9 @@ export function resolveDrawSlotKey(
   if (options.slotKey != null && String(options.slotKey).length > 0) {
     return String(options.slotKey);
   }
-  const iv         = getIntervalMs();
-  const prevSlotMs = Math.floor(now.getTime() / iv) * iv - iv;
-  return formatSlotKey(new Date(prevSlotMs));
+  const iv           = getIntervalMs();
+  const currentSlotMs = Math.floor(now.getTime() / iv) * iv;
+  return formatSlotKey(new Date(currentSlotMs));
 }
 
 function formatSlotKey(d: Date): string {
@@ -202,7 +203,7 @@ export function getOkapiColorSlotBoundaries(at: Date = new Date()): {
     slotStart: new Date(startMs),
     drawAt:    new Date(drawMs),
     closeAt:   new Date(drawMs - getCloseBeforeMs()),
-    slotKey:   formatSlotKey(new Date(startMs)),
+    slotKey:   formatSlotKey(new Date(drawMs)),
   };
 }
 
