@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 const LANGUAGES = [
   { code: 'fr', label: 'FR' },
   { code: 'ln', label: 'LN' },
-  // future: { code: 'sw', label: 'SW' },
+  { code: 'sw', label: 'SW' },
   // future: { code: 'kg', label: 'KG' },
 ];
 
