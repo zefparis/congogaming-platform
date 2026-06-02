@@ -115,7 +115,7 @@ function OpenScreen({ live, secs, qrUrl, playUrl }: { live: LiveData; secs: numb
             transition={{ duration: 1.5, repeat: Infinity }}
             style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(28px,6vw,64px)', color: isJackpotReady ? '#ef4444' : '#FFD700', lineHeight: 1 }}
           >
-            {live.jackpotThresholdCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 'clamp(14px,3vw,32px)' }}>CDF</span>
+            {live.jackpotCdf.toLocaleString('fr-FR')} <span style={{ fontSize: 'clamp(14px,3vw,32px)' }}>CDF</span>
           </motion.div>
           {isJackpotReady && (
             <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 'clamp(10px,1.6vw,18px)', color: '#ef4444', letterSpacing: 3, marginTop: 4 }}>
