@@ -175,18 +175,28 @@ export default function AgentDashboard() {
         </div>
       )}
 
+      {/* Trust message */}
+      <div style={{
+        background: '#1a1a1a', border: '1px solid #2a2a2a',
+        borderRadius: 12, padding: '12px 16px', marginTop: 24, marginBottom: 0,
+        fontSize: 13, color: '#888', textAlign: 'center',
+      }}>
+        🔒 Vos commissions sont sécurisées sur Congo Gaming.<br />
+        <span style={{ color: '#F5A623' }}>Laissez accumuler et retirez quand vous voulez.</span>
+      </div>
+
       {/* Payout section */}
       {(() => {
-        const minPayout       = Number(agent.min_payout_cdf ?? 2000);
-        const canRequest      = pending_cdf >= minPayout;
+        const minPayout        = Number(agent.min_payout_cdf ?? 2000);
+        const canRequest       = pending_cdf >= minPayout;
         const alreadyRequested = !!agent.payout_requested_at;
-        const progress        = Math.min(100, (pending_cdf / minPayout) * 100);
+        const progress         = Math.min(100, (pending_cdf / minPayout) * 100);
         return (
-          <div style={{ marginTop: 24, background: '#ffffff06', borderRadius: 12, padding: '16px', border: '1px solid #ffffff10' }}>
+          <div style={{ marginTop: 12, background: '#ffffff06', borderRadius: 12, padding: '16px', border: '1px solid #ffffff10' }}>
             <p style={{ fontSize: 11, color: '#ffffff50', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12 }}>Demande de paiement</p>
 
             {/* Progress bar */}
-            <p style={{ fontSize: 12, color: '#ffffff60', marginBottom: 6 }}>Minimum pour retrait : {minPayout.toLocaleString('fr-FR')} CDF</p>
+            <p style={{ fontSize: 12, color: '#ffffff60', marginBottom: 6 }}>Minimum pour retrait : {minPayout.toLocaleString('fr-FR')} CDF</p>
             <div style={{ background: '#222', borderRadius: 8, height: 8, marginBottom: 6 }}>
               <div style={{ width: `${progress}%`, background: canRequest ? '#F5A623' : '#555', height: 8, borderRadius: 8, transition: 'width 0.3s' }} />
             </div>
@@ -224,8 +234,8 @@ export default function AgentDashboard() {
                 {requesting
                   ? 'Envoi en cours…'
                   : canRequest
-                    ? '💳 Demander le paiement'
-                    : `Encore ${(minPayout - pending_cdf).toLocaleString('fr-FR')} CDF avant le retrait`}
+                    ? `💳 Retirer ${pending_cdf.toLocaleString('fr-FR')} CDF`
+                    : `Encore ${(minPayout - pending_cdf).toLocaleString('fr-FR')} CDF pour débloquer le retrait`}
               </button>
             )}
           </div>
