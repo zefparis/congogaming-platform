@@ -89,8 +89,8 @@ function Countdown({ secs }: { secs: number }) {
 // ---------------------------------------------------------------------------
 // State screens
 // ---------------------------------------------------------------------------
-function OpenScreen({ live, secs, qrUrl, playUrl }: { live: LiveData; secs: number; qrUrl: string; playUrl: string }) {
-  const isJackpotReady = live.jackpotCdf >= live.jackpotThresholdCdf;
+function OpenScreen({ live, secs, qrUrl, playUrl, livePot }: { live: LiveData; secs: number; qrUrl: string; playUrl: string; livePot?: number }) {
+  const isJackpotReady = (livePot ?? live.jackpotCdf) >= live.jackpotThresholdCdf;
   return (
     <motion.div
       key="open"
@@ -292,6 +292,7 @@ export default function OkapiColorTVScreen() {
   const [error, setError]         = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [videoFailed, setVideoFailed]     = useState(false);
+  const [livePot, setLivePot]     = useState<number>(0);
 
   useEffect(() => {
     const check = () => setIsLargeScreen(window.innerWidth >= 900);
@@ -315,11 +316,22 @@ export default function OkapiColorTVScreen() {
           setSecs(data.currentDraw.secondsRemaining);
           return data;
         });
+        setLivePot((p) => p === 0 ? data.jackpotCdf : p);
       } catch { setError(true); }
     };
     fetchLive();
     const id = setInterval(fetchLive, 2000);
     return () => clearInterval(id);
+  }, []);
+
+  // SSE — real-time jackpot pot
+  useEffect(() => {
+    const es = new EventSource(`${BASE_URL}/api/okapi-color/jackpot/stream`);
+    es.onmessage = (e) => {
+      try { const { pot_cdf } = JSON.parse(e.data); setLivePot(Number(pot_cdf)); } catch {}
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
   }, []);
 
   // Local countdown tick every second
@@ -405,7 +417,7 @@ export default function OkapiColorTVScreen() {
         )}
         {live && (
           <AnimatePresence mode="wait">
-            {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} />}
+            {live.currentDraw.status === 'open'    && <OpenScreen    key="open"    live={live} secs={secs} qrUrl={qrUrl} playUrl={playUrl} livePot={livePot} />}
             {live.currentDraw.status === 'closing' && <ClosingScreen key="closing" secs={secs} />}
             {(live.currentDraw.status === 'drawing' || live.currentDraw.status === 'result') && (
               <DrawResultScreen key="draw-result" live={live} secs={secs} />

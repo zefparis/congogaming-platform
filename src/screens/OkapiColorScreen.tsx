@@ -131,6 +131,8 @@ function TicketCard({ t }: { t: MyTicket }) {
   );
 }
 
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.congogaming.com';
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -144,6 +146,7 @@ export default function OkapiColorScreen() {
   const [secs,       setSecs]       = useState(0);
   const [myTickets,  setMyTickets]  = useState<MyTicket[]>([]);
   const [balance,    setBalance]    = useState<number>(session?.balance_cdf ?? 0);
+  const [livePot,    setLivePot]    = useState<number>(0);
 
   // Buy flow
   const [selected,   setSelected]   = useState<number[]>([]);
@@ -169,12 +172,22 @@ export default function OkapiColorScreen() {
   useEffect(() => {
     const fetch_ = () => {
       api.okapiColorLive()
-        .then((d) => { setLive(d); setSecs(d.currentDraw.secondsRemaining); })
+        .then((d) => { setLive(d); setSecs(d.currentDraw.secondsRemaining); setLivePot((p) => p === 0 ? d.jackpotCdf : p); })
         .catch(() => {});
     };
     fetch_();
     const id = setInterval(fetch_, 2000);
     return () => clearInterval(id);
+  }, []);
+
+  // SSE — real-time jackpot pot
+  useEffect(() => {
+    const es = new EventSource(`${API_BASE}/api/okapi-color/jackpot/stream`);
+    es.onmessage = (e) => {
+      try { const { pot_cdf } = JSON.parse(e.data); setLivePot(Number(pot_cdf)); } catch {}
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
   }, []);
 
   // Local countdown tick
@@ -221,7 +234,7 @@ export default function OkapiColorScreen() {
     || (live != null && Date.now() >= new Date(live.currentDraw.closeAt).getTime());
   const isFull     = selected.length === 6;
   const jackpotPrizeCdf = live?.jackpotThresholdCdf ?? 250_000;
-  const potCdf           = live?.jackpotCdf ?? 0;
+  const potCdf           = livePot;
   const jackpotAvailable = potCdf >= jackpotPrizeCdf;
   const price      = live?.ticketPriceCdf ?? 1000;
   const intervalMin = Math.round((live?.drawIntervalSeconds ?? 600) / 60);

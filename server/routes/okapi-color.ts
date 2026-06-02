@@ -12,7 +12,7 @@ import { env } from '../env.js';
 // =============================================================
 export const OKAPI_COLOR_CONFIG = {
   ticketPriceCdf:         1000,
-  get jackpotContributionCdf() { return env.OKAPI_COLOR_CONTRIBUTION_CDF ?? 50; },
+  get jackpotContributionCdf() { return env.OKAPI_COLOR_CONTRIBUTION_CDF ?? 100; },
   get jackpotCdf()            { return env.OKAPI_COLOR_JACKPOT_CDF         ?? 250_000; },
   numbersRange:            24,
   playerPickCount:          6,
@@ -926,6 +926,45 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     } catch (e: any) {
       return reply.code(500).send({ error: e?.message || 'Purge failed' });
     }
+  });
+
+  // ----------------------------------------------------------
+  // GET /api/okapi-color/jackpot/stream
+  // Public — SSE pour mise à jour temps réel du pot jackpot
+  // ----------------------------------------------------------
+  app.get('/api/okapi-color/jackpot/stream', async (req, reply) => {
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type':                'text/event-stream',
+      'Cache-Control':               'no-cache',
+      'Connection':                  'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    const { data } = await supabaseAdmin
+      .from('okapi_color_jackpot').select('pot_cdf').eq('id', 1).single();
+    reply.raw.write(`data: ${JSON.stringify({ pot_cdf: data?.pot_cdf ?? 0 })}\n\n`);
+
+    const channelName = `jackpot-sse-${crypto.randomUUID()}`;
+    const channel = supabaseAdmin
+      .channel(channelName)
+      .on('postgres_changes', {
+        event:  'UPDATE',
+        schema: 'public',
+        table:  'okapi_color_jackpot',
+      }, (payload) => {
+        reply.raw.write(`data: ${JSON.stringify({ pot_cdf: (payload.new as any).pot_cdf })}\n\n`);
+      })
+      .subscribe();
+
+    const ping = setInterval(() => {
+      reply.raw.write(': ping\n\n');
+    }, 15_000);
+
+    req.raw.on('close', () => {
+      clearInterval(ping);
+      supabaseAdmin.removeChannel(channel);
+    });
   });
 };
 
