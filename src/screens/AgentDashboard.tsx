@@ -12,6 +12,13 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+const OPERATOR_LABEL: Record<string, string> = {
+  orange:   'Orange Money',
+  vodacom:  'Vodacom M-Pesa',
+  airtel:   'Airtel Money',
+  africell: 'Africell Money',
+};
+
 const TYPE_LABEL: Record<string, string> = {
   okapi_color: 'Okapi Color',
   flash:       'Flash',
@@ -25,6 +32,9 @@ interface AgentData {
     qr_code: string;
     zone: string | null;
     total_earned_cdf: number;
+    phone: string | null;
+    operator: string | null;
+    notes: string | null;
   };
   today_earned_cdf: number;
   pending_cdf: number;
@@ -130,6 +140,25 @@ export default function AgentDashboard() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Payment info */}
+      {(agent.phone || agent.operator) && (
+        <div style={{ marginTop: 24, background: '#ffffff06', borderRadius: 10, padding: '14px 16px', border: '1px solid #ffffff10' }}>
+          <p style={{ fontSize: 11, color: '#ffffff50', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>Paiement des commissions</p>
+          {agent.operator && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: '#ffffff60' }}>Opérateur</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{OPERATOR_LABEL[agent.operator] ?? agent.operator}</span>
+            </div>
+          )}
+          {agent.phone && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, color: '#ffffff60' }}>Numéro</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: 'monospace' }}>{agent.phone}</span>
+            </div>
+          )}
         </div>
       )}
 

@@ -108,22 +108,39 @@ function CommissionsDrawer({ agentId, onClose }: { agentId: string; onClose: () 
   );
 }
 
+const OPERATORS = [
+  { value: 'orange',   label: 'Orange Money' },
+  { value: 'vodacom',  label: 'Vodacom M-Pesa' },
+  { value: 'airtel',   label: 'Airtel Money' },
+  { value: 'africell', label: 'Africell Money' },
+];
+
+const OPERATOR_LABEL: Record<string, string> = Object.fromEntries(OPERATORS.map(o => [o.value, o.label]));
+
 function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => void; onClose: () => void }) {
   const [name, setName] = useState('');
   const [zone, setZone] = useState('');
   const [rate, setRate] = useState('5');
+  const [phone, setPhone] = useState('');
+  const [operator, setOperator] = useState('');
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setErr('Nom requis'); return; }
+    if (!name.trim())     { setErr('Nom requis');       return; }
+    if (!phone.trim())    { setErr('Téléphone requis');  return; }
+    if (!operator)        { setErr('Opérateur requis');  return; }
     try {
       setLoading(true);
       const agent = await adminApi.agentCreate({
         display_name:    name.trim(),
         zone:            zone.trim() || undefined,
         commission_rate: Number(rate) / 100,
+        phone:           phone.trim(),
+        operator,
+        notes:           notes.trim() || undefined,
       });
       onCreated(agent);
     } catch (e: any) {
@@ -152,12 +169,41 @@ function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => voi
           />
         </label>
         <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Numéro de téléphone *</span>
+          <input
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="09XXXXXXXX"
+          />
+        </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Opérateur *</span>
+          <select
+            value={operator}
+            onChange={e => setOperator(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-[#0f0f16] px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+          >
+            <option value="">— Choisir —</option>
+            {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+        <label className="mb-3 block">
           <span className="mb-1 block text-xs text-white/50">Zone / Quartier</span>
           <input
             value={zone}
             onChange={e => setZone(e.target.value)}
             className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
             placeholder="Gombe, Kinshasa"
+          />
+        </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Notes (optionnel)</span>
+          <input
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="Carrefour Limete, en face du Total"
           />
         </label>
         <label className="mb-5 block">
@@ -242,9 +288,17 @@ export default function AgentsTab() {
                 className="flex flex-col gap-3 rounded-xl border border-white/8 bg-white/3 p-4"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-white">{agent.display_name}</p>
                     {agent.zone && <p className="text-xs text-white/40">{agent.zone}</p>}
+                    {(agent.phone || agent.operator) && (
+                      <p className="mt-1 text-xs text-amber-400/80">
+                        {agent.operator ? OPERATOR_LABEL[agent.operator] ?? agent.operator : ''}
+                        {agent.phone && agent.operator ? ' · ' : ''}
+                        {agent.phone ?? ''}
+                      </p>
+                    )}
+                    {agent.notes && <p className="mt-0.5 text-xs text-white/30 italic">{agent.notes}</p>}
                   </div>
                   <StatusBadge status={agent.status} />
                 </div>

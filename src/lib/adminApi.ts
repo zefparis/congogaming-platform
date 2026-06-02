@@ -146,6 +146,9 @@ export interface Agent {
   status: 'active' | 'suspended';
   commission_rate: number;
   total_earned_cdf: number;
+  phone: string | null;
+  operator: 'orange' | 'vodacom' | 'airtel' | 'africell' | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -551,10 +554,10 @@ export const adminApi = {
   agentsList: () =>
     request<{ agents: Agent[] }>('/api/admin/agents'),
 
-  agentCreate: (body: { display_name: string; zone?: string; commission_rate?: number }) =>
+  agentCreate: (body: { display_name: string; zone?: string; commission_rate?: number; phone: string; operator: string; notes?: string }) =>
     request<Agent>('/api/admin/agents', { method: 'POST', body: JSON.stringify(body) }),
 
-  agentUpdate: (id: string, body: { status?: string; zone?: string; commission_rate?: number }) =>
+  agentUpdate: (id: string, body: { status?: string; zone?: string; commission_rate?: number; phone?: string; operator?: string; notes?: string }) =>
     request<Agent>(`/api/admin/agents/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   agentCommissions: (id: string) =>

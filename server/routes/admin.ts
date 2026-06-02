@@ -1587,9 +1587,15 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   // POST /api/admin/agents — create a new agent
   app.post('/api/admin/agents', { preHandler: requireSuperAdmin }, async (req, reply) => {
-    const { display_name, zone, commission_rate } = (req.body as any) || {};
+    const { display_name, zone, commission_rate, phone, operator, notes } = (req.body as any) || {};
     if (!display_name?.trim()) {
       return reply.code(400).send({ error: 'display_name requis' });
+    }
+    if (!phone?.trim()) {
+      return reply.code(400).send({ error: 'phone requis' });
+    }
+    if (!operator?.trim()) {
+      return reply.code(400).send({ error: 'operator requis' });
     }
     let qr_code = '';
     for (let i = 0; i < 10; i++) {
@@ -1605,8 +1611,11 @@ export default async function adminRoutes(app: FastifyInstance) {
       .insert({
         display_name: String(display_name).trim(),
         qr_code,
-        zone:            zone ? String(zone).trim() : null,
+        zone:            zone      ? String(zone).trim()     : null,
         commission_rate: commission_rate != null ? Number(commission_rate) : 0.05,
+        phone:           phone     ? String(phone).trim()    : null,
+        operator:        operator  ? String(operator).trim() : null,
+        notes:           notes     ? String(notes).trim()    : null,
       })
       .select()
       .single();
@@ -1621,11 +1630,14 @@ export default async function adminRoutes(app: FastifyInstance) {
     { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const { id } = req.params;
-      const { status, zone, commission_rate } = (req.body as any) || {};
+      const { status, zone, commission_rate, phone, operator, notes } = (req.body as any) || {};
       const updates: Record<string, unknown> = {};
-      if (status        !== undefined) updates.status          = status;
-      if (zone          !== undefined) updates.zone            = zone;
+      if (status          !== undefined) updates.status          = status;
+      if (zone            !== undefined) updates.zone            = zone;
       if (commission_rate !== undefined) updates.commission_rate = Number(commission_rate);
+      if (phone           !== undefined) updates.phone           = phone;
+      if (operator        !== undefined) updates.operator        = operator;
+      if (notes           !== undefined) updates.notes           = notes;
       if (!Object.keys(updates).length) {
         return reply.code(400).send({ error: 'Nothing to update' });
       }
