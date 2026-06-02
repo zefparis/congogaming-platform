@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Wallet, Plus, ArrowDownToLine } from 'lucide-react';
 import { getSession, refreshBalance } from '../lib/auth';
@@ -31,6 +32,7 @@ type FlashLatest = Awaited<ReturnType<typeof api.flashLatest>>;
 
 export default function HomeScreen() {
   const nav = useNavigate();
+  const { t } = useTranslation();
   const session = getSession();
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
   const [flashPot, setFlashPot] = useState<number>(0);
@@ -72,7 +74,7 @@ export default function HomeScreen() {
       const remaining = Math.max(0, Math.floor((nextDraw - now) / 1000));
       const m = String(Math.floor(remaining / 60)).padStart(2, '0');
       const s = String(remaining % 60).padStart(2, '0');
-      setCountdown(remaining > 0 ? `${m}:${s}` : 'TIRAGE EN COURS');
+      setCountdown(remaining > 0 ? `${m}:${s}` : t('home.draw_in_progress'));
 
       if (remaining === 0 && !refetchScheduled) {
         refetchScheduled = true;
@@ -148,7 +150,7 @@ export default function HomeScreen() {
                   textOverflow: 'ellipsis',
                 }}
               >
-                Salut, {session.display_name} 👋
+                {t('home.greeting', { name: session.display_name })}
               </div>
             )}
             <div
@@ -160,7 +162,7 @@ export default function HomeScreen() {
                 fontWeight: 600,
               }}
             >
-              SOLDE
+              {t('home.balance_label')}
             </div>
 
             {/* Balance — dominant */}
@@ -225,7 +227,7 @@ export default function HomeScreen() {
                 }}
               >
                 <Plus style={{ width: 16, height: 16 }} />
-                DÉPÔT
+                {t('home.deposit_btn')}
               </button>
               <button
                 type="button"
@@ -250,7 +252,7 @@ export default function HomeScreen() {
                 }}
               >
                 <ArrowDownToLine style={{ width: 16, height: 16 }} />
-                RETRAIT
+                {t('home.withdraw_btn')}
               </button>
             </div>
           </div>
@@ -304,7 +306,7 @@ export default function HomeScreen() {
           {/* Content on top */}
           <div style={{ position: 'relative', maxWidth: '55%', zIndex: 3, padding: '20px 16px' }}>
             <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 4 }}>
-              🏆 ÉVÉNEMENT OFFICIEL
+              {t('home.wc26_label')}
             </div>
             <div style={{ fontFamily: 'Bebas Neue', fontSize: 38, color: 'white', lineHeight: 1 }}>
               FIFA WORLD CUP
@@ -313,7 +315,7 @@ export default function HomeScreen() {
               2026
             </div>
             <div style={{ fontSize: 13, color: '#00A86B', marginTop: 4, marginBottom: 16 }}>
-              ⚽ Gagnez gros — Paris & Prédictions
+              {t('home.wc26_sub')}
             </div>
             <motion.button
               whileHover={{ filter: 'brightness(1.1)' }}
@@ -340,7 +342,7 @@ export default function HomeScreen() {
               }}
               style={ctaStyle}
             >
-              JOUER MAINTENANT →
+              {t('home.play_now')}
             </motion.button>
           </div>
         </div>
@@ -394,13 +396,13 @@ export default function HomeScreen() {
           />
           <div style={{ position: 'relative', maxWidth: '58%', zIndex: 3, padding: '20px 16px' }}>
             <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 4 }}>
-              🏔️ CRASH GAME
+              {t('home.crash_label')}
             </div>
             <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFD700', lineHeight: 1 }}>
               OKAPI CLIMB
             </div>
             <div style={{ fontSize: 13, color: 'white', marginTop: 4, marginBottom: 16, opacity: 0.85 }}>
-              Pariez, encaissez avant le crash. Jusqu'à ×50
+              {t('home.crash_sub')}
             </div>
             <motion.button
               whileHover={{ filter: 'brightness(1.1)' }}
@@ -408,7 +410,7 @@ export default function HomeScreen() {
               onClick={(e) => { e.stopPropagation(); nav('/climb'); }}
               style={ctaStyle}
             >
-              GRIMPER MAINTENANT →
+              {t('home.crash_btn')}
             </motion.button>
           </div>
         </div>
@@ -477,7 +479,7 @@ export default function HomeScreen() {
               ⚡ LOTO EXPRESS
             </div>
             <div style={{ color: '#FFFFFF', fontSize: 14, marginTop: 12, fontWeight: 600 }}>
-              Prochain tirage dans
+              {t('home.next_draw')}
             </div>
             <div
               style={{
@@ -497,15 +499,15 @@ export default function HomeScreen() {
                 className="animate-flicker"
                 style={{ color: '#00A86B', fontWeight: 700, fontSize: 15, marginTop: 4 }}
               >
-                ⚡ JACKPOT DISPO !
+                {t('home.jackpot_available')}
               </div>
             ) : (
               <div style={{ color: '#FFFFFF', fontSize: 15, marginTop: 4, fontWeight: 600 }}>
-                Pot : {flashPot.toLocaleString('fr-FR')} CDF
+                {t('home.pot', { amount: flashPot.toLocaleString('fr-FR') })}
               </div>
             )}
             <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4, marginBottom: 16 }}>
-              1 000 CDF / ticket
+              {t('home.ticket_price_1000')}
             </div>
             <motion.button
               whileHover={{ filter: 'brightness(1.1)' }}
@@ -517,7 +519,7 @@ export default function HomeScreen() {
                 border: '1px solid rgba(0,168,107,0.7)',
               }}
             >
-              JOUER MAINTENANT →
+              {t('home.play_now')}
             </motion.button>
           </div>
         </div>
@@ -564,23 +566,23 @@ export default function HomeScreen() {
             <div style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '58%' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Bebas Neue', fontSize: 13, color: '#00A86B', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00A86B' }} />
-                Nouveau Live
+                {t('home.color_live')}
               </div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFFFFF', lineHeight: 1, letterSpacing: 1 }}>OKAPI</div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#ef4444', lineHeight: 1, letterSpacing: 2, marginBottom: 4 }}>COLOR</div>
-              <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>6 numéros — rouges et or</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 6 }}>Tirage live toutes les 10 min</div>
+              <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>{t('home.color_nums')}</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 6 }}>{t('home.color_freq')}</div>
               <div style={{ color: '#FFD700', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
-                Jackpot : {okapiColorPot.toLocaleString('fr-FR')} CDF
+                {t('home.color_jackpot', { amount: okapiColorPot.toLocaleString('fr-FR') })}
               </div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 16 }}>1 000 CDF / ticket</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 16 }}>{t('home.ticket_price_1000')}</div>
               <motion.button
                 whileHover={{ filter: 'brightness(1.1)' }}
                 whileTap={{ scale: 0.98 }}
                 onClick={(e) => { e.stopPropagation(); nav('/okapi-color'); }}
                 style={{ ...ctaStyle, background: 'linear-gradient(135deg,#b91c1c,#ef4444)' }}
               >
-                JOUER MAINTENANT →
+                {t('home.play_now')}
               </motion.button>
             </div>
         </div>
@@ -682,7 +684,7 @@ export default function HomeScreen() {
                 textShadow: '0 1px 6px rgba(0,0,0,1)',
               }}
             >
-              Grattez et gagnez instantanément
+              {t('home.scratch_sub')}
             </div>
             <motion.button
               whileHover={{ filter: 'brightness(1.1)' }}
@@ -693,7 +695,7 @@ export default function HomeScreen() {
               }}
               style={ctaStyle}
             >
-              GRATTER MAINTENANT →
+              {t('home.scratch_btn')}
             </motion.button>
           </div>
         </div>
@@ -721,8 +723,8 @@ export default function HomeScreen() {
               boxShadow: '0 4px 20px rgba(0,168,107,0.25)',
             }}
           >
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFFFFF' }}>DÉPÔT</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>+ Fonds</span>
+            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFFFFF' }}>{t('home.deposit_btn')}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{t('home.deposit_sub')}</span>
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.96 }}
@@ -745,21 +747,21 @@ export default function HomeScreen() {
               boxShadow: '0 4px 20px rgba(255,215,0,0.1)',
             }}
           >
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700' }}>RETRAIT</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,215,0,0.6)' }}>- Fonds</span>
+            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700' }}>{t('home.withdraw_btn')}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,215,0,0.6)' }}>{t('home.withdraw_sub')}</span>
           </motion.button>
         </div>
 
         <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-4">
-          <div className="text-xs uppercase tracking-widest text-zinc-500">Astuce</div>
-          <div className="text-sm mt-1">Jouez de manière responsable. 18+ uniquement.</div>
+          <div className="text-xs uppercase tracking-widest text-zinc-500">{t('home.tip_title')}</div>
+          <div className="text-sm mt-1">{t('home.tip_body')}</div>
         </div>
 
         <button
           onClick={() => nav('/legal')}
           className="block w-full text-center text-xs text-gray-600 hover:text-gray-400 pt-2 pb-1"
         >
-          © Congo Gaming Limited SARL — Agréé MJS N°047/2016 — ARPTC N°0573-0574/2023
+          {t('home.legal')}
         </button>
       </div>
     </div>

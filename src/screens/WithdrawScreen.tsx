@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Wallet, XCircle } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
+import { displayError } from '../lib/errors';
 
 type State = 'idle' | 'pending' | 'success' | 'error';
 
@@ -28,6 +30,7 @@ const AFRICELL_MIN = 2250;
 
 export default function WithdrawScreen() {
   const nav = useNavigate();
+  const { t } = useTranslation();
   const session = getSession();
   const [amount, setAmount] = useState('');
   const initialDetected = detectProvider(session?.phone || '');
@@ -90,26 +93,26 @@ export default function WithdrawScreen() {
     if (!session) return;
     if (pendingWithdrawal) {
       setState('error');
-      setMsg('Retrait en cours de traitement. Ne relancez pas la demande.');
+      setMsg(t('withdraw.error_pending'));
       return;
     }
     const amt = Number(amount);
-    if (!amt || amt < 500) { setState('error'); setMsg('Minimum 500 CDF'); return; }
-    if (amt > balance) { setState('error'); setMsg('Solde insuffisant'); return; }
-    if (!/^0[89]\d{8}$/.test(phone)) { setState('error'); setMsg('Numéro invalide'); return; }
-    setState('pending'); setMsg('Retrait en cours…');
+    if (!amt || amt < 500) { setState('error'); setMsg(t('withdraw.error_min')); return; }
+    if (amt > balance) { setState('error'); setMsg(t('withdraw.error_balance')); return; }
+    if (!/^0[89]\d{8}$/.test(phone)) { setState('error'); setMsg(t('withdraw.error_phone')); return; }
+    setState('pending'); setMsg(t('withdraw.pending_msg'));
     try {
       const r = await api.withdraw({ amount: amt, provider_id: providerId, phone });
       if ((r as any)?.pending) {
         setState('pending');
-        setMsg('Retrait en cours de traitement. Ne relancez pas la demande.');
+        setMsg(t('withdraw.error_pending'));
       } else {
         setState('success');
-        setMsg('Demande de retrait envoyée');
+        setMsg(t('withdraw.success'));
       }
       await refreshPendingState();
     } catch (e: any) {
-      setState('error'); setMsg(e.message || 'Erreur');
+      setState('error'); setMsg(displayError(t, e?.code, e?.message));
     }
   };
 
@@ -136,7 +139,7 @@ export default function WithdrawScreen() {
       <div className="mt-3 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-950 border border-gold/20 p-4 flex items-center gap-3">
         <Wallet className="w-7 h-7 text-gold" />
         <div className="flex-1">
-          <div className="text-xs text-zinc-500 uppercase tracking-widest">Solde disponible</div>
+          <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('withdraw.balance_label')}</div>
           <div className="font-display text-3xl text-gold">{balance.toLocaleString('fr-FR')} <span className="text-xs text-zinc-400">CDF</span></div>
         </div>
       </div>
@@ -147,11 +150,10 @@ export default function WithdrawScreen() {
             <Loader2 className="w-5 h-5 animate-spin shrink-0 mt-0.5" />
             <div className="flex-1">
               <div className="font-semibold text-sm">
-                Retrait en cours de traitement
+                {t('withdraw.pending_title')}
               </div>
               <div className="text-xs text-yellow-200/80 mt-1">
-                Ne relancez pas la demande. Le solde sera mis à jour
-                automatiquement dès que l'opérateur confirme.
+                {t('withdraw.pending_body')}
               </div>
               <div className="text-[10px] text-yellow-200/60 mt-1 font-mono">
                 #{pendingWithdrawal.order_id.slice(0, 8)} —{' '}
@@ -165,13 +167,13 @@ export default function WithdrawScreen() {
             className="mt-3 w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-yellow-500/20 border border-yellow-500/40 text-yellow-200 text-sm font-semibold disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Rafraîchir le statut
+            {t('withdraw.refresh')}
           </button>
         </div>
       )}
 
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
-        <div className="text-xs text-zinc-500 uppercase tracking-widest">Numéro de réception</div>
+        <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('withdraw.phone_label')}</div>
         <input
           inputMode="numeric"
           value={phone}
@@ -216,7 +218,7 @@ export default function WithdrawScreen() {
                 fontWeight: 700,
               }}
             >
-              {detectedOperator.name} détecté
+              {t('withdraw.detected', { operator: detectedOperator.name })}
             </span>
             <span
               style={{
@@ -225,25 +227,25 @@ export default function WithdrawScreen() {
                 marginLeft: 'auto',
               }}
             >
-              ✓ automatique
+              {t('withdraw.automatic')}
             </span>
           </div>
         )}
         {phone.length === 10 && !detectedOperator && (
           <div style={{ color: '#FF4444', fontSize: 12, marginTop: 6 }}>
-            Numéro non reconnu — vérifiez votre numéro
+            {t('withdraw.invalid_number')}
           </div>
         )}
       </div>
 
       <div className="mt-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
-        <div className="text-xs text-zinc-500 uppercase tracking-widest">Montant (CDF) — min 500</div>
+        <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('withdraw.amount_label')}</div>
         <div className="font-display text-5xl text-white mt-1">
           {amount ? Number(amount).toLocaleString('fr-FR') : <span className="text-zinc-700">0</span>}
         </div>
         {detectedOperator?.id === 19 && Number(amount) > 0 && Number(amount) < AFRICELL_MIN && (
           <div style={{ color: '#FF8C00', fontSize: 12, marginTop: 8 }}>
-            Montant minimum Africell : 2 250 CDF
+            {t('withdraw.min_africell')}
           </div>
         )}
       </div>
@@ -271,7 +273,7 @@ export default function WithdrawScreen() {
         disabled={submitDisabled}
         className="mt-4 w-full h-16 rounded-2xl bg-gold text-black font-display text-3xl tracking-widest disabled:opacity-60"
       >
-        CONFIRMER
+        {t('common.confirm')}
       </motion.button>
     </div>
   );

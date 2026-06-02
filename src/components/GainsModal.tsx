@@ -3,6 +3,8 @@
 // data fetching, no game logic. Tables are static so we don't need an
 // effect or props beyond `type`.
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 type GainsModalProps = {
   open: boolean;
@@ -26,39 +28,44 @@ type Config = {
   footer: string[];
 };
 
-const LOTO: Config = {
-  header: '🎱 LOTO CONGO — Gains',
-  subtitle: 'Choisissez 6 numéros parmi 49 — Ticket 2 000 CDF',
-  rows: [
-    { label: '2 bons numéros', emoji: '🎯', value: '1 000 CDF',   color: '#888888' },
-    { label: '3 bons numéros', emoji: '🎯', value: '5 000 CDF',   color: '#FFFFFF' },
-    { label: '4 bons numéros', emoji: '🎯', value: '50 000 CDF',  color: '#00C875' },
-    { label: '5 bons numéros', emoji: '🎯', value: '500 000 CDF', color: '#4a9eff' },
-    { label: '6 bons numéros', emoji: '🏆', value: 'JACKPOT',     color: '#FFD700', jackpot: true },
-  ],
-  footer: [
-    'Jackpot minimum garanti : 5 000 000 CDF',
-    'Tirage quotidien à 20h00 heure de Kinshasa',
-  ],
-};
+function getLotoConfig(t: TFunction): Config {
+  return {
+    header: t('gains_modal.loto_header'),
+    subtitle: t('gains_modal.loto_subtitle'),
+    rows: [
+      { label: t('gains_modal.row_2_nums'), emoji: '🎯', value: '1 000 CDF',   color: '#888888' },
+      { label: t('gains_modal.row_3_nums'), emoji: '🎯', value: '5 000 CDF',   color: '#FFFFFF' },
+      { label: t('gains_modal.row_4_nums'), emoji: '🎯', value: '50 000 CDF',  color: '#00C875' },
+      { label: t('gains_modal.row_5_nums'), emoji: '🎯', value: '500 000 CDF', color: '#4a9eff' },
+      { label: t('gains_modal.row_6_nums'), emoji: '🏆', value: 'JACKPOT',     color: '#FFD700', jackpot: true },
+    ],
+    footer: [
+      t('gains_modal.loto_footer_1'),
+      t('gains_modal.loto_footer_2'),
+    ],
+  };
+}
 
-const FLASH: Config = {
-  header: '⚡ LOTO EXPRESS — Gains',
-  subtitle: 'Choisissez 5 numéros parmi 20 — Ticket 1 000 CDF',
-  rows: [
-    { label: '2 bons numéros', emoji: '🎯', value: '1 000 CDF',  color: '#888888' },
-    { label: '3 bons numéros', emoji: '🎯', value: '5 000 CDF',  color: '#FFFFFF' },
-    { label: '4 bons numéros', emoji: '🎯', value: '50 000 CDF', color: '#00C875' },
-    { label: '5 bons numéros', emoji: '🏆', value: 'JACKPOT',    color: '#FFD700', jackpot: true },
-  ],
-  footer: [
-    'Jackpot minimum garanti : 250 000 CDF',
-    'Tirage automatique toutes les 30 minutes',
-  ],
-};
+function getFlashConfig(t: TFunction): Config {
+  return {
+    header: t('gains_modal.flash_header'),
+    subtitle: t('gains_modal.flash_subtitle'),
+    rows: [
+      { label: t('gains_modal.row_2_nums'), emoji: '🎯', value: '1 000 CDF',  color: '#888888' },
+      { label: t('gains_modal.row_3_nums'), emoji: '🎯', value: '5 000 CDF',  color: '#FFFFFF' },
+      { label: t('gains_modal.row_4_nums'), emoji: '🎯', value: '50 000 CDF', color: '#00C875' },
+      { label: t('gains_modal.row_5_nums'), emoji: '🏆', value: 'JACKPOT',    color: '#FFD700', jackpot: true },
+    ],
+    footer: [
+      t('gains_modal.flash_footer_1'),
+      t('gains_modal.flash_footer_2'),
+    ],
+  };
+}
 
 export default function GainsModal({ open, onClose, type }: GainsModalProps) {
-  const cfg = type === 'loto' ? LOTO : FLASH;
+  const { t } = useTranslation();
+  const cfg = type === 'loto' ? getLotoConfig(t) : getFlashConfig(t);
 
   return (
     <AnimatePresence>
@@ -120,7 +127,7 @@ export default function GainsModal({ open, onClose, type }: GainsModalProps) {
             <button
               type="button"
               onClick={onClose}
-              aria-label="Fermer"
+              aria-label={t('gains_modal.close')}
               style={{
                 position: 'absolute',
                 top: 14,

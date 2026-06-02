@@ -1,6 +1,7 @@
 // FIFA World Cup 2026 splash — IHC Abu Dhabi · ADI PredictStreet co-branding.
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getSession } from '../lib/auth';
 
 const BEBAS = "'Bebas Neue', sans-serif";
@@ -35,7 +36,8 @@ type Particle = {
 
 export default function SplashScreen() {
   const nav = useNavigate();
-  const [t, setT] = useState<T>(() => diff(KICKOFF));
+  const { t } = useTranslation();
+  const [countdown, setCountdown] = useState<T>(() => diff(KICKOFF));
 
   const particles = useMemo<Particle[]>(
     () =>
@@ -56,7 +58,7 @@ export default function SplashScreen() {
       nav('/', { replace: true });
       return;
     }
-    const id = setInterval(() => setT(diff(KICKOFF)), 1000);
+    const id = setInterval(() => setCountdown(diff(KICKOFF)), 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -236,10 +238,10 @@ export default function SplashScreen() {
             }}
           >
             {[
-              { v: t.d, l: 'Jours' },
-              { v: t.h, l: 'Heures' },
-              { v: t.m, l: 'Min' },
-              { v: t.s, l: 'Sec' },
+              { v: countdown.d, l: t('splash.days') },
+              { v: countdown.h, l: t('splash.hours') },
+              { v: countdown.m, l: t('splash.min') },
+              { v: countdown.s, l: t('splash.sec') },
             ].map((c, i) => (
               <div
                 key={c.l}
@@ -302,7 +304,7 @@ export default function SplashScreen() {
               animation: 'splashFadeup 1.3s ease-out both',
             }}
           >
-            S'INSCRIRE
+            {t('splash.register')}
           </button>
 
           {/* 10. CTA secondary */}
@@ -325,7 +327,7 @@ export default function SplashScreen() {
               animation: 'splashFadeup 1.4s ease-out both',
             }}
           >
-            Déjà client — Se connecter
+            {t('splash.login')}
           </button>
         </div>
 

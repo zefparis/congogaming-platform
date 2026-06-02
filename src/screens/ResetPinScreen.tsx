@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { AuthApiError, resetPinByPhone } from '../lib/auth';
+import { displayError } from '../lib/errors';
 
 type Step = 'new' | 'confirm' | 'done';
 
 export default function ResetPinScreen() {
   const nav = useNavigate();
+  const { t } = useTranslation();
   const location = useLocation();
   const phone = (location.state as { phone?: string } | null)?.phone || '';
 
@@ -45,7 +48,7 @@ export default function ResetPinScreen() {
     if (loading) return;
     if (confirmPin.length !== 4) return;
     if (newPin !== confirmPin) {
-      setErr('Les deux PIN sont différents.');
+      setErr(t('reset_pin.error_mismatch'));
       setConfirmPin('');
       return;
     }
@@ -56,16 +59,16 @@ export default function ResetPinScreen() {
     } catch (e) {
       if (e instanceof AuthApiError) {
         if (e.code === 'PIN_RESET_NOT_REQUIRED') {
-          setErr('Votre PIN est déjà à jour. Connectez-vous.');
+          setErr(t('reset_pin.error_already_ok'));
         } else if (e.code === 'USER_NOT_FOUND') {
-          setErr('Numéro inconnu.');
+          setErr(t('reset_pin.error_not_found'));
         } else if (e.code === 'INVALID_PIN_FORMAT') {
-          setErr('PIN invalide.');
+          setErr(t('reset_pin.error_invalid'));
         } else {
-          setErr(e.message || 'Erreur');
+          setErr(displayError(t, e.code, e.message));
         }
       } else {
-        setErr('Erreur réseau.');
+        setErr(t('reset_pin.error_network'));
       }
       setConfirmPin('');
       setStep('new');
@@ -79,14 +82,14 @@ export default function ResetPinScreen() {
     return (
       <div className="min-h-screen flex flex-col p-6 pt-16 items-center text-center">
         <div className="text-5xl mb-4">✅</div>
-        <div className="font-display text-3xl text-gold mb-3">PIN changé.</div>
-        <div className="text-zinc-300 text-base mb-10">Connectez-vous avec votre nouveau PIN.</div>
+        <div className="font-display text-3xl text-gold mb-3">{t('reset_pin.done_title')}</div>
+        <div className="text-zinc-300 text-base mb-10">{t('reset_pin.done_body')}</div>
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => nav('/login', { replace: true })}
           className="w-full max-w-sm h-14 rounded-2xl bg-gold text-black font-display text-2xl tracking-wider"
         >
-          SE CONNECTER
+          {t('reset_pin.login')}
         </motion.button>
       </div>
     );
@@ -96,15 +99,15 @@ export default function ResetPinScreen() {
     <div className="min-h-screen flex flex-col p-6 pt-10">
       <div className="flex items-center gap-3 mb-4">
         <img src="/images/okapi.PNG" alt="Congo Gaming" className="h-10 w-auto object-contain" />
-        <div className="text-zinc-500 text-xs uppercase tracking-widest">Nouveau PIN</div>
+        <div className="text-zinc-500 text-xs uppercase tracking-widest">{t('reset_pin.page_label')}</div>
       </div>
 
       <div className="bg-amber-900/30 border border-amber-700/40 rounded-2xl p-4 mb-5">
-        <div className="text-amber-200 font-display text-lg mb-1">Votre ancien PIN doit être remplacé.</div>
+        <div className="text-amber-200 font-display text-lg mb-1">{t('reset_pin.warning_title')}</div>
         <div className="text-amber-100/80 text-sm">
           {step === 'new'
-            ? 'Entrez un nouveau PIN à 4 chiffres.'
-            : 'Entrez à nouveau le même PIN pour confirmer.'}
+            ? t('reset_pin.warning_new')
+            : t('reset_pin.warning_confirm')}
         </div>
       </div>
 
@@ -112,7 +115,7 @@ export default function ResetPinScreen() {
         <Lock className="w-6 h-6 text-gold" />
         <div className="flex-1">
           <div className="text-xs text-zinc-500">
-            {step === 'new' ? 'Nouveau PIN' : 'Confirmer PIN'}
+            {step === 'new' ? t('reset_pin.field_new') : t('reset_pin.field_confirm')}
           </div>
           <div className="flex gap-3 mt-2">
             {[0, 1, 2, 3].map((i) => (
@@ -144,7 +147,7 @@ export default function ResetPinScreen() {
       />
 
       {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
-      {loading && <div className="mt-3 text-gold text-sm">Mise à jour…</div>}
+      {loading && <div className="mt-3 text-gold text-sm">{t('reset_pin.updating')}</div>}
 
       <div className="mt-5">
         <NumPad onDigit={onDigit} onDelete={onDelete} />
@@ -156,7 +159,7 @@ export default function ResetPinScreen() {
           onClick={goConfirm}
           className="w-full mt-6 py-5 bg-gold text-black font-black text-xl rounded-2xl tracking-widest"
         >
-          CONTINUER
+          {t('common.continue')}
         </motion.button>
       )}
 
@@ -167,7 +170,7 @@ export default function ResetPinScreen() {
           disabled={loading}
           className="w-full mt-6 py-5 bg-amber-600 text-white font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
         >
-          CHANGER MON PIN
+          {t('reset_pin.change_pin')}
         </motion.button>
       )}
 
@@ -180,7 +183,7 @@ export default function ResetPinScreen() {
           }}
           className="mt-4 text-zinc-400 text-sm"
         >
-          ← Recommencer
+          {t('reset_pin.restart')}
         </button>
       )}
     </div>

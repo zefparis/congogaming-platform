@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -57,6 +58,7 @@ function getCountdownToKinshasa20h(): string {
 
 export default function LotoScreen() {
   const nav = useNavigate();
+  const { t } = useTranslation();
   const session = getSession();
 
   const [selected, setSelected] = useState<number[]>([]);
@@ -114,7 +116,7 @@ export default function LotoScreen() {
   if (comingSoon === null) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-bg text-zinc-500 text-sm">
-        Chargement…
+        {t('loto.loading')}
       </div>
     );
   }
@@ -151,11 +153,11 @@ export default function LotoScreen() {
   const submit = async () => {
     if (!session || !isFull || state === 'pending') return;
     setState('pending');
-    setMsg('Validation du ticket…');
+    setMsg(t('loto.validating'));
     try {
       await api.lotoTicket(session.id, selected);
       setState('success');
-      setMsg('Ticket enregistré !');
+      setMsg(t('loto.ticket_registered'));
       setPlayedNums(selected);
       setSelected([]);
       const newBal = await refreshBalance(session.id);
@@ -164,7 +166,7 @@ export default function LotoScreen() {
       api.lotoMesTickets(session.id).then((r) => setTickets(r.tickets)).catch(() => {});
     } catch (e: any) {
       setState('error');
-      setMsg(e.message || 'Erreur');
+      setMsg(e.message || t('common.error'));
     }
   };
 
@@ -202,7 +204,7 @@ export default function LotoScreen() {
             cursor: 'pointer',
           }}
         >
-          ℹ️ Gains
+          {t('loto.gains_button')}
         </button>
       </header>
       <GainsModal open={showGains} onClose={() => setShowGains(false)} type="loto" />
@@ -216,13 +218,13 @@ export default function LotoScreen() {
           marginTop: 8,
         }}
       >
-        💰 Solde : {balance.toLocaleString('fr-FR')} CDF
+        {t('loto.balance_display', { amount: balance.toLocaleString('fr-FR') })}
       </div>
 
       {/* Dernier tirage */}
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
         <div className="flex items-center justify-between">
-          <div className="text-xs uppercase tracking-widest text-zinc-500">Dernier tirage</div>
+          <div className="text-xs uppercase tracking-widest text-zinc-500">{t('loto.last_draw')}</div>
           {tirage && (
             <div className="text-[10px] text-zinc-500">
               {new Date(tirage.drawn_at).toLocaleDateString('fr-FR')}
@@ -240,17 +242,17 @@ export default function LotoScreen() {
         ) : null}
         <div className="mt-3">
           <div className="text-sm text-white">
-            Prochain tirage dans <span className="font-mono font-semibold">{countdown}</span>
+            {t('loto.next_draw')} <span className="font-mono font-semibold">{countdown}</span>
           </div>
           <div className="text-[10px] text-zinc-500 mt-0.5">
-            Tous les jours à 20h00 (Kinshasa)
+            {t('loto.daily_draw')}
           </div>
         </div>
         <div className="mt-4">
           {potCdf < JACKPOT_SEUIL ? (
             <div>
               <div className="text-xs text-zinc-300">
-                Pot jackpot : <span className="text-gold font-semibold">{potCdf.toLocaleString('fr-FR')}</span> / {JACKPOT_SEUIL.toLocaleString('fr-FR')} CDF
+                {t('loto.jackpot_pot')} <span className="text-gold font-semibold">{potCdf.toLocaleString('fr-FR')}</span> / {JACKPOT_SEUIL.toLocaleString('fr-FR')} CDF
               </div>
               <div
                 style={{
@@ -277,7 +279,7 @@ export default function LotoScreen() {
               className="animate-flicker font-display tracking-wider"
               style={{ color: '#FFD700', fontSize: '1.1rem' }}
             >
-              🔥 JACKPOT DISPONIBLE — {potCdf.toLocaleString('fr-FR')} CDF
+              {t('loto.jackpot_available', { amount: potCdf.toLocaleString('fr-FR') })}
             </div>
           )}
         </div>
@@ -287,7 +289,7 @@ export default function LotoScreen() {
       <div className="mt-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
         <div className="flex items-center justify-between">
           <div className="text-xs uppercase tracking-widest text-zinc-500">
-            Choisissez 6 numéros
+            {t('loto.choose_numbers')}
           </div>
           <div className="font-display text-xl text-gold">{selected.length}/6</div>
         </div>
@@ -318,7 +320,7 @@ export default function LotoScreen() {
             onClick={quickPick}
             className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2"
           >
-            <Shuffle className="w-4 h-4" /> QUICK PICK
+            <Shuffle className="w-4 h-4" /> {t('flash.quick_pick')}
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -326,7 +328,7 @@ export default function LotoScreen() {
             disabled={selected.length === 0}
             className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Trash2 className="w-4 h-4" /> EFFACER
+            <Trash2 className="w-4 h-4" /> {t('flash.clear')}
           </motion.button>
         </div>
       </div>
@@ -365,7 +367,7 @@ export default function LotoScreen() {
         disabled={!isFull || state === 'pending'}
         className="mt-4 w-full h-16 rounded-2xl bg-gradient-to-r from-gold via-yellow-300 to-gold text-black font-display text-2xl tracking-widest disabled:opacity-50 disabled:from-zinc-700 disabled:via-zinc-700 disabled:to-zinc-700 disabled:text-zinc-400"
       >
-        JOUER — {TICKET_PRICE.toLocaleString('fr-FR')} CDF
+        {t('loto.play_button', { price: TICKET_PRICE.toLocaleString('fr-FR') })}
       </motion.button>
 
       {/* Mes tickets accordion */}
@@ -375,7 +377,7 @@ export default function LotoScreen() {
           className="w-full flex items-center justify-between p-4"
         >
           <div className="text-xs uppercase tracking-widest text-zinc-400">
-            Mes tickets ({tickets.length})
+            {t('loto.my_tickets', { count: tickets.length })}
           </div>
           {showTickets ? (
             <ChevronUp className="w-4 h-4 text-zinc-400" />
@@ -394,38 +396,37 @@ export default function LotoScreen() {
             >
               <div className="px-4 pb-4 space-y-2">
                 {tickets.length === 0 && (
-                  <div className="text-sm text-zinc-500">Aucun ticket pour le moment.</div>
+                  <div className="text-sm text-zinc-500">{t('loto.no_tickets')}</div>
                 )}
-                {tickets.map((t) => (
+                {tickets.map((ticket) => (
                   <div
-                    key={t.id}
+                    key={ticket.id}
                     className="rounded-xl bg-zinc-950 border border-zinc-800 p-3"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-[10px] text-zinc-500">
-                        {new Date(t.created_at).toLocaleString('fr-FR')}
+                        {new Date(ticket.created_at).toLocaleString('fr-FR')}
                       </div>
-                      <StatusBadge status={t.status} />
+                      <StatusBadge status={ticket.status} />
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {t.numeros.map((n) => (
+                      {ticket.numeros.map((n) => (
                         <Ball key={n} n={n} variant="gold" small />
                       ))}
                     </div>
-                    {t.jackpot_en_attente && (
+                    {ticket.jackpot_en_attente && (
                       <div className="mt-2 text-[10px] text-zinc-400">
-                        Versé dès que le pot atteint 5 000 000 CDF
+                        {t('loto.jackpot_pending_note')}
                       </div>
                     )}
-                    {t.gains_cdf > 0 && !t.jackpot_en_attente && (
+                    {ticket.gains_cdf > 0 && !ticket.jackpot_en_attente && (
                       <div className="mt-2 text-sm text-congogreen font-semibold">
-                        + {t.gains_cdf.toLocaleString('fr-FR')} CDF
+                        + {ticket.gains_cdf.toLocaleString('fr-FR')} CDF
                       </div>
                     )}
-                    {t.status !== 'pending' && !t.jackpot_en_attente && (
+                    {ticket.status !== 'pending' && !ticket.jackpot_en_attente && (
                       <div className="mt-1 text-[10px] text-zinc-500">
-                        {t.nb_bons} numéro{t.nb_bons > 1 ? 's' : ''} correct
-                        {t.nb_bons > 1 ? 's' : ''}
+                        {t(ticket.nb_bons === 1 ? 'loto.correct_numbers_one' : 'loto.correct_numbers_other', { count: ticket.nb_bons })}
                       </div>
                     )}
                   </div>
@@ -467,6 +468,7 @@ function StatusBadge({
 }: {
   status: 'pending' | 'gagnant' | 'perdant' | 'jackpot_attente';
 }) {
+  const { t } = useTranslation();
   const map = {
     pending: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300',
     gagnant: 'bg-congogreen/15 border-congogreen/30 text-congogreen',
@@ -474,10 +476,10 @@ function StatusBadge({
     jackpot_attente: 'bg-orange-500/15 border-orange-500/40 text-orange-300',
   } as const;
   const label = {
-    pending: 'En attente',
-    gagnant: 'Gagnant',
-    perdant: 'Perdant',
-    jackpot_attente: '⏳ Jackpot en attente',
+    pending: t('loto.status_pending'),
+    gagnant: t('loto.status_winner'),
+    perdant: t('loto.status_loser'),
+    jackpot_attente: t('loto.status_jackpot'),
   }[status];
   return (
     <span
