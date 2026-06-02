@@ -6,7 +6,6 @@ import NumPad from '../components/NumPad';
 import { useTranslation } from 'react-i18next';
 import { AuthApiError, detectOperator, loginUser, validateCongoPhone, getSession } from '../lib/auth';
 import { displayError } from '../lib/errors';
-import { LanguageToggle } from '../components/LanguageToggle';
 
 function formatRemaining(seconds: number): string {
   if (seconds <= 0) return '0s';
@@ -101,9 +100,6 @@ export default function LoginScreen() {
 
   return (
     <div className="min-h-screen flex flex-col p-6 pt-12" style={{ position: 'relative' }}>
-      <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
-        <LanguageToggle />
-      </div>
       <div className="flex items-center gap-3 mb-6">
         <img
           src="/images/okapi.PNG"
