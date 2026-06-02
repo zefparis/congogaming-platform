@@ -102,19 +102,11 @@ function KycRoute() {
   return <KycScreen />;
 }
 
-const UNAUTH_PATHS = ['/splash', '/login', '/register', '/reset-pin'];
-
 function AppRoutes() {
   const location = useLocation();
   const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
-  const showGlobalLang = !UNAUTH_PATHS.includes(location.pathname);
   return (
     <>
-      {showGlobalLang && (
-        <div style={{ position: 'fixed', top: 8, right: 12, zIndex: 100 }}>
-          <LanguageToggle />
-        </div>
-      )}
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/splash" element={<PageWrap><SplashScreen /></PageWrap>} />
@@ -184,6 +176,18 @@ function AppShell() {
       }
       style={isFullscreen ? { height: '100dvh', overflow: 'hidden' } : undefined}
     >
+      {!isFullscreen && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          padding: '4px 16px',
+          background: '#0f0f0f',
+          borderBottom: '1px solid #1e1e1e',
+        }}>
+          <LanguageToggle />
+        </div>
+      )}
       <AppRoutes />
     </div>
   );
