@@ -7,6 +7,7 @@ import TransactionItem, { type TransactionType } from '../components/Transaction
 import { AuthApiError, changePin, clearSession, getSession, refreshSession, updateDisplayName } from '../lib/auth';
 import { api } from '../lib/api';
 import { displayError } from '../lib/errors';
+import { LanguageToggle } from '../components/LanguageToggle';
 
 function computeInitials(displayName: string | null | undefined, phone: string | undefined): string {
   if (displayName) {
@@ -18,7 +19,7 @@ function computeInitials(displayName: string | null | undefined, phone: string |
 }
 
 export default function AccountScreen() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [session, setSession] = useState(getSession());
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
@@ -651,17 +652,13 @@ export default function AccountScreen() {
 
       {/* Language toggle */}
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Globe className="w-5 h-5 text-gold" />
-          <h2 className="font-display text-base text-zinc-300 tracking-wider">{t('account.language_section')}</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-gold" />
+            <h2 className="font-display text-base text-zinc-300 tracking-wider">{t('account.language_section')}</h2>
+          </div>
+          <LanguageToggle />
         </div>
-        <button
-          type="button"
-          onClick={() => i18n.changeLanguage(i18n.language === 'fr' ? 'ln' : 'fr')}
-          className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 hover:border-gold/40 transition text-sm font-semibold text-white"
-        >
-          {i18n.language === 'fr' ? t('account.language_switch_ln') : t('account.language_switch_fr')}
-        </button>
       </div>
 
       <motion.button
