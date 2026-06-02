@@ -35,6 +35,9 @@ interface AgentData {
     phone: string | null;
     operator: string | null;
     notes: string | null;
+    min_payout_cdf: number;
+    payout_requested_at: string | null;
+    payout_requested_amount_cdf: number | null;
   };
   today_earned_cdf: number;
   pending_cdf: number;
@@ -52,6 +55,35 @@ export default function AgentDashboard() {
   const [data, setData] = useState<AgentData | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState(false);
+  const [payoutMsg, setPayoutMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function handleRequestPayout() {
+    if (!qrCode || requesting) return;
+    try {
+      setRequesting(true);
+      setPayoutMsg(null);
+      const res = await fetch(`${BASE_URL}/api/agents/${qrCode.toUpperCase()}/request-payout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (json.code === 'BELOW_MINIMUM') {
+          setPayoutMsg({ ok: false, text: `Minimum non atteint (${json.minimum?.toLocaleString('fr-FR')} CDF requis)` });
+        } else if (json.code === 'ALREADY_REQUESTED') {
+          setPayoutMsg({ ok: false, text: 'Demande déjà envoyée, réessayez dans 24h.' });
+        } else {
+          setPayoutMsg({ ok: false, text: 'Erreur, réessayez.' });
+        }
+        return;
+      }
+      setPayoutMsg({ ok: true, text: `Demande envoyée — ${json.amount?.toLocaleString('fr-FR')} CDF` });
+      setData(d => d ? { ...d, agent: { ...d.agent, payout_requested_at: new Date().toISOString(), payout_requested_amount_cdf: json.amount } } : d);
+    } finally {
+      setRequesting(false);
+    }
+  }
 
   useEffect(() => {
     if (!qrCode) { setError(true); setLoading(false); return; }
@@ -143,24 +175,62 @@ export default function AgentDashboard() {
         </div>
       )}
 
-      {/* Payment info */}
-      {(agent.phone || agent.operator) && (
-        <div style={{ marginTop: 24, background: '#ffffff06', borderRadius: 10, padding: '14px 16px', border: '1px solid #ffffff10' }}>
-          <p style={{ fontSize: 11, color: '#ffffff50', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>Paiement des commissions</p>
-          {agent.operator && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: '#ffffff60' }}>Opérateur</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{OPERATOR_LABEL[agent.operator] ?? agent.operator}</span>
+      {/* Payout section */}
+      {(() => {
+        const minPayout       = Number(agent.min_payout_cdf ?? 2000);
+        const canRequest      = pending_cdf >= minPayout;
+        const alreadyRequested = !!agent.payout_requested_at;
+        const progress        = Math.min(100, (pending_cdf / minPayout) * 100);
+        return (
+          <div style={{ marginTop: 24, background: '#ffffff06', borderRadius: 12, padding: '16px', border: '1px solid #ffffff10' }}>
+            <p style={{ fontSize: 11, color: '#ffffff50', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12 }}>Demande de paiement</p>
+
+            {/* Progress bar */}
+            <p style={{ fontSize: 12, color: '#ffffff60', marginBottom: 6 }}>Minimum pour retrait : {minPayout.toLocaleString('fr-FR')} CDF</p>
+            <div style={{ background: '#222', borderRadius: 8, height: 8, marginBottom: 6 }}>
+              <div style={{ width: `${progress}%`, background: canRequest ? '#F5A623' : '#555', height: 8, borderRadius: 8, transition: 'width 0.3s' }} />
             </div>
-          )}
-          {agent.phone && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: '#ffffff60' }}>Numéro</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: 'monospace' }}>{agent.phone}</span>
-            </div>
-          )}
-        </div>
-      )}
+            <p style={{ fontSize: 12, color: '#ffffff50', marginBottom: 14, textAlign: 'right' }}>
+              {pending_cdf.toLocaleString('fr-FR')} / {minPayout.toLocaleString('fr-FR')} CDF
+            </p>
+
+            {payoutMsg && (
+              <p style={{ fontSize: 13, marginBottom: 12, color: payoutMsg.ok ? '#34d399' : '#f87171', textAlign: 'center' }}>
+                {payoutMsg.text}
+              </p>
+            )}
+
+            {alreadyRequested && !payoutMsg ? (
+              <div style={{ color: '#F5A623', textAlign: 'center', fontSize: 13, fontWeight: 600, padding: '10px 0' }}>
+                ✅ Demande envoyée — paiement en cours
+                {(agent.operator || agent.phone) && (
+                  <div style={{ fontSize: 12, fontWeight: 400, color: '#ffffff80', marginTop: 4 }}>
+                    via {agent.operator ? (OPERATOR_LABEL[agent.operator] ?? agent.operator) : ''}{agent.phone ? ` · ${agent.phone}` : ''}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                disabled={!canRequest || requesting}
+                onClick={handleRequestPayout}
+                style={{
+                  background: canRequest ? '#F5A623' : '#333',
+                  color: canRequest ? '#000' : '#666',
+                  width: '100%', padding: '14px', borderRadius: 12,
+                  fontWeight: 700, border: 'none', cursor: canRequest ? 'pointer' : 'default',
+                  fontSize: 14, opacity: requesting ? 0.6 : 1,
+                }}
+              >
+                {requesting
+                  ? 'Envoi en cours…'
+                  : canRequest
+                    ? '💳 Demander le paiement'
+                    : `Encore ${(minPayout - pending_cdf).toLocaleString('fr-FR')} CDF avant le retrait`}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       <p style={{ marginTop: 32, textAlign: 'center', fontSize: 11, color: '#ffffff20', letterSpacing: 2, textTransform: 'uppercase' }}>
         Congo Gaming · Réseau Agent

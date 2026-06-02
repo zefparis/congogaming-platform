@@ -303,6 +303,13 @@ export default function AgentsTab() {
                   <StatusBadge status={agent.status} />
                 </div>
 
+                {agent.payout_requested_at && (
+                  <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5 text-xs font-bold text-amber-400">
+                    <span>💳</span>
+                    <span>Paiement demandé — {(agent.payout_requested_amount_cdf ?? 0).toLocaleString('fr-FR')} CDF</span>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-3">
                   <img
                     src={qrImgUrl(agent.qr_code, 80)}

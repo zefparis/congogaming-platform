@@ -149,6 +149,9 @@ export interface Agent {
   phone: string | null;
   operator: 'orange' | 'vodacom' | 'airtel' | 'africell' | null;
   notes: string | null;
+  min_payout_cdf: number;
+  payout_requested_at: string | null;
+  payout_requested_amount_cdf: number | null;
   created_at: string;
 }
 

@@ -1671,14 +1671,28 @@ export default async function adminRoutes(app: FastifyInstance) {
     { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const { id } = req.params;
-      const { error } = await supabaseAdmin
+
+      const { data: pendingRows } = await supabaseAdmin
+        .from('agent_commissions')
+        .select('commission_cdf')
+        .eq('agent_id', id)
+        .eq('status', 'pending');
+      const paid_cdf = (pendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
+
+      const { error: payErr } = await supabaseAdmin
         .from('agent_commissions')
         .update({ status: 'paid' })
         .eq('agent_id', id)
         .eq('status', 'pending');
-      if (error) return reply.code(500).send({ error: error.message });
-      await audit(req, 'agent_pay', null, null, null, { agent_id: id });
-      return reply.send({ ok: true });
+      if (payErr) return reply.code(500).send({ error: payErr.message });
+
+      await supabaseAdmin
+        .from('agents')
+        .update({ payout_requested_at: null, payout_requested_amount_cdf: null })
+        .eq('id', id);
+
+      await audit(req, 'agent_payout', null, null, null, { agent_id: id, paid_cdf });
+      return reply.send({ ok: true, paid_cdf });
     },
   );
 
