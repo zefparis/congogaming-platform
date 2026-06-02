@@ -80,13 +80,26 @@ export async function clearSession() {
   await authRequest<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }).catch(() => ({ ok: true }));
 }
 
-export async function registerUser(phone: string, pin: string, referralCode?: string | null): Promise<SessionUser> {
+export async function registerUser(phone: string, pin: string, referralCode?: string | null, agentRef?: string | null): Promise<SessionUser> {
   const { user } = await authRequest<{ user: SessionUser }>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ phone, pin, adult: true, referralCode: referralCode || undefined }),
+    body: JSON.stringify({
+      phone,
+      pin,
+      adult: true,
+      referralCode: referralCode || undefined,
+      agentRef:     agentRef     || undefined,
+    }),
   });
   currentUser = user;
   return user;
+}
+
+export async function linkAgent(agentRef: string): Promise<{ linked: boolean }> {
+  return authRequest<{ ok: boolean; linked: boolean }>('/api/auth/link-agent', {
+    method: 'POST',
+    body: JSON.stringify({ agentRef }),
+  }).then(r => ({ linked: r.linked })).catch(() => ({ linked: false }));
 }
 
 export async function loginUser(phone: string, pin: string): Promise<SessionUser> {

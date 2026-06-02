@@ -18,12 +18,19 @@ export default function RegisterScreen() {
   const [pin, setPin] = useState('');
   const [adult, setAdult] = useState(false);
   const [referralCode, setReferralCode] = useState('');
+  const [agentRef, setAgentRef] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
-    if (ref) setReferralCode(ref.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12));
+    if (!ref) return;
+    const upper = ref.toUpperCase();
+    if (/^AG-[A-Z0-9]{6}$/.test(upper)) {
+      setAgentRef(upper);
+    } else {
+      setReferralCode(upper.replace(/[^A-Z0-9]/g, '').slice(0, 12));
+    }
   }, [searchParams]);
 
   const op = detectOperator(phone);
@@ -42,7 +49,7 @@ export default function RegisterScreen() {
     if (pin.length !== 4 || loading) return;
     try {
       setLoading(true);
-      const user = await registerUser(phone, pin, referralCode || null);
+      const user = await registerUser(phone, pin, referralCode || null, agentRef);
       // KYC is now scoped to PredictStreet (/jouer) only — see
       // `PredictStreetRoute` in App.tsx. Fresh accounts go straight to
       // home; the KYC scan is triggered the first time they tap the
@@ -86,6 +93,25 @@ export default function RegisterScreen() {
       <p className="text-zinc-400 text-sm mt-1 mb-6">
         {step === 'phone' ? t('register.subtitle_phone') : t('register.subtitle_pin')}
       </p>
+
+      {agentRef && (
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/8 p-4">
+          <div className="flex-1">
+            <p className="text-xs text-zinc-400 mb-2">Vous avez déjà un compte ?</p>
+            <button
+              onClick={() => nav(`/login?ref=${agentRef}`)}
+              className="w-full rounded-xl bg-zinc-800 border border-zinc-700 py-2 text-sm font-semibold text-gold"
+            >
+              Se connecter
+            </button>
+          </div>
+          <span className="text-zinc-600 text-xs px-1">ou</span>
+          <div className="flex-1 text-center">
+            <p className="text-xs text-zinc-400 mb-2">Nouveau ?</p>
+            <p className="text-sm font-semibold text-white">Créer un compte</p>
+          </div>
+        </div>
+      )}
 
       {step === 'phone' ? (
         <>

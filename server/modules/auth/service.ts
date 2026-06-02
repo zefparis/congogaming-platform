@@ -260,3 +260,31 @@ export async function getUserById(userId: string): Promise<AuthUser | null> {
   if (error) throw new Error(error.message);
   return data ? sanitizeUser(data) : null;
 }
+
+export async function linkAgentRef(userId: string, agentQrCode: string): Promise<{ linked: boolean }> {
+  const code = agentQrCode.trim().toUpperCase();
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('agent_ref')
+    .eq('id', userId)
+    .single();
+
+  if (user?.agent_ref) return { linked: false };
+
+  const { data: agent } = await supabaseAdmin
+    .from('agents')
+    .select('id')
+    .eq('qr_code', code)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!agent?.id) return { linked: false };
+
+  await supabaseAdmin
+    .from('users')
+    .update({ agent_ref: agent.id })
+    .eq('id', userId)
+    .is('agent_ref', null);
+
+  return { linked: true };
+}
