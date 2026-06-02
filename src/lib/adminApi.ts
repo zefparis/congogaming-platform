@@ -512,6 +512,18 @@ export const adminApi = {
     });
   },
 
+  okapiColorJackpotSet: (amount_cdf: number) =>
+    request<{ ok: boolean; old_pot: number; new_pot: number }>(
+      '/api/admin/okapi-color/jackpot/set',
+      { method: 'POST', body: JSON.stringify({ amount_cdf }) },
+    ),
+
+  okapiColorJackpotCredit: (delta_cdf: number) =>
+    request<{ ok: boolean; old_pot: number; new_pot: number }>(
+      '/api/admin/okapi-color/jackpot/credit',
+      { method: 'POST', body: JSON.stringify({ delta_cdf }) },
+    ),
+
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {

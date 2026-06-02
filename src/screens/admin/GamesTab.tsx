@@ -340,6 +340,10 @@ function OkapiColorSubTab() {
   const [secs, setSecs] = useState(0);
   const [actionMsg, setActionMsg] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [jackpotSetInput, setJackpotSetInput] = useState('');
+  const [jackpotCreditInput, setJackpotCreditInput] = useState('');
+  const [jackpotMsg, setJackpotMsg] = useState('');
+  const [jackpotLoading, setJackpotLoading] = useState(false);
 
   async function load() {
     const [l, d] = await Promise.all([
@@ -382,6 +386,47 @@ function OkapiColorSubTab() {
       setActionMsg(`❌ ${e.message}`);
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleJackpotSet() {
+    const amount = Number(jackpotSetInput);
+    if (!jackpotSetInput || isNaN(amount) || amount < 0) {
+      setJackpotMsg('❌ Montant invalide');
+      return;
+    }
+    if (!confirm(`Définir le pot jackpot à ${amount.toLocaleString('fr-FR')} CDF ?`)) return;
+    setJackpotLoading(true); setJackpotMsg('');
+    try {
+      const r = await adminApi.okapiColorJackpotSet(amount);
+      setJackpotMsg(`✅ Pot défini : ${Number(r.old_pot).toLocaleString('fr-FR')} → ${Number(r.new_pot).toLocaleString('fr-FR')} CDF`);
+      setJackpotSetInput('');
+      load();
+    } catch (e: any) {
+      setJackpotMsg(`❌ ${e.message}`);
+    } finally {
+      setJackpotLoading(false);
+    }
+  }
+
+  async function handleJackpotCredit() {
+    const delta = Number(jackpotCreditInput);
+    if (!jackpotCreditInput || isNaN(delta) || delta === 0) {
+      setJackpotMsg('❌ Delta invalide (doit être ≠ 0)');
+      return;
+    }
+    const sign = delta > 0 ? '+' : '';
+    if (!confirm(`${sign}${delta.toLocaleString('fr-FR')} CDF au pot jackpot ?`)) return;
+    setJackpotLoading(true); setJackpotMsg('');
+    try {
+      const r = await adminApi.okapiColorJackpotCredit(delta);
+      setJackpotMsg(`✅ Pot crédité : ${Number(r.old_pot).toLocaleString('fr-FR')} → ${Number(r.new_pot).toLocaleString('fr-FR')} CDF`);
+      setJackpotCreditInput('');
+      load();
+    } catch (e: any) {
+      setJackpotMsg(`❌ ${e.message}`);
+    } finally {
+      setJackpotLoading(false);
     }
   }
 
@@ -443,6 +488,68 @@ function OkapiColorSubTab() {
         {actionMsg && (
           <div className={`text-sm px-3 py-2 rounded-lg ${actionMsg.startsWith('✅') ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-400'}`}>
             {actionMsg}
+          </div>
+        )}
+      </div>
+
+      {/* Jackpot management */}
+      <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/[0.03] p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] uppercase tracking-wider text-yellow-500/70">🎰 Gestion Jackpot</div>
+          <div className="text-sm text-white/50">
+            Pot actuel : <span className="font-semibold" style={{ color: '#FFD700' }}>{fmtCdf(live?.jackpotCdf ?? 0)}</span>
+            <span className="ml-3 text-white/30">Seuil : {fmtCdf(live?.jackpotThresholdCdf ?? 250_000)}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {/* Set exact */}
+          <div className="space-y-2">
+            <div className="text-[11px] uppercase tracking-wider text-white/40">Définir montant exact</div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                value={jackpotSetInput}
+                onChange={(e) => setJackpotSetInput(e.target.value)}
+                placeholder="Montant (CDF)"
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-yellow-500/50 focus:outline-none"
+              />
+              <button
+                onClick={handleJackpotSet}
+                disabled={jackpotLoading || !jackpotSetInput}
+                className="rounded-lg px-4 py-2 text-sm font-semibold bg-yellow-600/80 hover:bg-yellow-600 text-black disabled:opacity-40"
+              >
+                Définir
+              </button>
+            </div>
+          </div>
+
+          {/* Credit / debit */}
+          <div className="space-y-2">
+            <div className="text-[11px] uppercase tracking-wider text-white/40">Créditer / Débiter</div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={jackpotCreditInput}
+                onChange={(e) => setJackpotCreditInput(e.target.value)}
+                placeholder="+ ou − CDF"
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-yellow-500/50 focus:outline-none"
+              />
+              <button
+                onClick={handleJackpotCredit}
+                disabled={jackpotLoading || !jackpotCreditInput}
+                className="rounded-lg px-4 py-2 text-sm font-semibold bg-zinc-600/80 hover:bg-zinc-600 text-white disabled:opacity-40"
+              >
+                Appliquer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {jackpotMsg && (
+          <div className={`text-sm px-3 py-2 rounded-lg ${jackpotMsg.startsWith('✅') ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-400'}`}>
+            {jackpotMsg}
           </div>
         )}
       </div>

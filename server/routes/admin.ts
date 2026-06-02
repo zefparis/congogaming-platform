@@ -1488,6 +1488,48 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ draws: data || [] });
   });
 
+  app.post('/api/admin/okapi-color/jackpot/set', async (req, reply) => {
+    const { amount_cdf } = req.body as { amount_cdf: number };
+    if (amount_cdf === undefined || amount_cdf === null || Number(amount_cdf) < 0) {
+      return reply.code(400).send({ code: 'INVALID_AMOUNT' });
+    }
+    const newPot = Number(amount_cdf);
+
+    const { data: current } = await supabaseAdmin
+      .from('okapi_color_jackpot').select('pot_cdf').eq('id', 1).single();
+
+    const { error } = await supabaseAdmin
+      .from('okapi_color_jackpot')
+      .update({ pot_cdf: newPot, updated_at: new Date().toISOString() })
+      .eq('id', 1);
+    if (error) return reply.code(500).send({ code: 'DB_ERROR', error: error.message });
+
+    await audit(req, 'okapi_color_jackpot_set', null, newPot, null,
+      { old_pot: current?.pot_cdf, new_pot: newPot });
+
+    return reply.send({ ok: true, old_pot: current?.pot_cdf, new_pot: newPot });
+  });
+
+  app.post('/api/admin/okapi-color/jackpot/credit', async (req, reply) => {
+    const { delta_cdf } = req.body as { delta_cdf: number };
+    if (delta_cdf === undefined || delta_cdf === null || Number(delta_cdf) === 0) {
+      return reply.code(400).send({ code: 'INVALID_AMOUNT' });
+    }
+    const delta = Number(delta_cdf);
+
+    const { data: current } = await supabaseAdmin
+      .from('okapi_color_jackpot').select('pot_cdf').eq('id', 1).single();
+
+    const { error } = await supabaseAdmin.rpc('increment_okapi_color_jackpot', { delta });
+    if (error) return reply.code(500).send({ code: 'DB_ERROR', error: error.message });
+
+    const newPot = (Number(current?.pot_cdf) ?? 0) + delta;
+    await audit(req, 'okapi_color_jackpot_credit', null, delta, null,
+      { old_pot: current?.pot_cdf, new_pot: newPot });
+
+    return reply.send({ ok: true, old_pot: current?.pot_cdf, new_pot: newPot });
+  });
+
   app.get('/api/admin/transactions/export', async (req, reply) => {
     const { data, error } = await buildTxQuery(req.query).limit(10000);
     if (error) return reply.code(500).send({ error: error.message });
