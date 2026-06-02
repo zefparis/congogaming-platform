@@ -175,34 +175,35 @@ export default function AgentDashboard() {
         </div>
       )}
 
-      {/* Trust message */}
-      <div style={{
-        background: '#1a1a1a', border: '1px solid #2a2a2a',
-        borderRadius: 12, padding: '12px 16px', marginTop: 24, marginBottom: 0,
-        fontSize: 13, color: '#888', textAlign: 'center',
-      }}>
-        🔒 Vos commissions sont sécurisées sur Congo Gaming.<br />
-        <span style={{ color: '#F5A623' }}>Laissez accumuler et retirez quand vous voulez.</span>
-      </div>
-
-      {/* Payout section */}
       {(() => {
         const minPayout        = Number(agent.min_payout_cdf ?? 2000);
         const canRequest       = pending_cdf >= minPayout;
         const alreadyRequested = !!agent.payout_requested_at;
-        const progress         = Math.min(100, (pending_cdf / minPayout) * 100);
         return (
-          <div style={{ marginTop: 12, background: '#ffffff06', borderRadius: 12, padding: '16px', border: '1px solid #ffffff10' }}>
-            <p style={{ fontSize: 11, color: '#ffffff50', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 12 }}>Demande de paiement</p>
+          <div style={{ marginTop: 24 }}>
+            {/* Trust message */}
+            <div style={{
+              background: '#1a1a1a', border: '1px solid #2a2a2a',
+              borderRadius: 12, padding: '12px 16px', marginBottom: 12,
+              fontSize: 13, color: '#888', textAlign: 'center',
+            }}>
+              🔒 Vos commissions sont sécurisées sur Congo Gaming.<br />
+              <span style={{ color: '#F5A623' }}>Laissez accumuler et retirez quand vous voulez.</span>
+            </div>
 
             {/* Progress bar */}
-            <p style={{ fontSize: 12, color: '#ffffff60', marginBottom: 6 }}>Minimum pour retrait : {minPayout.toLocaleString('fr-FR')} CDF</p>
-            <div style={{ background: '#222', borderRadius: 8, height: 8, marginBottom: 6 }}>
-              <div style={{ width: `${progress}%`, background: canRequest ? '#F5A623' : '#555', height: 8, borderRadius: 8, transition: 'width 0.3s' }} />
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ background: '#222', borderRadius: 8, height: 8 }}>
+                <div style={{
+                  width: `${Math.min(100, (pending_cdf / minPayout) * 100)}%`,
+                  background: canRequest ? '#F5A623' : '#555',
+                  height: 8, borderRadius: 8, transition: 'width 0.3s',
+                }} />
+              </div>
+              <p style={{ fontSize: 12, color: '#666', textAlign: 'center', marginTop: 4 }}>
+                {pending_cdf.toLocaleString('fr-FR')} / {minPayout.toLocaleString('fr-FR')} CDF minimum
+              </p>
             </div>
-            <p style={{ fontSize: 12, color: '#ffffff50', marginBottom: 14, textAlign: 'right' }}>
-              {pending_cdf.toLocaleString('fr-FR')} / {minPayout.toLocaleString('fr-FR')} CDF
-            </p>
 
             {payoutMsg && (
               <p style={{ fontSize: 13, marginBottom: 12, color: payoutMsg.ok ? '#34d399' : '#f87171', textAlign: 'center' }}>
@@ -210,14 +211,10 @@ export default function AgentDashboard() {
               </p>
             )}
 
+            {/* Payout button */}
             {alreadyRequested && !payoutMsg ? (
-              <div style={{ color: '#F5A623', textAlign: 'center', fontSize: 13, fontWeight: 600, padding: '10px 0' }}>
-                ✅ Demande envoyée — paiement en cours
-                {(agent.operator || agent.phone) && (
-                  <div style={{ fontSize: 12, fontWeight: 400, color: '#ffffff80', marginTop: 4 }}>
-                    via {agent.operator ? (OPERATOR_LABEL[agent.operator] ?? agent.operator) : ''}{agent.phone ? ` · ${agent.phone}` : ''}
-                  </div>
-                )}
+              <div style={{ color: '#F5A623', textAlign: 'center', padding: 12, fontSize: 13 }}>
+                ✅ Demande envoyée — paiement en cours via {agent.operator} · {agent.phone}
               </div>
             ) : (
               <button
@@ -227,8 +224,9 @@ export default function AgentDashboard() {
                   background: canRequest ? '#F5A623' : '#333',
                   color: canRequest ? '#000' : '#666',
                   width: '100%', padding: '14px', borderRadius: 12,
-                  fontWeight: 700, border: 'none', cursor: canRequest ? 'pointer' : 'default',
-                  fontSize: 14, opacity: requesting ? 0.6 : 1,
+                  fontWeight: 700, border: 'none', fontSize: 14,
+                  cursor: canRequest ? 'pointer' : 'default',
+                  opacity: requesting ? 0.6 : 1,
                 }}
               >
                 {requesting
@@ -238,6 +236,17 @@ export default function AgentDashboard() {
                     : `Encore ${(minPayout - pending_cdf).toLocaleString('fr-FR')} CDF pour débloquer le retrait`}
               </button>
             )}
+
+            {/* Disclaimer */}
+            <div style={{
+              fontSize: 11, color: '#555', textAlign: 'center',
+              padding: '12px 16px', lineHeight: 1.6, marginTop: 8,
+            }}>
+              Vous gagnez 50 CDF sur chaque ticket joué par vos clients sur<br />
+              Okapi Color, Flash Loto et Scratch.<br />
+              Les commissions sont actives tant que vos clients jouent sur Congo Gaming.<br />
+              Congo Gaming se réserve le droit de modifier les conditions avec préavis de 30 jours.
+            </div>
           </div>
         );
       })()}
