@@ -1,25 +1,10 @@
-// FIFA World Cup 2026 splash — IHC Abu Dhabi · ADI PredictStreet co-branding.
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSession } from '../lib/auth';
 
 const BEBAS = "'Bebas Neue', sans-serif";
 const BARLOW = "'Barlow Condensed', sans-serif";
-const KICKOFF = new Date('2026-06-11T00:00:00Z').getTime();
-
-type T = { d: string; h: string; m: string; s: string };
-function diff(target: number): T {
-  const ms = Math.max(0, target - Date.now());
-  const sec = Math.floor(ms / 1000);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return {
-    d: pad(Math.floor(sec / 86400)),
-    h: pad(Math.floor((sec % 86400) / 3600)),
-    m: pad(Math.floor((sec % 3600) / 60)),
-    s: pad(sec % 60),
-  };
-}
 
 const FIRE_COLORS = ['#ff6600', '#ff9900', '#ffcc00', '#ff4400'];
 const rand = (min: number, max: number) => Math.random() * (max - min) + min;
@@ -37,7 +22,6 @@ type Particle = {
 export default function SplashScreen() {
   const nav = useNavigate();
   const { t } = useTranslation();
-  const [countdown, setCountdown] = useState<T>(() => diff(KICKOFF));
 
   const particles = useMemo<Particle[]>(
     () =>
@@ -53,15 +37,9 @@ export default function SplashScreen() {
     [],
   );
 
-  useEffect(() => {
-    if (getSession()) {
-      nav('/', { replace: true });
-      return;
-    }
-    const id = setInterval(() => setCountdown(diff(KICKOFF)), 1000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (getSession()) {
+    nav('/', { replace: true });
+  }
 
   return (
     <div
@@ -206,83 +184,7 @@ export default function SplashScreen() {
             Prediction Market · DRC
           </div>
 
-          {/* 6. FIFA tag */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: 2,
-              padding: '7px 18px',
-              marginBottom: 16,
-              fontSize: 11,
-              letterSpacing: 3,
-              color: '#ffffff',
-              fontWeight: 700,
-              fontFamily: BARLOW,
-              animation: 'splashFadeup 1s ease-out both',
-            }}
-          >
-            <span>★</span>
-            <span>FIFA WORLD CUP 2026™ — OFFICIEL</span>
-            <span>★</span>
-          </div>
-
-          {/* 7. Countdown */}
-          <div
-            style={{
-              display: 'flex',
-              animation: 'splashFadeup 1.1s ease-out both',
-              marginBottom: 22,
-            }}
-          >
-            {[
-              { v: countdown.d, l: t('splash.days') },
-              { v: countdown.h, l: t('splash.hours') },
-              { v: countdown.m, l: t('splash.min') },
-              { v: countdown.s, l: t('splash.sec') },
-            ].map((c, i) => (
-              <div
-                key={c.l}
-                style={{
-                  minWidth: 54,
-                  padding: '10px 12px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '0.5px solid rgba(255,255,255,0.1)',
-                  borderLeftWidth: i === 0 ? 0.5 : 0,
-                  textAlign: 'center',
-                }}
-              >
-                <div
-                  key={c.v}
-                  style={{
-                    fontFamily: BEBAS,
-                    fontSize: 34,
-                    lineHeight: 1,
-                    color: '#ffffff',
-                    animation: 'splashDigitPop 0.45s ease-out',
-                  }}
-                >
-                  {c.v}
-                </div>
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: 8,
-                    letterSpacing: 2,
-                    color: 'rgba(255,255,255,0.3)',
-                    textTransform: 'uppercase',
-                    fontFamily: BARLOW,
-                  }}
-                >
-                  {c.l}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* 9. CTA primary */}
+          {/* CTA primary */}
           <button
             type="button"
             onClick={() => nav('/register')}
@@ -375,10 +277,5 @@ const KEYFRAMES = `
 @keyframes splashFloat {
   0%   { transform: translateY(0)      scale(1);   opacity: 0.7; }
   100% { transform: translateY(-120px) scale(0.3); opacity: 0;   }
-}
-@keyframes splashDigitPop {
-  0%   { transform: scale(1);   }
-  50%  { transform: scale(1.2); }
-  100% { transform: scale(1);   }
 }
 `;
