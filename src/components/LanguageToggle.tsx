@@ -4,6 +4,7 @@ const LANGUAGES = [
   { code: 'fr', label: 'FR' },
   { code: 'ln', label: 'LN' },
   { code: 'sw', label: 'SW' },
+  { code: 'en', label: 'EN' },
   // future: { code: 'kg', label: 'KG' },
 ];
 
