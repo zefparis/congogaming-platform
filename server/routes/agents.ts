@@ -45,11 +45,10 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
       let tier: string;
       if      (totalEarned >= 5000000) tier = 'diamond';
       else if (totalEarned >= 1000000) tier = 'gold';
-      else if (totalEarned >= 500000)  tier = 'silver';
-      else                             tier = 'bronze';
+      else                             tier = 'standard';
 
       const tierThresholds: Record<string, number | null> = {
-        bronze: 500000, silver: 1000000, gold: 5000000, diamond: null,
+        standard: 1000000, gold: 5000000, diamond: null,
       };
       const next_tier_cdf = tierThresholds[tier];
 
@@ -86,8 +85,7 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
       const total        = (pendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
       const totalEarned  = Number(agent.total_earned_cdf ?? 0);
       const agentTier    = totalEarned >= 5000000 ? 'diamond'
-                         : totalEarned >= 1000000 ? 'gold'
-                         : totalEarned >= 500000  ? 'silver' : 'bronze';
+                         : totalEarned >= 1000000 ? 'gold' : 'standard';
       const minimum      = agentTier === 'diamond' ? 1000 : Number(agent.min_payout_cdf ?? 2000);
 
       if (total < minimum) {

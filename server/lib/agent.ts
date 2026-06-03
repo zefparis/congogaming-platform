@@ -63,10 +63,8 @@ export async function recordAgentWinCommission(
     if (!agent || agent.status !== 'active') return;
 
     const total = Number(agent.total_earned_cdf);
-    let winRate = 0;
-    if (total >= 5000000) winRate = 0.03;
-    else if (total >= 1000000) winRate = 0.02;
-    else return;
+    if (total < 1000000) return;
+    const winRate = total >= 5000000 ? 0.03 : 0.02;
 
     const commissionCdf = Math.floor(gainCdf * winRate);
     if (commissionCdf <= 0) return;

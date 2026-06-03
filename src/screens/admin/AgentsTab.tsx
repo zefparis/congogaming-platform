@@ -12,15 +12,13 @@ function qrImgUrl(qrCode: string, size = 140): string {
 function getTierColor(total: number): string {
   if (total >= 5000000) return '#00BFFF';
   if (total >= 1000000) return '#F5A623';
-  if (total >= 500000)  return '#C0C0C0';
   return '#CD7F32';
 }
 
 function getTierLabel(total: number): string {
   if (total >= 5000000) return 'DIAMOND';
   if (total >= 1000000) return 'VIP GOLD';
-  if (total >= 500000)  return 'SILVER';
-  return 'BRONZE';
+  return 'STANDARD';
 }
 
 function StatusBadge({ status }: { status: string }) {

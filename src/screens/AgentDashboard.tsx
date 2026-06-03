@@ -20,10 +20,9 @@ const OPERATOR_LABEL: Record<string, string> = {
 };
 
 const TIERS = {
-  bronze:  { label: 'BRONZE',   color: '#CD7F32', next: 500000,  perks: '50 CDF / ticket' },
-  silver:  { label: 'SILVER',   color: '#C0C0C0', next: 1000000, perks: '50 CDF / ticket + badge' },
-  gold:    { label: 'VIP GOLD', color: '#F5A623', next: 5000000, perks: '50 CDF / ticket + 2% sur gains' },
-  diamond: { label: 'DIAMOND',  color: '#00BFFF', next: null,   perks: '50 CDF / ticket + 3% sur gains + paiement prioritaire' },
+  standard: { label: 'STANDARD', color: '#CD7F32', next: 1000000, perks: '50 FC / ticket' },
+  gold:     { label: 'VIP GOLD', color: '#F5A623', next: 5000000, perks: '50 FC / ticket + 2% sur gains de tes clients' },
+  diamond:  { label: 'DIAMOND',  color: '#00BFFF', next: null,   perks: '50 FC / ticket + 3% sur gains + paiement prioritaire' },
 } as const;
 
 const TYPE_LABEL: Record<string, string> = {
@@ -129,7 +128,7 @@ export default function AgentDashboard() {
   }
 
   const { agent, today_earned_cdf, pending_cdf, tier, next_tier_cdf, recent } = data;
-  const tierInfo = TIERS[tier as keyof typeof TIERS] ?? TIERS.bronze;
+  const tierInfo = TIERS[tier as keyof typeof TIERS] ?? TIERS.standard;
   const totalEarned = Number(agent.total_earned_cdf);
 
   return (
@@ -204,10 +203,9 @@ export default function AgentDashboard() {
             </p>
 
             {([
-              { tier: 'BRONZE',   color: '#CD7F32', seuil: 'Départ',       ticket: '50 FC / ticket', gain: '—',                    prio: '—' },
-              { tier: 'SILVER',   color: '#C0C0C0', seuil: '500 000 FC',   ticket: '50 FC / ticket', gain: '—',                    prio: '—' },
-              { tier: 'VIP GOLD', color: '#F5A623', seuil: '1 000 000 FC', ticket: '50 FC / ticket', gain: '+ 2% sur chaque gain', prio: '—' },
-              { tier: 'DIAMOND',  color: '#00BFFF', seuil: '5 000 000 FC', ticket: '50 FC / ticket', gain: '+ 3% sur chaque gain', prio: '✅ Paiement prioritaire' },
+              { tier: 'STANDARD', color: '#CD7F32', seuil: 'Départ',       ticket: '50 FC / ticket', gain: '—',                                    prio: '—' },
+              { tier: 'VIP GOLD', color: '#F5A623', seuil: '1 000 000 FC', ticket: '50 FC / ticket', gain: '+ 2% sur chaque gain de tes clients', prio: '—' },
+              { tier: 'DIAMOND',  color: '#00BFFF', seuil: '5 000 000 FC', ticket: '50 FC / ticket', gain: '+ 3% sur chaque gain de tes clients', prio: '✅ Paiement prioritaire' },
             ] as const).map(row => (
               <div key={row.tier} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -231,7 +229,9 @@ export default function AgentDashboard() {
             <div style={{ marginTop: 12, color: '#555', fontSize: 11, lineHeight: 1.6 }}>
               💡 <strong style={{ color: '#888' }}>Exemple VIP GOLD :</strong><br />
               Ton client gagne 50 000 FC → toi tu reçois 1 000 FC automatiquement.<br />
-              Plus tes clients gagnent, plus tu gagnes avec eux.
+              <br />
+              💡 <strong style={{ color: '#888' }}>Exemple DIAMOND :</strong><br />
+              Ton client gagne 50 000 FC → toi tu reçois 1 500 FC automatiquement.
             </div>
 
             <div style={{ marginTop: 8, color: '#555', fontSize: 11, lineHeight: 1.6 }}>
@@ -269,8 +269,8 @@ export default function AgentDashboard() {
       )}
 
       {(() => {
-        const basePayout       = Number(agent.min_payout_cdf ?? 2000);
-        const minPayout        = tier === 'diamond' ? Math.min(1000, basePayout) : basePayout;
+        const basePayout = Number(agent.min_payout_cdf ?? 2000);
+        const minPayout  = tier === 'diamond' ? Math.min(1000, basePayout) : basePayout;
         const canRequest       = pending_cdf >= minPayout;
         const alreadyRequested = !!agent.payout_requested_at;
         return (
