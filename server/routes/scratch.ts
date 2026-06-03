@@ -5,7 +5,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { generateGrid } from '../lib/scratchEngine.js';
 import { ScratchBuyBodySchema, ScratchClaimBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
-import { recordAgentCommission } from '../lib/agent.js';
+import { recordAgentCommission, recordAgentWinCommission } from '../lib/agent.js';
 
 const ALLOWED_BETS = new Set([500, 1000, 2000, 5000]);
 
@@ -112,6 +112,8 @@ export default async function scratchRoutes(app: FastifyInstance) {
         const row = Array.isArray(data) ? data[0] : data;
         const win = Number(row?.win_amount_cdf ?? 0);
         const new_balance = Number(row?.new_balance ?? 0);
+
+        if (win > 0) await recordAgentWinCommission(user_id, ticket_id, 'scratch', win);
 
         return reply.send({
           win_amount_cdf: Number(win),

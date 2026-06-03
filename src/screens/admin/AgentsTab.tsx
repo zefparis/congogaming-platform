@@ -9,6 +9,20 @@ function qrImgUrl(qrCode: string, size = 140): string {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(target)}`;
 }
 
+function getTierColor(total: number): string {
+  if (total >= 5000000) return '#00BFFF';
+  if (total >= 1000000) return '#F5A623';
+  if (total >= 500000)  return '#C0C0C0';
+  return '#CD7F32';
+}
+
+function getTierLabel(total: number): string {
+  if (total >= 5000000) return 'DIAMOND';
+  if (total >= 1000000) return 'VIP GOLD';
+  if (total >= 500000)  return 'SILVER';
+  return 'BRONZE';
+}
+
 function StatusBadge({ status }: { status: string }) {
   const active = status === 'active';
   return (
@@ -290,6 +304,9 @@ export default function AgentsTab() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold text-white">{agent.display_name}</p>
+                    <span style={{ background: getTierColor(Number(agent.total_earned_cdf)), color: '#000', borderRadius: 12, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>
+                      {getTierLabel(Number(agent.total_earned_cdf))}
+                    </span>
                     {agent.zone && <p className="text-xs text-white/40">{agent.zone}</p>}
                     {(agent.phone || agent.operator) && (
                       <p className="mt-1 text-xs text-amber-400/80">

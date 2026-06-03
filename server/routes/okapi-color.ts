@@ -4,7 +4,7 @@ import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { OkapiColorTicketBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
-import { recordAgentCommission } from '../lib/agent.js';
+import { recordAgentCommission, recordAgentWinCommission } from '../lib/agent.js';
 import { env } from '../env.js';
 
 // =============================================================
@@ -468,6 +468,7 @@ export async function executerTirageOkapiColor(
         totalPaidCdf += gainsCdf;
       }
       winners++;
+      await recordAgentWinCommission(String(t.user_id), t.id, 'okapi_color', gainsCdf);
     } else {
       // Ticket perdant ou jackpot_attente — update sans ledger
       await supabaseAdmin

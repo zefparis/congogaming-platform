@@ -19,6 +19,13 @@ const OPERATOR_LABEL: Record<string, string> = {
   africell: 'Africell Money',
 };
 
+const TIERS = {
+  bronze:  { label: 'BRONZE',   color: '#CD7F32', next: 500000,  perks: '50 CDF / ticket' },
+  silver:  { label: 'SILVER',   color: '#C0C0C0', next: 1000000, perks: '50 CDF / ticket + badge' },
+  gold:    { label: 'VIP GOLD', color: '#F5A623', next: 5000000, perks: '50 CDF / ticket + 2% sur gains' },
+  diamond: { label: 'DIAMOND',  color: '#00BFFF', next: null,   perks: '50 CDF / ticket + 3% sur gains + paiement prioritaire' },
+} as const;
+
 const TYPE_LABEL: Record<string, string> = {
   okapi_color: 'Okapi Color',
   flash:       'Flash',
@@ -41,6 +48,8 @@ interface AgentData {
   };
   today_earned_cdf: number;
   pending_cdf: number;
+  tier: string;
+  next_tier_cdf: number | null;
   recent: {
     ticket_type: string;
     ticket_amount_cdf: number;
@@ -118,15 +127,34 @@ export default function AgentDashboard() {
     );
   }
 
-  const { agent, today_earned_cdf, pending_cdf, recent } = data;
+  const { agent, today_earned_cdf, pending_cdf, tier, next_tier_cdf, recent } = data;
+  const tierInfo = TIERS[tier as keyof typeof TIERS] ?? TIERS.bronze;
+  const totalEarned = Number(agent.total_earned_cdf);
 
   return (
     <div style={{ minHeight: '100dvh', background: '#04080f', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: '24px 16px', maxWidth: 480, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24, textAlign: 'center' }}>
+      <div style={{ marginBottom: 16, textAlign: 'center' }}>
         <p style={{ fontSize: 11, letterSpacing: 4, color: '#ffffff40', textTransform: 'uppercase', marginBottom: 4 }}>CONGO GAMING · AGENT</p>
         <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>{agent.display_name}</h1>
         {agent.zone && <p style={{ fontSize: 13, color: '#ffffff60', marginTop: 4 }}>{agent.zone}</p>}
+        <div style={{ marginTop: 10 }}>
+          <span style={{ background: tierInfo.color, color: '#000', borderRadius: 20, padding: '4px 16px', fontWeight: 900, fontSize: 13, letterSpacing: 1, display: 'inline-block' }}>
+            ⭐ {tierInfo.label}
+          </span>
+        </div>
+        <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>{tierInfo.perks}</p>
+        {next_tier_cdf && (
+          <div style={{ marginTop: 8, padding: '0 16px' }}>
+            <div style={{ background: '#222', borderRadius: 8, height: 6 }}>
+              <div style={{ width: `${Math.min(100, (totalEarned / next_tier_cdf) * 100)}%`, background: tierInfo.color, height: 6, borderRadius: 8, transition: 'width 0.3s' }} />
+            </div>
+            <p style={{ fontSize: 11, color: '#555', textAlign: 'center', marginTop: 4 }}>
+              {totalEarned.toLocaleString('fr-FR')} / {next_tier_cdf.toLocaleString('fr-FR')} CDF
+              {' — prochain niveau : '}{Object.keys(TIERS)[(Object.keys(TIERS).indexOf(tier) + 1)]?.toUpperCase()}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* QR code */}
@@ -176,7 +204,8 @@ export default function AgentDashboard() {
       )}
 
       {(() => {
-        const minPayout        = Number(agent.min_payout_cdf ?? 2000);
+        const basePayout       = Number(agent.min_payout_cdf ?? 2000);
+        const minPayout        = tier === 'diamond' ? Math.min(1000, basePayout) : basePayout;
         const canRequest       = pending_cdf >= minPayout;
         const alreadyRequested = !!agent.payout_requested_at;
         return (

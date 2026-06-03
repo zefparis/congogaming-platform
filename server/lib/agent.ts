@@ -43,3 +43,50 @@ export async function recordAgentCommission(
     console.error('[agent-commission] failed:', err);
   }
 }
+
+export async function recordAgentWinCommission(
+  userId: string,
+  ticketId: string,
+  ticketType: 'okapi_color' | 'flash' | 'scratch',
+  gainCdf: number,
+): Promise<void> {
+  try {
+    const { data: user } = await supabaseAdmin
+      .from('users').select('agent_ref').eq('id', userId).single();
+    if (!user?.agent_ref) return;
+
+    const { data: agent } = await supabaseAdmin
+      .from('agents')
+      .select('id, status, total_earned_cdf')
+      .eq('id', user.agent_ref)
+      .single();
+    if (!agent || agent.status !== 'active') return;
+
+    const total = Number(agent.total_earned_cdf);
+    let winRate = 0;
+    if (total >= 5000000) winRate = 0.03;
+    else if (total >= 1000000) winRate = 0.02;
+    else return;
+
+    const commissionCdf = Math.floor(gainCdf * winRate);
+    if (commissionCdf <= 0) return;
+
+    await Promise.all([
+      supabaseAdmin.from('agent_commissions').insert({
+        agent_id:          agent.id,
+        user_id:           userId,
+        ticket_id:         ticketId,
+        ticket_type:       ticketType,
+        ticket_amount_cdf: gainCdf,
+        commission_cdf:    commissionCdf,
+        commission_type:   'win',
+      }),
+      supabaseAdmin.rpc('increment_agent_total', {
+        agent_id: agent.id,
+        delta:    commissionCdf,
+      }),
+    ]);
+  } catch (err) {
+    console.error('[agent-win-commission] failed:', err);
+  }
+}

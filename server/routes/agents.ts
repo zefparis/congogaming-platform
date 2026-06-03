@@ -41,10 +41,24 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
       const today_earned_cdf = (todayRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
       const pending_cdf      = (allPendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
 
+      const totalEarned = Number(agent.total_earned_cdf);
+      let tier: string;
+      if      (totalEarned >= 5000000) tier = 'diamond';
+      else if (totalEarned >= 1000000) tier = 'gold';
+      else if (totalEarned >= 500000)  tier = 'silver';
+      else                             tier = 'bronze';
+
+      const tierThresholds: Record<string, number | null> = {
+        bronze: 500000, silver: 1000000, gold: 5000000, diamond: null,
+      };
+      const next_tier_cdf = tierThresholds[tier];
+
       return reply.send({
         agent,
         today_earned_cdf,
         pending_cdf,
+        tier,
+        next_tier_cdf,
         recent: recentRows || [],
       });
     },
@@ -57,7 +71,7 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
       const { qrCode } = req.params;
       const { data: agent, error } = await supabaseAdmin
         .from('agents')
-        .select('id, status, min_payout_cdf, payout_requested_at')
+        .select('id, status, total_earned_cdf, min_payout_cdf, payout_requested_at')
         .eq('qr_code', qrCode.toUpperCase())
         .eq('status', 'active')
         .single();
@@ -69,8 +83,12 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
         .eq('agent_id', agent.id)
         .eq('status', 'pending');
 
-      const total   = (pendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
-      const minimum = Number(agent.min_payout_cdf ?? 2000);
+      const total        = (pendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
+      const totalEarned  = Number(agent.total_earned_cdf ?? 0);
+      const agentTier    = totalEarned >= 5000000 ? 'diamond'
+                         : totalEarned >= 1000000 ? 'gold'
+                         : totalEarned >= 500000  ? 'silver' : 'bronze';
+      const minimum      = agentTier === 'diamond' ? 1000 : Number(agent.min_payout_cdf ?? 2000);
 
       if (total < minimum) {
         return reply.code(400).send({ code: 'BELOW_MINIMUM', minimum, current: total });

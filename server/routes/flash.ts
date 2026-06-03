@@ -4,7 +4,7 @@ import { recordLedgerEntry } from '../lib/ledger.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { FlashTicketBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
-import { recordAgentCommission } from '../lib/agent.js';
+import { recordAgentCommission, recordAgentWinCommission } from '../lib/agent.js';
 import { env } from '../env.js';
 
 const PRIX_FLASH = 1000;
@@ -163,6 +163,7 @@ export async function executerTirageFlash(): Promise<ExecuterTirageFlashResult> 
         p_tirage_id: tirage.id,
         p_idempotency_key: `flash:payout:${t.id}`,
       });
+      await recordAgentWinCommission(String(t.user_id), t.id, 'flash', gains_cdf);
       if (isFive) {
         jackpotPaye = true;
         await applyFlashJackpotDeltaIdempotent(
