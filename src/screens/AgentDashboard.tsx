@@ -64,6 +64,7 @@ export default function AgentDashboard() {
   const [data, setData] = useState<AgentData | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showTierInfo, setShowTierInfo] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [payoutMsg, setPayoutMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -176,6 +177,70 @@ export default function AgentDashboard() {
             <p style={{ fontSize: 13, fontWeight: 700, color: s.color, lineHeight: 1.2 }}>{s.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Tier explanation */}
+      <div style={{ marginBottom: 16 }}>
+        <button
+          onClick={() => setShowTierInfo(!showTierInfo)}
+          style={{
+            width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a',
+            borderRadius: showTierInfo ? '12px 12px 0 0' : 12, padding: '10px 16px', color: '#888',
+            fontSize: 13, cursor: 'pointer', textAlign: 'left',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}
+        >
+          <span>💡 Comment gagner plus ?</span>
+          <span>{showTierInfo ? '▲' : '▼'}</span>
+        </button>
+
+        {showTierInfo && (
+          <div style={{
+            background: '#111', border: '1px solid #1e1e1e', borderTop: 'none',
+            borderRadius: '0 0 12px 12px', padding: 16, fontSize: 12,
+          }}>
+            <p style={{ color: '#F5A623', fontWeight: 700, marginBottom: 12 }}>
+              Plus tu vends, plus tu gagnes 🚀
+            </p>
+
+            {([
+              { tier: 'BRONZE',   color: '#CD7F32', seuil: 'Départ',       ticket: '50 FC / ticket', gain: '—',                    prio: '—' },
+              { tier: 'SILVER',   color: '#C0C0C0', seuil: '500 000 FC',   ticket: '50 FC / ticket', gain: '—',                    prio: '—' },
+              { tier: 'VIP GOLD', color: '#F5A623', seuil: '1 000 000 FC', ticket: '50 FC / ticket', gain: '+ 2% sur chaque gain', prio: '—' },
+              { tier: 'DIAMOND',  color: '#00BFFF', seuil: '5 000 000 FC', ticket: '50 FC / ticket', gain: '+ 3% sur chaque gain', prio: '✅ Paiement prioritaire' },
+            ] as const).map(row => (
+              <div key={row.tier} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 0', borderBottom: '1px solid #1a1a1a',
+              }}>
+                <span style={{
+                  background: row.color, color: '#000',
+                  borderRadius: 8, padding: '2px 8px',
+                  fontWeight: 700, fontSize: 11, minWidth: 72, textAlign: 'center',
+                }}>
+                  {row.tier}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: '#888', fontSize: 11 }}>À partir de {row.seuil}</div>
+                  <div style={{ color: '#ccc', fontSize: 11 }}>{row.ticket}{row.gain !== '—' ? ` · ${row.gain}` : ''}</div>
+                  {row.prio !== '—' && <div style={{ color: '#00BFFF', fontSize: 11 }}>{row.prio}</div>}
+                </div>
+              </div>
+            ))}
+
+            <div style={{ marginTop: 12, color: '#555', fontSize: 11, lineHeight: 1.6 }}>
+              💡 <strong style={{ color: '#888' }}>Exemple VIP GOLD :</strong><br />
+              Ton client gagne 50 000 FC → toi tu reçois 1 000 FC automatiquement.<br />
+              Plus tes clients gagnent, plus tu gagnes avec eux.
+            </div>
+
+            <div style={{ marginTop: 8, color: '#555', fontSize: 11, lineHeight: 1.6 }}>
+              📈 <strong style={{ color: '#888' }}>Comment progresser vite ?</strong><br />
+              Colle ton QR code bien visible. Explique le jeu à tes clients.<br />
+              Chaque ticket joué compte pour ton total.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Recent commissions */}
