@@ -33,6 +33,24 @@ export default async function callbackRoutes(app: FastifyInstance) {
 
     if (!order_id) return reply.code(400).send({ error: 'Missing order_id' });
 
+    // ── UniPay relay (fire-and-forget) ────────────────────────
+    // WD- references are UniPay wallet transactions — not in Congo Gaming DB.
+    // Forward immediately after signature check, before any DB lookup.
+    if (order_id.startsWith('WD-')) {
+      const unipayCallback = process.env['UNIPAY_CALLBACK_URL'];
+      if (unipayCallback) {
+        fetch(unipayCallback, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10_000),
+        }).catch((err: unknown) => {
+          app.log.warn({ err, order_id }, 'UniPay relay failed');
+        });
+      }
+      return reply.code(200).send({ ok: true });
+    }
+
     const hash = eventHash(body);
     const { error: eventErr } = await supabaseAdmin.from('payment_events').insert({
       order_id,
