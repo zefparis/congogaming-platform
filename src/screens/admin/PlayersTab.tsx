@@ -29,8 +29,16 @@ function Drawer({
   const [delta, setDelta] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'super_admin'>(getCachedRole);
   const isSuper = role === 'super_admin';
+
+  // Auto-clear success toast after 3 s.
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(null), 3000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
 
   // Re-confirm role from server (in case session was opened before role was cached).
   useEffect(() => {
@@ -153,13 +161,15 @@ function Drawer({
     if (!confirm(`Ajuster le solde de ${n.toLocaleString('fr-FR')} CDF ?`)) return;
     setBusy(true);
     setError(null);
+    setSuccessMsg(null);
     try {
-      await adminApi.adjustBalance(userId, n);
+      const res = await adminApi.adjustBalance(userId, n);
       setDelta('');
+      setSuccessMsg(`Solde ajusté avec succès · nouveau solde : ${res.new_balance_cdf.toLocaleString('fr-FR')} CDF`);
       await load();
       onChanged();
     } catch (e: any) {
-      setError(e?.message || 'Erreur');
+      setError(e?.message || 'Erreur lors de l\'ajustement');
     } finally {
       setBusy(false);
     }
@@ -226,9 +236,16 @@ function Drawer({
         </div>
 
         {!data && !error && <div className="text-white/50">Chargement…</div>}
+        {successMsg && (
+          <div className="rounded border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300 flex items-center justify-between gap-2">
+            <span>✓ {successMsg}</span>
+            <button onClick={() => setSuccessMsg(null)} className="shrink-0 text-emerald-400/60 hover:text-emerald-300">✕</button>
+          </div>
+        )}
         {error && (
-          <div className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
-            {error}
+          <div className="rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 flex items-center justify-between gap-2">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-300">✕</button>
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
@@ -977,21 +977,22 @@ export default async function adminRoutes(app: FastifyInstance) {
         req.log.info({ userId: id, delta, reason }, 'admin balance adjustment requested');
 
         if (!Number.isFinite(delta) || delta === 0) {
-          return reply.code(400).send({ error: 'delta_cdf required' });
+          return reply.code(400).send({ error: 'delta_cdf requis (non nul)' });
         }
 
-        const { data, error } = await supabaseAdmin.rpc('adjust_balance', {
-          p_user_id: id,
-          p_delta: delta,
+        const result = await recordLedgerEntry({
+          user_id: id,
+          direction: delta > 0 ? 'credit' : 'debit',
+          amount: Math.abs(Math.trunc(delta)),
+          currency: 'CDF',
+          reason: reason || 'admin_adjustment',
+          reference_type: 'admin',
+          reference_id: randomUUID(),
+          idempotency_key: `admin:adjust:${id}:${randomUUID()}`,
         });
 
-        if (error) {
-          req.log.error({ userId: id, delta, error: error.message }, 'admin balance adjustment failed');
-          return reply.code(400).send({ error: error.message });
-        }
-
-        const newBalance = Number(data ?? 0);
-        req.log.info({ userId: id, delta, newBalance }, 'admin balance adjustment successful');
+        const newBalance = result.balance ?? 0;
+        req.log.info({ userId: id, delta, newBalance, duplicate: result.duplicate }, 'admin balance adjustment successful');
 
         await audit(req, 'adjust_balance', id, delta, reason);
         return reply.send({ new_balance_cdf: newBalance });
