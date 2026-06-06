@@ -41,7 +41,12 @@ export default function HomeScreen() {
   const [countdown, setCountdown] = useState<string>('--:--');
 
   useEffect(() => {
-    if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
+    const doRefresh = () => {
+      const s = getSession();
+      if (s) refreshBalance(s.id).then(setBalance).catch(() => {});
+    };
+
+    doRefresh();
     api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
     api
       .flashLatest()
@@ -51,12 +56,17 @@ export default function HomeScreen() {
       })
       .catch(() => {});
 
-    // Refresh balance every 30 seconds to catch admin adjustments
-    const interval = setInterval(() => {
-      if (session) refreshBalance(session.id).then(setBalance).catch(() => {});
-    }, 30000);
+    // Refresh immediately when the tab regains visibility (app focus / tab switch back).
+    const onVisible = () => { if (document.visibilityState === 'visible') doRefresh(); };
+    document.addEventListener('visibilitychange', onVisible);
 
-    return () => clearInterval(interval);
+    // Refresh every 15 seconds to catch admin adjustments promptly.
+    const interval = setInterval(doRefresh, 15_000);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   useEffect(() => {
