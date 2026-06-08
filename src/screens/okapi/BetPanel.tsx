@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import AutoBetPanel, { type AutoConfig } from './AutoBetPanel'
+import type { BetCurrency } from '../../lib/okapi-api'
 
-const fmtCdf = (n: number) =>
+const fmtAmount = (n: number) =>
   Math.max(0, Math.floor(n)).toLocaleString('fr-FR')
 
 type GameState = 'waiting' | 'playing' | 'crashed' | 'cashedout'
@@ -14,6 +15,8 @@ interface Props {
   hasBet: boolean
   /** When true, the MISER button is disabled regardless of round phase. */
   locked?: boolean
+  /** Betting currency — drives presets, limits and labels. */
+  currency?: BetCurrency
   onPlaceBet: (amount: number) => void
   onCashout: () => void
   // --- Auto-bet integration ---
@@ -25,15 +28,18 @@ interface Props {
   onAutoStop: () => void
 }
 
-const QUICK = [100, 500, 1000, 5000]
-const MIN_BET = 100
-const MAX_BET = 50000
+// Per-currency presets, limits and default stake.
+const BET_CONFIG: Record<BetCurrency, { quick: number[]; min: number; max: number; default: number }> = {
+  CDF: { quick: [100, 500, 1000, 5000], min: 100, max: 50000, default: 1000 },
+  CGLT: { quick: [1, 5, 10, 50], min: 1, max: 1000, default: 1 },
+}
 
 export default function BetPanel({
   state,
   multiplier,
   hasBet,
   locked = false,
+  currency = 'CDF',
   onPlaceBet,
   onCashout,
   autoRunning,
@@ -43,8 +49,15 @@ export default function BetPanel({
   onAutoStart,
   onAutoStop,
 }: Props) {
-  const [amount, setAmount] = useState<number>(1000)
+  const cfg = BET_CONFIG[currency]
+  const [amount, setAmount] = useState<number>(cfg.default)
   const [mode, setMode] = useState<Mode>('manual')
+
+  // When the player switches currency, reset the stake to that currency's
+  // default so a 1000 CDF stake doesn't leak into a CGLT bet (and vice-versa).
+  useEffect(() => {
+    setAmount(cfg.default)
+  }, [currency, cfg.default])
 
   // While auto is running, force the mode tab to 'auto' so the user can't
   // navigate away from the live status panel.
@@ -54,10 +67,7 @@ export default function BetPanel({
   const canCashout = state === 'playing' && hasBet
 
   const clamp = (n: number) =>
-    Math.max(MIN_BET, Math.min(MAX_BET, Math.floor(n) || 0))
-
-  const quickLabel = (n: number) =>
-    n >= 1000 ? `${n / 1000}k` : `${n}`
+    Math.max(cfg.min, Math.min(cfg.max, Math.floor(n) || 0))
 
   // In AUTO mode, the cashout is handled automatically by the bot, so the
   // manual CASH OUT button is irrelevant — and on narrow phones the 2-column
@@ -136,6 +146,7 @@ export default function BetPanel({
             amount={amount}
             setAmount={setAmount}
             canBet={canBet}
+            currency={currency}
             onPlaceBet={() => onPlaceBet(clamp(amount))}
           />
         )}
@@ -151,6 +162,7 @@ export default function BetPanel({
           state={state}
           amount={amount}
           multiplier={multiplier}
+          currency={currency}
           onCashout={onCashout}
         />
       )}
@@ -162,13 +174,16 @@ interface ManualBetProps {
   amount: number
   setAmount: (n: number) => void
   canBet: boolean
+  currency: BetCurrency
   onPlaceBet: () => void
 }
 
-function ManualBet({ amount, setAmount, canBet, onPlaceBet }: ManualBetProps) {
+function ManualBet({ amount, setAmount, canBet, currency, onPlaceBet }: ManualBetProps) {
+  const cfg = BET_CONFIG[currency]
   const clamp = (n: number) =>
-    Math.max(MIN_BET, Math.min(MAX_BET, Math.floor(n) || 0))
-  const quickLabel = (n: number) => (n >= 1000 ? `${n / 1000}k` : `${n}`)
+    Math.max(cfg.min, Math.min(cfg.max, Math.floor(n) || 0))
+  const quickLabel = (n: number) =>
+    currency === 'CDF' && n >= 1000 ? `${n / 1000}k` : `${n}`
   return (
     <>
       <div
@@ -183,9 +198,9 @@ function ManualBet({ amount, setAmount, canBet, onPlaceBet }: ManualBetProps) {
       >
         <input
           type="number"
-          min={MIN_BET}
-          max={MAX_BET}
-          placeholder="100"
+          min={cfg.min}
+          max={cfg.max}
+          placeholder={String(cfg.default)}
           value={amount}
           disabled={!canBet}
           onChange={(e) => setAmount(clamp(Number(e.target.value)))}
@@ -202,7 +217,7 @@ function ManualBet({ amount, setAmount, canBet, onPlaceBet }: ManualBetProps) {
             opacity: canBet ? 1 : 0.5,
           }}
         />
-        <span style={{ color: '#888', fontSize: 12 }}>CDF</span>
+        <span style={{ color: '#888', fontSize: 12 }}>{currency}</span>
       </div>
 
       <div
@@ -212,7 +227,7 @@ function ManualBet({ amount, setAmount, canBet, onPlaceBet }: ManualBetProps) {
           gap: 4,
         }}
       >
-        {QUICK.map((q) => (
+        {cfg.quick.map((q) => (
           <button
             key={q}
             disabled={!canBet}
@@ -266,10 +281,11 @@ interface CashoutCardProps {
   state: GameState
   amount: number
   multiplier: number
+  currency: BetCurrency
   onCashout: () => void
 }
 
-function CashoutCard({ canCashout, hasBet, state, amount, multiplier, onCashout }: CashoutCardProps) {
+function CashoutCard({ canCashout, hasBet, state, amount, multiplier, currency, onCashout }: CashoutCardProps) {
   // Live winnings if the user cashes out RIGHT NOW.
   const win = amount * multiplier
 
@@ -308,7 +324,7 @@ function CashoutCard({ canCashout, hasBet, state, amount, multiplier, onCashout 
             color: '#444',
           }}
         >
-          {hasBet ? `${fmtCdf(amount)} CDF` : '—'}
+          {hasBet ? `${fmtAmount(amount)} ${currency}` : '—'}
         </span>
         {hasBet && state === 'waiting' && (
           <span style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
@@ -393,8 +409,8 @@ function CashoutCard({ canCashout, hasBet, state, amount, multiplier, onCashout 
           lineHeight: 1,
         }}
       >
-        <span style={{ fontSize: 26 }}>{fmtCdf(win)}</span>
-        <span style={{ fontSize: 12, opacity: 0.85 }}>CDF</span>
+        <span style={{ fontSize: 26 }}>{fmtAmount(win)}</span>
+        <span style={{ fontSize: 12, opacity: 0.85 }}>{currency}</span>
       </motion.div>
 
       <span

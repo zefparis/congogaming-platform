@@ -1100,6 +1100,7 @@ export default function OkapiGame() {
           multiplier={multiplier}
           hasBet={Boolean(betId)}
           locked={betLocked || betSubmitting || !wsConnected}
+          currency={currency}
           onPlaceBet={handlePlaceBet}
           onCashout={handleCashout}
           autoRunning={Boolean(autoSession)}
