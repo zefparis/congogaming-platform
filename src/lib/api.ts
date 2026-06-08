@@ -170,6 +170,18 @@ export const api = {
         jackpot_en_attente: boolean; tirage_id: string | null; created_at: string; settled_at: string | null;
       }>;
     }>('/api/okapi-color/history'),
+  walletBalance: () => req<{ balance: number }>('/api/wallet/balance'),
+  cgltBalance: () =>
+    req<{ phone: string | null; cglt_balance: number; equivalent_usdt: number | null }>('/api/cglt/balance'),
+  cgltSwap: (amount_cdf: number) =>
+    req<{
+      success: boolean;
+      new_cglt_balance: number;
+      new_cdf_balance: number | null;
+      amount_cdf: number;
+      amount_cglt: number;
+      rate: number;
+    }>('/api/cglt/swap', { method: 'POST', body: JSON.stringify({ amount_cdf }) }),
   farmingStatus: () =>
     req<{
       phone: string;

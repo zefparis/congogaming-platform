@@ -7,6 +7,7 @@ import type { GameMessage } from '../../lib/okapi-socket'
 import { okapiApi } from '../../lib/okapi-api'
 import type { BetCurrency } from '../../lib/okapi-api'
 import { getCGLTBalance } from '../../services/unipay-cglt'
+import SwapCGLTModal from '../../components/SwapCGLTModal'
 import { getSession, refreshBalance, saveSession } from '../../lib/auth'
 import MultiplierDisplay from './MultiplierDisplay'
 import CrashHistory from './CrashHistory'
@@ -35,6 +36,9 @@ export default function OkapiGame() {
   // Currency of the next bet (CDF via CDF ledger, CGLT via UniPay wallet).
   const [currency, setCurrency] = useState<BetCurrency>('CDF')
   const [cgltBalance, setCgltBalance] = useState<number>(0)
+  // CDF→CGLT swap modal. Opens automatically when the player selects CGLT
+  // with an empty/insufficient wallet, and via the /compte button.
+  const [showSwapModal, setShowSwapModal] = useState<boolean>(false)
   const [betError, setBetError] = useState<string | null>(null)
   const [betSubmitting, setBetSubmitting] = useState<boolean>(false)
   // Locks the MISER button after a 409 from the server (e.g. betting closed)
@@ -1071,7 +1075,11 @@ export default function OkapiGame() {
                 key={c}
                 type="button"
                 disabled={Boolean(betId)}
-                onClick={() => setCurrency(c)}
+                onClick={() => {
+                  setCurrency(c)
+                  // Selecting CGLT with an empty wallet → offer a swap.
+                  if (c === 'CGLT' && cgltBalance <= 0) setShowSwapModal(true)
+                }}
                 style={{
                   flex: 1,
                   height: 34,
@@ -1111,6 +1119,13 @@ export default function OkapiGame() {
           onAutoStop={handleAutoStop}
         />
       </div>
+
+      {showSwapModal && (
+        <SwapCGLTModal
+          onClose={() => setShowSwapModal(false)}
+          onSuccess={(newBalance) => setCgltBalance(newBalance)}
+        />
+      )}
     </div>
   )
 }

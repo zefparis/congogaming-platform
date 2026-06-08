@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import SwapCGLTModal from '../components/SwapCGLTModal';
 import { AlertTriangle, BadgeCheck, Check, Copy, Gift, Globe, KeyRound, LogOut, Pause, Pencil, Phone, ShieldAlert, ShieldCheck, Share2, ShieldOff, TrendingDown, TrendingUp, Trophy, User, Users, Wallet, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import TransactionItem, { type TransactionType } from '../components/TransactionItem';
@@ -72,6 +73,9 @@ export default function AccountScreen() {
   const [referral, setReferral] = useState<Awaited<ReturnType<typeof api.myReferral>> | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+
+  // CDF→CGLT swap modal (also auto-opened from games).
+  const [showSwapModal, setShowSwapModal] = useState(false);
 
   useEffect(() => {
     refreshSession().then((u) => {
@@ -353,7 +357,19 @@ export default function AccountScreen() {
           <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('account.balance_label')}</div>
           <div className="font-display text-3xl text-gold">{balance.toLocaleString('fr-FR')} <span className="text-xs text-zinc-400">CDF</span></div>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowSwapModal(true)}
+          className="shrink-0 h-10 px-4 rounded-xl font-bold text-sm text-black"
+          style={{ background: 'linear-gradient(90deg, #FFD700, #38BDF8)' }}
+        >
+          Obtenir CGLT 💎
+        </button>
       </div>
+
+      {showSwapModal && (
+        <SwapCGLTModal onClose={() => setShowSwapModal(false)} />
+      )}
 
       {/* KYC Status */}
       <div
