@@ -182,6 +182,12 @@ export const api = {
       amount_cglt: number;
       rate: number;
     }>('/api/cglt/swap', { method: 'POST', body: JSON.stringify({ amount_cdf }) }),
+  cgltWithdraw: (amount_cglt: number, phone: string) =>
+    req<{
+      success: boolean;
+      new_cglt_balance: number;
+      amount_cglt: number;
+    }>('/api/cglt/withdraw', { method: 'POST', body: JSON.stringify({ amount_cglt, phone }) }),
   farmingStatus: () =>
     req<{
       phone: string;

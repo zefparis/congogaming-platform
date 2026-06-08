@@ -8,6 +8,7 @@ import { okapiApi } from '../../lib/okapi-api'
 import type { BetCurrency } from '../../lib/okapi-api'
 import { getCGLTBalance } from '../../services/unipay-cglt'
 import SwapCGLTModal from '../../components/SwapCGLTModal'
+import CGLTWalletSheet from '../../components/CGLTWalletSheet'
 import { getSession, refreshBalance, saveSession } from '../../lib/auth'
 import MultiplierDisplay from './MultiplierDisplay'
 import CrashHistory from './CrashHistory'
@@ -40,6 +41,8 @@ export default function OkapiGame() {
   // CDF→CGLT swap modal. Opens automatically when the player selects CGLT
   // with an empty/insufficient wallet, and via the /compte button.
   const [showSwapModal, setShowSwapModal] = useState<boolean>(false)
+  // CGLT wallet bottom sheet, opened by tapping the header balance.
+  const [showWalletSheet, setShowWalletSheet] = useState<boolean>(false)
   const [betError, setBetError] = useState<string | null>(null)
   const [betSubmitting, setBetSubmitting] = useState<boolean>(false)
   // Locks the MISER button after a 409 from the server (e.g. betting closed)
@@ -880,14 +883,29 @@ export default function OkapiGame() {
         >
           OKAPI CLIMB
         </div>
-        <div
+        <button
+          type="button"
+          onClick={() => setShowWalletSheet(true)}
           className="font-semibold tracking-wider whitespace-nowrap"
-          style={{ fontSize: 12, color: currency === 'CGLT' ? '#38BDF8' : '#FFD700' }}
+          style={{
+            fontSize: 12,
+            color: currency === 'CGLT' ? '#38BDF8' : '#FFD700',
+            background: 'rgba(255,255,255,0.06)',
+            border: `1px solid ${currency === 'CGLT' ? 'rgba(56,189,248,0.4)' : 'rgba(255,215,0,0.4)'}`,
+            borderRadius: 8,
+            padding: '4px 10px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          aria-label="Ouvrir le portefeuille CGLT"
         >
           {currency === 'CGLT'
             ? `${cgltBalance.toLocaleString()} CGLT`
             : `${balance.toLocaleString()} CDF`}
-        </div>
+          <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
+        </button>
         <button
           onClick={() => setIsMuted(!isMuted)}
           style={{
@@ -1132,6 +1150,18 @@ export default function OkapiGame() {
         <SwapCGLTModal
           onClose={() => setShowSwapModal(false)}
           onSuccess={(newBalance) => setCgltBalance(newBalance)}
+        />
+      )}
+
+      {showWalletSheet && (
+        <CGLTWalletSheet
+          cgltBalance={cgltBalance}
+          onClose={() => setShowWalletSheet(false)}
+          onBalanceChange={(newBalance) => {
+            setCgltBalance(newBalance)
+            // Re-sync from the authoritative UniPay wallet shortly after.
+            void syncCgltBalance()
+          }}
         />
       )}
     </div>
