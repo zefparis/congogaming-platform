@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LanguageToggle } from '../components/LanguageToggle';
 import { getSession } from '../lib/auth';
 
 const BEBAS = "'Bebas Neue', sans-serif";
@@ -131,11 +130,6 @@ export default function SplashScreen() {
 
       {/* ── CONTENT ── */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
-
-        {/* ── HEADER — LanguageToggle ONLY ── */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
-          <LanguageToggle />
-        </div>
 
         {/* ── TOP BAR (badges only — NO language selector) ── */}
         <div style={{

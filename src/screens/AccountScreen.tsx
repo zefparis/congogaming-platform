@@ -8,7 +8,6 @@ import TransactionItem, { type TransactionType } from '../components/Transaction
 import { AuthApiError, changePin, clearSession, getSession, refreshSession, updateDisplayName } from '../lib/auth';
 import { api } from '../lib/api';
 import { displayError } from '../lib/errors';
-import { LanguageToggle } from '../components/LanguageToggle';
 
 function computeInitials(displayName: string | null | undefined, phone: string | undefined): string {
   if (displayName) {
@@ -668,12 +667,9 @@ export default function AccountScreen() {
 
       {/* Language toggle */}
       <div className="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-gold" />
-            <h2 className="font-display text-base text-zinc-300 tracking-wider">{t('account.language_section')}</h2>
-          </div>
-          <LanguageToggle />
+        <div className="flex items-center gap-2">
+          <Globe className="w-5 h-5 text-gold" />
+          <h2 className="font-display text-base text-zinc-300 tracking-wider">{t('account.language_section')}</h2>
         </div>
       </div>
 
