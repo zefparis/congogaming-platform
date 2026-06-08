@@ -132,18 +132,21 @@ export default function SplashScreen() {
       {/* ── CONTENT ── */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
 
-        {/* ── TOP BAR ── */}
+        {/* ── HEADER — LanguageToggle ONLY ── */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+          <LanguageToggle />
+        </div>
+
+        {/* ── TOP BAR (badges only — NO language selector) ── */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '10px 14px 6px',
-          gap: 8,
+          padding: '4px 14px 6px',
         }}>
           <span style={{ fontSize: 8, letterSpacing: 2, textTransform: 'uppercase', color: 'rgba(245,166,35,0.55)', whiteSpace: 'nowrap' }}>
             DRC · Officiel
           </span>
-          <LanguageToggle />
           <span style={{ fontSize: 8, letterSpacing: 1.5, textTransform: 'uppercase', color: 'rgba(245,166,35,0.55)', textAlign: 'right', whiteSpace: 'nowrap' }}>
             Agréé MJS N°047/2016
           </span>
