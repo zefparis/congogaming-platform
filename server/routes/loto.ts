@@ -6,6 +6,24 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { LotoTicketBodySchema } from '../lib/validation.js';
 import { COMING_SOON_PAYLOAD, isCongoLotoEnabled } from '../lib/featureFlags.js';
 import { onWagerPlaced } from '../lib/referral.js';
+import { addXPAndReward, toFarmingPayload, type FarmingPayload } from '../lib/farming.js';
+import { getUserUnipayPhone } from '../lib/unipay-cglt.js';
+
+// Best-effort XP/CGLT farming; never breaks the ticket-buy flow.
+async function awardLotoFarming(
+  log: { error: (obj: unknown, msg?: string) => void },
+  userId: string,
+  betAmount: number,
+): Promise<FarmingPayload | null> {
+  try {
+    const phone = await getUserUnipayPhone(userId);
+    if (!phone) return null;
+    return toFarmingPayload(await addXPAndReward(supabaseAdmin, phone, betAmount));
+  } catch (err) {
+    log.error({ err }, '[farming] loto award failed');
+    return null;
+  }
+}
 
 /**
  * Soft-disable guard for Congo Loto. When the feature flag is off we
@@ -390,9 +408,12 @@ const lotoRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     // server-side via the `referral_wager_events` table.
     await onWagerPlaced(app.log, user_id, TICKET_PRICE_CDF, 'loto', ticket.id);
 
+    const farming = await awardLotoFarming(app.log, user_id, TICKET_PRICE_CDF);
+
     return reply.send({
       ticket_id: ticket.id,
       new_balance: Number(user.balance_cdf) - TICKET_PRICE_CDF,
+      farming,
     });
   });
 

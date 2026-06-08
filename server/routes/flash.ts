@@ -6,6 +6,24 @@ import { FlashTicketBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
 import { recordAgentCommission, recordAgentWinCommission } from '../lib/agent.js';
 import { env } from '../env.js';
+import { addXPAndReward, toFarmingPayload, type FarmingPayload } from '../lib/farming.js';
+import { getUserUnipayPhone } from '../lib/unipay-cglt.js';
+
+// Best-effort XP/CGLT farming; never breaks the ticket-buy flow.
+async function awardFlashFarming(
+  log: { error: (obj: unknown, msg?: string) => void },
+  userId: string,
+  betAmount: number,
+): Promise<FarmingPayload | null> {
+  try {
+    const phone = await getUserUnipayPhone(userId);
+    if (!phone) return null;
+    return toFarmingPayload(await addXPAndReward(supabaseAdmin, phone, betAmount));
+  } catch (err) {
+    log.error({ err }, '[farming] flash award failed');
+    return null;
+  }
+}
 
 const PRIX_FLASH = 1000;
 const JACKPOT_CONTRIBUTION = 500; // 50% du ticket
@@ -313,9 +331,12 @@ const flashRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     await onWagerPlaced(app.log, user_id, PRIX_FLASH, 'flash', ticket.id);
     await recordAgentCommission(user_id, ticket.id, 'flash', PRIX_FLASH);
 
+    const farming = await awardFlashFarming(app.log, user_id, PRIX_FLASH);
+
     return reply.send({
       ticket_id: ticket.id,
       new_balance: Number(user.balance_cdf) - PRIX_FLASH,
+      farming,
     });
   });
 

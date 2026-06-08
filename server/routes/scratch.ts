@@ -6,6 +6,24 @@ import { generateGrid } from '../lib/scratchEngine.js';
 import { ScratchBuyBodySchema, ScratchClaimBodySchema } from '../lib/validation.js';
 import { onWagerPlaced } from '../lib/referral.js';
 import { recordAgentCommission, recordAgentWinCommission } from '../lib/agent.js';
+import { addXPAndReward, toFarmingPayload, type FarmingPayload } from '../lib/farming.js';
+import { getUserUnipayPhone } from '../lib/unipay-cglt.js';
+
+// Best-effort XP/CGLT farming; never breaks the buy flow.
+async function awardScratchFarming(
+  log: { error: (obj: unknown, msg?: string) => void },
+  userId: string,
+  betAmount: number,
+): Promise<FarmingPayload | null> {
+  try {
+    const phone = await getUserUnipayPhone(userId);
+    if (!phone) return null;
+    return toFarmingPayload(await addXPAndReward(supabaseAdmin, phone, betAmount));
+  } catch (err) {
+    log.error({ err }, '[farming] scratch award failed');
+    return null;
+  }
+}
 
 const ALLOWED_BETS = new Set([500, 1000, 2000, 5000]);
 
@@ -73,11 +91,14 @@ export default async function scratchRoutes(app: FastifyInstance) {
         await onWagerPlaced(req.log, user_id, Number(bet), 'scratch', String(ticket.id));
         await recordAgentCommission(user_id, String(ticket.id), 'scratch', Number(bet));
 
+        const farming = await awardScratchFarming(req.log, user_id, Number(bet));
+
         return reply.send({
           ticket_id: ticket.id,
           grid_hidden: true,
           bet_amount_cdf: Number(bet),
           grid, // symbols only — payout not exposed
+          farming,
         });
       } catch (e: any) {
         req.log.error({ err: e }, '[scratch/buy]');

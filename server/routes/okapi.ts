@@ -8,6 +8,25 @@ import { OkapiBetBodySchema, OkapiCashoutBodySchema } from '../lib/validation.js
 import { onWagerPlaced } from '../lib/referral.js'
 import { recordAgentCommission } from '../lib/agent.js'
 import { debitCGLT, creditCGLT, getUserUnipayPhone, CgltError } from '../lib/unipay-cglt.js'
+import { addXPAndReward, toFarmingPayload, type FarmingPayload } from '../lib/farming.js'
+
+// Best-effort XP/CGLT farming after a successful wager. Never throws — a
+// farming failure must not break the bet flow.
+async function awardFarming(
+  log: { error: (obj: unknown, msg?: string) => void },
+  phone: string | null,
+  betAmount: number,
+): Promise<FarmingPayload | null> {
+  if (!phone) return null
+  const sb = getSupabase()
+  if (!sb) return null
+  try {
+    return toFarmingPayload(await addXPAndReward(sb, phone, betAmount))
+  } catch (err) {
+    log.error({ err }, '[farming] award failed')
+    return null
+  }
+}
 
 // Tracks in-flight CGLT bets so cashout pays winnings in CGLT (via UniPay)
 // instead of the CDF ledger. CGLT bets are intentionally kept off the
@@ -155,7 +174,8 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
       }
       cgltBets.set(bet_id, { phone, gameRef, amount: amount_cdf })
       await onWagerPlaced(app.log, user_id, amount_cdf, 'okapi', bet_id)
-      return reply.send({ bet_id, balance: newBalance, currency: 'CGLT' })
+      const farming = await awardFarming(app.log, phone, amount_cdf)
+      return reply.send({ bet_id, balance: newBalance, currency: 'CGLT', farming })
     }
 
     let balance: number | null = null
@@ -222,7 +242,9 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
     await onWagerPlaced(app.log, user_id, amount_cdf, 'okapi', bet_id)
     await recordAgentCommission(user_id, bet_id, 'okapi', amount_cdf)
 
-    return reply.send({ bet_id, balance })
+    const farming = await awardFarming(app.log, await getUserUnipayPhone(user_id), amount_cdf)
+
+    return reply.send({ bet_id, balance, farming })
   })
 
   app.post('/api/game/cashout', { preHandler: app.requireAuth }, async (req, reply) => {

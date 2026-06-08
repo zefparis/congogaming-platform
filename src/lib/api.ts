@@ -170,4 +170,17 @@ export const api = {
         jackpot_en_attente: boolean; tirage_id: string | null; created_at: string; settled_at: string | null;
       }>;
     }>('/api/okapi-color/history'),
+  farmingStatus: () =>
+    req<{
+      phone: string;
+      total_xp: number;
+      total_cglt_earned: number;
+      current_tier: { name: string; label: string; cglt_reward: number };
+      next_tier: { name: string; label: string; cglt_reward: number; xp_needed: number } | null;
+      progress_percent: number;
+      recent_rewards: Array<{ tier: string; cglt_amount: number; xp_at_reward: number; status: string; created_at: string }>;
+      tiers: Array<{ name: string; xp_min: number; xp_max: number | null; cglt_reward: number; label: string }>;
+    }>('/api/farming/status'),
 };
+
+export type FarmingStatus = Awaited<ReturnType<typeof api.farmingStatus>>;

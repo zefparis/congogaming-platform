@@ -23,6 +23,7 @@ import kycRoutes from './routes/kyc.js';
 import scratchRoutes from './routes/scratch.js';
 import okapiColorRoutes from './routes/okapi-color.js';
 import cgltRoutes from './routes/cglt.js';
+import farmingRoutes from './routes/farming.js';
 import { engine } from './lib/okapi-engine.js';
 import { startCrons } from './cron.js';
 import { env } from './env.js';
@@ -101,6 +102,7 @@ await app.register(kycRoutes);
 await app.register(scratchRoutes);
 await app.register(okapiColorRoutes);
 await app.register(cgltRoutes);
+await app.register(farmingRoutes);
 
 const port = env.PORT;
 const host = env.HOST;
