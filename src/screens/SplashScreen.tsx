@@ -149,20 +149,33 @@ export default function SplashScreen() {
           </span>
         </div>
 
-        {/* ── HERO ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 20px 0', textAlign: 'center' }}>
+        {/* ── HERO IMAGE full-width ── */}
+        <div style={{ position: 'relative', width: '100vw', marginLeft: 'calc(-50vw + 50%)', overflow: 'hidden' }}>
           <img
             src="/images/okapiscreen.png"
             alt="Congo Gaming"
+            className="splash-hero-img"
             style={{
-              width: 280,
+              width: '100%',
               height: 'auto',
-              objectFit: 'contain',
-              filter: 'drop-shadow(0 0 20px rgba(212,175,55,0.4))',
-              animation: 'splashFadeup 0.7s ease-out both',
-              marginBottom: 14,
+              objectFit: 'cover',
+              objectPosition: 'top',
+              display: 'block',
             }}
           />
+          <div aria-hidden style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 80,
+            background: 'linear-gradient(transparent, #0a0800)',
+            pointerEvents: 'none',
+          }} />
+        </div>
+
+        {/* ── HERO TEXT ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 20px 0', textAlign: 'center' }}>
 
           <h1 style={{
             margin: '0 0 6px',
@@ -363,6 +376,15 @@ export default function SplashScreen() {
 }
 
 const KEYFRAMES = `
+.splash-hero-img {
+  height: auto;
+}
+@media (min-width: 640px) {
+  .splash-hero-img {
+    max-height: 500px;
+    object-position: top;
+  }
+}
 @keyframes splashFadeup {
   from { transform: translateY(14px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
