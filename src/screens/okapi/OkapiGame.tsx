@@ -15,6 +15,7 @@ import PlayersList from './PlayersList'
 import BetPanel from './BetPanel'
 import type { AutoConfig } from './AutoBetPanel'
 import ClimbCurve from './ClimbCurve'
+import FarmingBar from '../../components/FarmingBar'
 
 type GameState = 'waiting' | 'playing' | 'crashed' | 'cashedout'
 type BgKey = 'climb' | 'slip' | 'crash' | 'win'
@@ -507,6 +508,8 @@ export default function OkapiGame() {
       setBetId(res.bet_id)
       betIdRef.current = res.bet_id
       hasBetRef.current = true
+      // XP was awarded server-side for this wager — refresh the farming bar.
+      window.dispatchEvent(new Event('farming:refresh'))
       if (currency === 'CGLT') {
         // CGLT bets are settled against the UniPay wallet; the returned
         // balance is the CGLT balance, not the CDF ledger.
@@ -584,6 +587,8 @@ export default function OkapiGame() {
       setBetId(res.bet_id)
       betIdRef.current = res.bet_id
       hasBetRef.current = true
+      // XP was awarded server-side for this wager — refresh the farming bar.
+      window.dispatchEvent(new Event('farming:refresh'))
       if (res.balance !== null && res.balance !== undefined) {
         updateBalance(res.balance)
       }
@@ -903,6 +908,9 @@ export default function OkapiGame() {
           {isMuted ? '🔇 Muet' : '🔊 Son'}
         </button>
       </div>
+
+      {/* FARMING MINI-BAR — sticky, just under the header */}
+      <FarmingBar zIndex={29} />
 
       {/* HISTORY BAR */}
       <div

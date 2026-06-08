@@ -5,6 +5,7 @@ import { displayError } from '../lib/errors';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import { api } from '../lib/api';
 import { getSession, refreshBalance } from '../lib/auth';
+import FarmingBar from '../components/FarmingBar';
 
 type Sym = 'okapi' | 'diamond' | 'lightning' | 'star' | 'coin' | 'flame';
 
@@ -452,6 +453,8 @@ export default function ScratchScreen() {
       const newBal = await refreshBalance(userId).catch(() => null);
       if (newBal != null) setBalance(newBal);
       setTicketId(r.ticket_id);
+      // XP awarded server-side for this wager — refresh the farming bar.
+      window.dispatchEvent(new Event('farming:refresh'));
       setGrid(r.grid as Sym[]);
     } catch (e: any) {
       alert(displayError(t, e?.code, e?.message));
@@ -553,6 +556,9 @@ export default function ScratchScreen() {
           </span>
         </div>
       </div>
+
+      {/* FARMING MINI-BAR — sticky, just under the header */}
+      <FarmingBar top={56} zIndex={5} />
 
       {/* Bet chips */}
       <div

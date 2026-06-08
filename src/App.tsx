@@ -21,7 +21,6 @@ import OkapiGame from './screens/okapi/OkapiGame';
 import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
 import BottomNav from './components/BottomNav';
-import FarmingWidget from './components/FarmingWidget';
 import InstallPrompt from './components/InstallPrompt';
 import { LanguageToggle } from './components/LanguageToggle';
 import { clearSession, getSession, refreshSession } from './lib/auth';
@@ -107,10 +106,8 @@ function KycRoute() {
 function AppRoutes() {
   const location = useLocation();
   const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
-  // Farming widget appears at the bottom of each game page. Offset clears the
-  // BottomNav where it is shown (flash/scratch/climb); loto has no BottomNav.
-  const gamePages = ['/loto', '/flash', '/scratch', '/climb'];
-  const isGamePage = gamePages.includes(location.pathname);
+  // The farming progress bar is now a sticky mini-bar rendered inside each
+  // game screen (under its header) — no floating overlay here.
   return (
     <>
       <AnimatePresence mode="wait">
@@ -145,7 +142,6 @@ function AppRoutes() {
       </AnimatePresence>
       {showNav && <InstallPrompt />}
       {showNav && <BottomNav />}
-      {isGamePage && <FarmingWidget bottomOffset={showNav ? 72 : 12} />}
     </>
   );
 }

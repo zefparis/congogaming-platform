@@ -17,6 +17,7 @@ import { displayError } from '../lib/errors';
 import { getSession, refreshBalance } from '../lib/auth';
 import { api } from '../lib/api';
 import GainsModal from '../components/GainsModal';
+import FarmingBar from '../components/FarmingBar';
 
 type State = 'idle' | 'pending' | 'success' | 'error';
 
@@ -156,6 +157,8 @@ export default function FlashScreen() {
       await api.flashTicket(session.id, selected);
       setState('success');
       setMsg(t('flash.ticket_registered'));
+      // XP awarded server-side for this wager — refresh the farming bar.
+      window.dispatchEvent(new Event('farming:refresh'));
       setPlayedNums(selected);
       setSelected([]);
       const newBal = await refreshBalance(session.id);
@@ -209,6 +212,7 @@ export default function FlashScreen() {
           {t('flash.gains_button')}
         </button>
       </header>
+      <FarmingBar />
       <GainsModal open={showGains} onClose={() => setShowGains(false)} type="flash" />
 
       <div

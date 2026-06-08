@@ -15,6 +15,7 @@ import {
 import { getSession, refreshBalance } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
 import GainsModal from '../components/GainsModal';
+import FarmingBar from '../components/FarmingBar';
 import CongoLotoComingSoon from './CongoLotoComingSoon';
 
 type State = 'idle' | 'pending' | 'success' | 'error';
@@ -158,6 +159,8 @@ export default function LotoScreen() {
       await api.lotoTicket(session.id, selected);
       setState('success');
       setMsg(t('loto.ticket_registered'));
+      // XP awarded server-side for this wager — refresh the farming bar.
+      window.dispatchEvent(new Event('farming:refresh'));
       setPlayedNums(selected);
       setSelected([]);
       const newBal = await refreshBalance(session.id);
@@ -207,6 +210,7 @@ export default function LotoScreen() {
           {t('loto.gains_button')}
         </button>
       </header>
+      <FarmingBar />
       <GainsModal open={showGains} onClose={() => setShowGains(false)} type="loto" />
 
       <div
