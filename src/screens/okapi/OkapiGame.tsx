@@ -5,6 +5,8 @@ import { ArrowLeft } from 'lucide-react'
 import { gameSocket } from '../../lib/okapi-socket'
 import type { GameMessage } from '../../lib/okapi-socket'
 import { okapiApi } from '../../lib/okapi-api'
+import type { BetCurrency } from '../../lib/okapi-api'
+import { getCGLTBalance } from '../../services/unipay-cglt'
 import { getSession, refreshBalance, saveSession } from '../../lib/auth'
 import MultiplierDisplay from './MultiplierDisplay'
 import CrashHistory from './CrashHistory'
@@ -30,6 +32,9 @@ export default function OkapiGame() {
   // Always start at 0; the real balance is fetched from the backend on mount.
   // Never trust the value cached in localStorage to display in-game.
   const [balance, setBalance] = useState<number>(0)
+  // Currency of the next bet (CDF via CDF ledger, CGLT via UniPay wallet).
+  const [currency, setCurrency] = useState<BetCurrency>('CDF')
+  const [cgltBalance, setCgltBalance] = useState<number>(0)
   const [betError, setBetError] = useState<string | null>(null)
   const [betSubmitting, setBetSubmitting] = useState<boolean>(false)
   // Locks the MISER button after a 409 from the server (e.g. betting closed)
@@ -188,17 +193,30 @@ export default function OkapiGame() {
     }
   }, [state, isMuted])
 
+  // Pull the player's CGLT balance (UniPay wallet) — used when betting in CGLT.
+  const syncCgltBalance = useCallback(async () => {
+    if (!userId) return
+    try {
+      const res = await getCGLTBalance()
+      setCgltBalance(Number(res.cglt_balance) || 0)
+    } catch {
+      /* keep last known value */
+    }
+  }, [userId])
+
   // Pull authoritative balance from the backend on mount
   useEffect(() => {
     syncBalance()
+    syncCgltBalance()
 
     // Refresh balance every 30 seconds to catch admin adjustments
     const interval = setInterval(() => {
       syncBalance()
+      syncCgltBalance()
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [syncBalance])
+  }, [syncBalance, syncCgltBalance])
 
   // Restore an active auto-bet session if the user navigates back to /climb
   // mid-session. Without this, leaving the page wipes the in-memory
@@ -479,13 +497,18 @@ export default function OkapiGame() {
     setBetError(null)
     setBetSubmitting(true)
     try {
-      const res = await okapiApi.placeBet(userId, amount)
+      const res = await okapiApi.placeBet(userId, amount, null, currency)
       // Only commit the bet client-side after the server has actually
       // debited the wallet via adjust_balance.
       setBetId(res.bet_id)
       betIdRef.current = res.bet_id
       hasBetRef.current = true
-      if (res.balance !== null && res.balance !== undefined) {
+      if (currency === 'CGLT') {
+        // CGLT bets are settled against the UniPay wallet; the returned
+        // balance is the CGLT balance, not the CDF ledger.
+        if (res.balance !== null && res.balance !== undefined) setCgltBalance(Number(res.balance) || 0)
+        else await syncCgltBalance()
+      } else if (res.balance !== null && res.balance !== undefined) {
         updateBalance(res.balance)
       } else {
         // Server up but Supabase not configured: pull authoritative value.
@@ -762,7 +785,11 @@ export default function OkapiGame() {
     try {
       const res = await okapiApi.cashout(userId, currentBetId)
       setCashoutMultiplier(res.multiplier)
-      if (res.balance !== null && res.balance !== undefined) {
+      if (currency === 'CGLT') {
+        // CGLT winnings are credited to the UniPay wallet; refresh that balance.
+        if (res.balance !== null && res.balance !== undefined) setCgltBalance(Number(res.balance) || 0)
+        else await syncCgltBalance()
+      } else if (res.balance !== null && res.balance !== undefined) {
         updateBalance(res.balance)
       } else {
         // Pull authoritative value from the backend.
@@ -770,7 +797,8 @@ export default function OkapiGame() {
       }
     } catch {
       // Cashout failed (e.g. race with crash). Re-sync to reflect the loss.
-      syncBalance()
+      if (currency === 'CGLT') syncCgltBalance()
+      else syncBalance()
     } finally {
       // Reset bet state after cashout (mirror CRASHED path)
       setBetId(null)
@@ -845,9 +873,11 @@ export default function OkapiGame() {
         </div>
         <div
           className="font-semibold tracking-wider whitespace-nowrap"
-          style={{ fontSize: 12, color: '#FFD700' }}
+          style={{ fontSize: 12, color: currency === 'CGLT' ? '#38BDF8' : '#FFD700' }}
         >
-          {balance.toLocaleString()} CDF
+          {currency === 'CGLT'
+            ? `${cgltBalance.toLocaleString()} CGLT`
+            : `${balance.toLocaleString()} CDF`}
         </div>
         <button
           onClick={() => setIsMuted(!isMuted)}
@@ -1032,6 +1062,39 @@ export default function OkapiGame() {
               : betError}
           </div>
         )}
+        {/* Currency toggle: CDF (house ledger) vs CGLT (UniPay wallet). */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          {(['CDF', 'CGLT'] as BetCurrency[]).map((c) => {
+            const active = currency === c
+            return (
+              <button
+                key={c}
+                type="button"
+                disabled={Boolean(betId)}
+                onClick={() => setCurrency(c)}
+                style={{
+                  flex: 1,
+                  height: 34,
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 13,
+                  letterSpacing: '0.04em',
+                  cursor: betId ? 'not-allowed' : 'pointer',
+                  opacity: betId && !active ? 0.5 : 1,
+                  border: active
+                    ? c === 'CGLT' ? '1px solid #38BDF8' : '1px solid #FFD700'
+                    : '1px solid #333',
+                  background: active
+                    ? c === 'CGLT' ? 'rgba(56,189,248,0.15)' : 'rgba(255,215,0,0.15)'
+                    : '#1a1a1a',
+                  color: active ? (c === 'CGLT' ? '#38BDF8' : '#FFD700') : '#888',
+                }}
+              >
+                {c === 'CGLT' ? 'CGLT 🔷' : 'CDF'}
+              </button>
+            )
+          })}
+        </div>
         <BetPanel
           state={state}
           multiplier={multiplier}

@@ -1,6 +1,7 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.congogaming.com'
 
-export interface BetResponse { bet_id: string; balance: number | null }
+export type BetCurrency = 'CDF' | 'CGLT'
+export interface BetResponse { bet_id: string; balance: number | null; currency?: BetCurrency }
 export interface CashoutResponse { win_amount: number; multiplier: number; balance: number | null }
 export interface HistoryResponse { history: number[] }
 export interface BalanceResponse { balance: number }
@@ -22,8 +23,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const okapiApi = {
-  placeBet: (_user_id: string, amount_cdf: number, auto_session_id?: string | null) =>
-    request<BetResponse>('/api/game/bet', { method: 'POST', body: JSON.stringify({ amount_cdf, auto_session_id }) }),
+  placeBet: (_user_id: string, amount_cdf: number, auto_session_id?: string | null, currency: BetCurrency = 'CDF') =>
+    request<BetResponse>('/api/game/bet', { method: 'POST', body: JSON.stringify({ amount_cdf, auto_session_id, currency }) }),
   cashout: (_user_id: string, bet_id: string) =>
     request<CashoutResponse>('/api/game/cashout', { method: 'POST', body: JSON.stringify({ bet_id }) }),
   history: () => request<HistoryResponse>('/api/game/history'),

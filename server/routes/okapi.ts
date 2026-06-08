@@ -7,6 +7,12 @@ import { getSupabase } from '../lib/supabase.js'
 import { OkapiBetBodySchema, OkapiCashoutBodySchema } from '../lib/validation.js'
 import { onWagerPlaced } from '../lib/referral.js'
 import { recordAgentCommission } from '../lib/agent.js'
+import { debitCGLT, creditCGLT, getUserUnipayPhone, CgltError } from '../lib/unipay-cglt.js'
+
+// Tracks in-flight CGLT bets so cashout pays winnings in CGLT (via UniPay)
+// instead of the CDF ledger. CGLT bets are intentionally kept off the
+// CDF-oriented okapi_bets table / cashout RPC so the CDF path is untouched.
+const cgltBets = new Map<string, { phone: string; gameRef: string; amount: number }>()
 
 type WSLike = {
   send: (data: string) => void
@@ -111,7 +117,7 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
     const parsed = OkapiBetBodySchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid bet' })
     const user_id = req.user.id
-    const { amount_cdf, auto_session_id } = parsed.data
+    const { amount_cdf, auto_session_id, currency } = parsed.data
 
     const BET_GRACE_MS = 800
     const sincePlayStart = engine.state === 'PLAYING' && engine.startTime ? Date.now() - engine.startTime : Infinity
@@ -120,6 +126,38 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
 
     const bet_id = randomUUID()
     const round_id = engine.info().round_id
+
+    // ── CGLT bet path (1 CGLT = 1 CDF) — handled entirely via UniPay ──────
+    if (currency === 'CGLT') {
+      const phone = await getUserUnipayPhone(user_id)
+      if (!phone) return reply.code(404).send({ error: 'phone_not_found' })
+      const gameRef = `okapi:${round_id}:${bet_id}`
+      let newBalance: number
+      try {
+        const res = await debitCGLT(phone, amount_cdf, gameRef)
+        newBalance = res.new_balance
+      } catch (e) {
+        if (e instanceof CgltError) {
+          if (e.code === 'INSUFFICIENT_CGLT') return reply.code(402).send({ error: 'Insufficient CGLT' })
+          return reply.code(e.status).send({ error: e.code })
+        }
+        return reply.code(500).send({ error: 'CGLT debit failed' })
+      }
+      try {
+        engine.registerBet({ bet_id, user_id, amount_cdf, round_id, cashed_out: false })
+      } catch (error) {
+        // Refund the CGLT debit if the engine rejects the bet.
+        await creditCGLT(phone, amount_cdf, gameRef, `${gameRef}:refund`).catch((err) =>
+          app.log.error({ err }, 'okapi CGLT refund failed'),
+        )
+        app.log.error({ err: error, user_id, bet_id }, 'failed to register CGLT bet')
+        return reply.code(500).send({ error: 'Bet persistence failed' })
+      }
+      cgltBets.set(bet_id, { phone, gameRef, amount: amount_cdf })
+      await onWagerPlaced(app.log, user_id, amount_cdf, 'okapi', bet_id)
+      return reply.send({ bet_id, balance: newBalance, currency: 'CGLT' })
+    }
+
     let balance: number | null = null
     try {
       const ledger = await recordLedgerEntry({
@@ -204,6 +242,28 @@ const okapiRoutes: FastifyPluginAsync = async (app) => {
     const multiplier = engine.currentMultiplier()
     if (engine.crashPoint != null && multiplier >= engine.crashPoint) return reply.code(409).send({ error: 'Too late' })
     const win_amount = Math.floor(bet.amount_cdf * multiplier)
+
+    // ── CGLT cashout path — pay winnings in CGLT via UniPay ──────────────
+    const cgltBet = cgltBets.get(bet_id)
+    if (cgltBet) {
+      let balance: number | null = null
+      try {
+        const res = await creditCGLT(cgltBet.phone, win_amount, cgltBet.gameRef, `${cgltBet.gameRef}:win`)
+        balance = res.new_balance
+      } catch (e) {
+        return reply.code(e instanceof CgltError ? e.status : 500).send({
+          error: e instanceof CgltError ? e.code : 'CGLT credit failed',
+        })
+      }
+      cgltBets.delete(bet_id)
+      bet.cashed_out = true
+      bet.cashout_multiplier = multiplier
+      for (const ws of sockets) {
+        try { ws.send(JSON.stringify({ type: 'CASHOUT_CONFIRM', multiplier, winAmount: win_amount })) }
+        catch { cleanupSocket(ws) }
+      }
+      return reply.send({ win_amount, multiplier, balance, currency: 'CGLT' })
+    }
 
     let balance: number | null = null
     try {

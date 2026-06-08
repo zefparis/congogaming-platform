@@ -22,6 +22,7 @@ import agentsPublicRoutes from './routes/agents.js';
 import kycRoutes from './routes/kyc.js';
 import scratchRoutes from './routes/scratch.js';
 import okapiColorRoutes from './routes/okapi-color.js';
+import cgltRoutes from './routes/cglt.js';
 import { engine } from './lib/okapi-engine.js';
 import { startCrons } from './cron.js';
 import { env } from './env.js';
@@ -99,6 +100,7 @@ await app.register(adminRoutes);
 await app.register(kycRoutes);
 await app.register(scratchRoutes);
 await app.register(okapiColorRoutes);
+await app.register(cgltRoutes);
 
 const port = env.PORT;
 const host = env.HOST;
@@ -118,4 +120,5 @@ const gracefulShutdown = async (signal: string) => {
 };
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

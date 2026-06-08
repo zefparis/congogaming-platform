@@ -28,6 +28,9 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('604800'),
   VITE_API_URL: z.string().optional(),
   VITE_WS_URL: z.string().optional(),
+  // UniPay CGLT gaming integration (server-to-server; key must NOT be bundled)
+  UNIPAY_API_URL: z.string().url().optional(),
+  GAMING_API_KEY: z.string().min(8).optional(),
   // Feature flags. Defaults preserve the production behaviour; set the
   // env var explicitly per environment to flip the flag.
   CONGO_LOTO_ENABLED: z
