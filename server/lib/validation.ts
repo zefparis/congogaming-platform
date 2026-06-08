@@ -27,11 +27,16 @@ export const WithdrawBodySchema = z.object({
   phone: PhoneSchema,
 });
 
-export const OkapiBetBodySchema = z.object({
-  amount_cdf: z.number().int().min(100).max(50_000),
-  auto_session_id: z.string().uuid().nullable().optional(),
-  currency: z.enum(['CDF', 'CGLT']).default('CDF'),
-});
+export const OkapiBetBodySchema = z
+  .object({
+    amount_cdf: z.number().int().min(1).max(50_000),
+    auto_session_id: z.string().uuid().nullable().optional(),
+    currency: z.enum(['CDF', 'CGLT']).default('CDF'),
+  })
+  .refine((d) => (d.currency === 'CGLT' ? d.amount_cdf >= 1 : d.amount_cdf >= 100), {
+    message: 'Mise minimale: 100 CDF (1 CGLT)',
+    path: ['amount_cdf'],
+  });
 
 export const OkapiCashoutBodySchema = z.object({
   bet_id: z.string().uuid(),

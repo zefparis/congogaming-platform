@@ -220,6 +220,10 @@ function ManualBet({ amount, setAmount, canBet, currency, onPlaceBet }: ManualBe
         <span style={{ color: '#888', fontSize: 12 }}>{currency}</span>
       </div>
 
+      <div style={{ color: '#666', fontSize: 10, fontWeight: 600 }}>
+        Mise min. {fmtAmount(cfg.min)} {currency}
+      </div>
+
       <div
         style={{
           display: 'grid',
