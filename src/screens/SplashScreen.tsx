@@ -152,13 +152,13 @@ export default function SplashScreen() {
         {/* ── HERO ── */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 20px 0', textAlign: 'center' }}>
           <img
-            src="/images/okapi.PNG"
+            src="/images/okapiscreen.png"
             alt="Congo Gaming"
             style={{
-              height: 110,
-              width: 'auto',
+              width: 280,
+              height: 'auto',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 0 28px rgba(245,166,35,0.45))',
+              filter: 'drop-shadow(0 0 20px rgba(212,175,55,0.4))',
               animation: 'splashFadeup 0.7s ease-out both',
               marginBottom: 14,
             }}
