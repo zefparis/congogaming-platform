@@ -710,57 +710,34 @@ export default function HomeScreen() {
           </div>
         </div>
 
-        {/* DÉPÔT / RETRAIT — glassmorphism buttons */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={() => nav('/depot')}
-            style={{
-              flex: 1,
-              height: 80,
-              borderRadius: 16,
-              background: 'linear-gradient(135deg, rgba(0,168,107,0.35), rgba(0,168,107,0.15))',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid rgba(0,168,107,0.6)',
-              color: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 4,
-              cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(0,168,107,0.25)',
-            }}
-          >
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFFFFF' }}>{t('home.deposit_btn')}</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{t('home.deposit_sub')}</span>
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={() => nav('/retrait')}
-            style={{
-              flex: 1,
-              height: 80,
-              borderRadius: 16,
-              background: 'rgba(255,255,255,0.05)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,215,0,0.4)',
-              color: '#FFD700',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 4,
-              cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(255,215,0,0.1)',
-            }}
-          >
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700' }}>{t('home.withdraw_btn')}</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,215,0,0.6)' }}>{t('home.withdraw_sub')}</span>
-          </motion.button>
-        </div>
+        {/* Ma Wallet UniPay */}
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => window.open('https://app.unipaycongo.com', '_blank')}
+          style={{
+            width: '100%',
+            height: 80,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, rgba(0,168,107,0.35), rgba(0,168,107,0.15))',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(0,168,107,0.6)',
+            color: '#FFFFFF',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0,168,107,0.25)',
+          }}
+        >
+          <span style={{ fontFamily: 'Bebas Neue', fontSize: 26, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Wallet size={20} />
+            Ma Wallet UniPay
+          </span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Dépôt · Retrait · CGLT</span>
+        </motion.button>
 
         <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-4">
           <div className="text-xs uppercase tracking-widest text-zinc-500">{t('home.tip_title')}</div>
