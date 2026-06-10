@@ -77,9 +77,11 @@ const envSchema = z.object({
     .transform((val) => val.toLowerCase() !== 'false')
     .default('true'),
   // PredictStreet SSO — all optional; system works without them
-  PREDICTSTREET_RSA_PRIVATE_KEY: z.string().optional(), // PEM (Railway secret) — ephemeral if unset
-  PREDICTSTREET_SERVER_SECRET:   z.string().optional(), // Shared secret for limits API
-  PREDICTSTREET_PARTNER_ID:      z.string().optional(), // Provided by PredictStreet at onboarding
+  PREDICTSTREET_RSA_PRIVATE_KEY:  z.string().optional(), // PEM (Railway secret) — ephemeral if unset
+  PREDICTSTREET_SERVER_SECRET:    z.string().optional(), // Legacy alias for bearer token
+  PREDICTSTREET_BEARER_TOKEN:     z.string().optional(), // Bearer token for limits API (preferred)
+  PREDICTSTREET_WEBHOOK_SECRET:   z.string().optional(), // HMAC-SHA256 secret for webhook
+  PREDICTSTREET_PARTNER_ID:       z.string().optional(), // Provided by PredictStreet at onboarding
 });
 
 export type Env = z.infer<typeof envSchema>;

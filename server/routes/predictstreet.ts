@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { supabaseAdmin } from '../lib/supabase.js';
 
 const KID = 'cgl-ps-v1';
@@ -58,6 +58,16 @@ function mintRS256(userId: string): string {
 export default async function predictstreetRoutes(app: FastifyInstance) {
   initKeys(app.log);
 
+  // Capture raw body for webhook HMAC verification (scoped to this plugin only).
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req: FastifyRequest, body: string, done) => {
+    (req as FastifyRequest & { _rawBody: string })._rawBody = body;
+    try {
+      done(null, JSON.parse(body));
+    } catch (e) {
+      done(e as Error);
+    }
+  });
+
   /* ────────────────────────────────────────────────────────────────────────
    * GET /.well-known/jwks.json
    * Public — PredictStreet fetches this to verify our JWTs.
@@ -84,24 +94,30 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
   });
 
   /* ────────────────────────────────────────────────────────────────────────
+   * Bearer-token auth helper — constant-time, supports both vars.
+   * ──────────────────────────────────────────────────────────────────────── */
+  function verifyBearerToken(authHeader: string | undefined): boolean {
+    const secret = process.env.PREDICTSTREET_BEARER_TOKEN
+                ?? process.env.PREDICTSTREET_SERVER_SECRET;
+    if (!secret) return false;
+
+    const provided = authHeader ?? '';
+    const expected = `Bearer ${secret}`;
+    const maxLen   = Math.max(provided.length, expected.length);
+    const a = Buffer.from(provided.padEnd(maxLen));
+    const b = Buffer.from(expected.padEnd(maxLen));
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
    * GET /api/predictstreet/users/:provider_user_id/limits
-   * Server-to-server endpoint called by PredictStreet backend.
-   * Auth: Bearer == PREDICTSTREET_SERVER_SECRET (fixed shared secret).
+   * Server-to-server. Auth: Bearer PREDICTSTREET_BEARER_TOKEN.
+   * Returns real month-to-date deposit/withdrawal consumed from transactions.
    * ──────────────────────────────────────────────────────────────────────── */
   app.get<{ Params: { provider_user_id: string } }>(
     '/api/predictstreet/users/:provider_user_id/limits',
     async (req, reply) => {
-      const secret = process.env.PREDICTSTREET_SERVER_SECRET;
-      if (!secret) {
-        return reply.code(503).send({ error: 'Limits API not configured — set PREDICTSTREET_SERVER_SECRET' });
-      }
-
-      // Constant-time comparison to prevent timing attacks
-      const provided = req.headers.authorization ?? '';
-      const expected = `Bearer ${secret}`;
-      const a = Buffer.from(provided.padEnd(expected.length));
-      const b = Buffer.from(expected.padEnd(provided.length));
-      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      if (!verifyBearerToken(req.headers.authorization)) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
@@ -116,23 +132,123 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
 
       if (!user) return reply.code(404).send({ error: 'User not found' });
 
-      // Fetch per-user limits (falls back to platform defaults if no row)
-      const { data: limits } = await supabaseAdmin
-        .from('predictstreet_limits')
-        .select('*')
-        .eq('user_id', provider_user_id)
-        .maybeSingle();
+      // Start of current calendar month (UTC)
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const monthStartIso = monthStart.toISOString();
+
+      // Per-user limits row + month-to-date aggregates in parallel
+      const [limitsRes, depositRes, withdrawalRes] = await Promise.all([
+        supabaseAdmin
+          .from('predictstreet_limits')
+          .select('deposit_limit, withdrawal_limit, kyc_status, eligible, updated_at')
+          .eq('user_id', provider_user_id)
+          .maybeSingle(),
+
+        supabaseAdmin
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', provider_user_id)
+          .eq('type', 'deposit')
+          .eq('status', 2)
+          .gte('created_at', monthStartIso),
+
+        supabaseAdmin
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', provider_user_id)
+          .eq('type', 'withdrawal')
+          .eq('status', 2)
+          .gte('created_at', monthStartIso),
+      ]);
+
+      const limits = limitsRes.data;
+      const depositConsumed    = (depositRes.data    ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+      const withdrawalConsumed = (withdrawalRes.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
       return reply.send({
         provider_user_id,
-        deposit_limit:    String(limits?.deposit_limit    ?? '1000.00'),
-        deposit_consumed: String(limits?.deposit_consumed ?? '0.00'),
-        trade_limit:      String(limits?.trade_limit      ?? '500'),
-        trade_consumed:   String(limits?.trade_consumed   ?? '0'),
-        eligible:         limits?.eligible   ?? true,
-        kyc_status:       limits?.kyc_status ?? 'approved',
-        updated_at:       limits?.updated_at ?? new Date().toISOString(),
+        deposit_limit:         Number(limits?.deposit_limit    ?? 500),
+        deposit_consumed:      depositConsumed,
+        withdrawal_limit:      Number(limits?.withdrawal_limit ?? 500),
+        withdrawal_consumed:   withdrawalConsumed,
+        kyc_status:            limits?.kyc_status ?? 'approved',
+        eligible:              limits?.eligible   ?? true,
+        updated_at:            limits?.updated_at ?? new Date().toISOString(),
       });
+    },
+  );
+
+  /* ────────────────────────────────────────────────────────────────────────
+   * POST /api/predictstreet/limits/webhook
+   * Inbound webhook from PredictStreet when a limit or eligibility changes.
+   * Auth: X-Partner-Id + X-Limits-Signature: sha256=<HMAC-SHA256 body>
+   * Dedup: event id stored in predictstreet_events (idempotent).
+   * ──────────────────────────────────────────────────────────────────────── */
+  app.post(
+    '/api/predictstreet/limits/webhook',
+    async (req, reply) => {
+      const webhookSecret = process.env.PREDICTSTREET_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        app.log.warn('[predictstreet] PREDICTSTREET_WEBHOOK_SECRET not set — webhook rejected');
+        return reply.code(503).send({ error: 'Webhook not configured' });
+      }
+
+      // ── Verify partner identity ──────────────────────────────────────────
+      const partnerId = req.headers['x-partner-id'];
+      if (partnerId !== 'congo-gaming') {
+        return reply.code(403).send({ error: 'Invalid partner' });
+      }
+
+      // ── Verify HMAC-SHA256 signature ──────────────────────────────────────
+      const rawSig = req.headers['x-limits-signature'];
+      if (typeof rawSig !== 'string' || !rawSig.startsWith('sha256=')) {
+        return reply.code(401).send({ error: 'Missing signature' });
+      }
+
+      const bodyStr = (req as FastifyRequest & { _rawBody?: string })._rawBody
+                     ?? JSON.stringify(req.body);
+
+      const expected  = 'sha256=' + crypto.createHmac('sha256', webhookSecret).update(bodyStr).digest('hex');
+      const provided  = rawSig;
+      const eqLen     = Math.max(expected.length, provided.length);
+      const eBuf      = Buffer.from(expected.padEnd(eqLen));
+      const pBuf      = Buffer.from(provided.padEnd(eqLen));
+      if (eBuf.length !== pBuf.length || !crypto.timingSafeEqual(eBuf, pBuf)) {
+        app.log.warn({ partnerId }, '[predictstreet] Invalid webhook signature');
+        return reply.code(401).send({ error: 'Invalid signature' });
+      }
+
+      // ── Parse & validate body ─────────────────────────────────────────────
+      const body = req.body as { id?: unknown; event?: unknown; subject?: unknown };
+      const { id, event, subject } = body;
+
+      if (!id || !event || !subject) {
+        return reply.code(400).send({ error: 'Missing required fields: id, event, subject' });
+      }
+      if (event !== 'limit_changed' && event !== 'eligibility_changed') {
+        return reply.code(400).send({ error: 'Unknown event type' });
+      }
+
+      // ── Deduplication ─────────────────────────────────────────────────────
+      const { error: insertErr } = await supabaseAdmin
+        .from('predictstreet_events')
+        .insert({ id: String(id), event: String(event), subject: String(subject) });
+
+      if (insertErr) {
+        if (insertErr.code === '23505') {
+          // Duplicate event — acknowledge without reprocessing
+          app.log.info({ id, event }, '[predictstreet] duplicate webhook event — skipped');
+          return reply.code(200).send({ received: true, duplicate: true });
+        }
+        app.log.error({ insertErr }, '[predictstreet] webhook insert error');
+        return reply.code(500).send({ error: 'Internal error' });
+      }
+
+      app.log.info({ id, event, subject }, '[predictstreet] webhook event received');
+
+      return reply.code(200).send({ received: true });
     },
   );
 }
