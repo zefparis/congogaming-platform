@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { supabaseAdmin } from '../lib/supabase.js';
 
 const KID = 'cgl-ps-v1';
-const ISS = 'https://api.congogaming.com';
+const ISS = 'congo-gaming';
 const AUD = 'predictstreet-prod';
 const TTL = 300; // 5 minutes
 
@@ -43,6 +43,8 @@ function mintRS256(userId: string): string {
     iss: ISS,
     aud: AUD,
     sub: userId,
+    partner: 'congo-gaming',
+    provider_user_id: userId,
     iat: now,
     exp: now + TTL,
     jti: crypto.randomUUID(),
