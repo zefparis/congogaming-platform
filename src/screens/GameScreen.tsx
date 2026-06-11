@@ -7,7 +7,7 @@ const PS_ORIGIN   = (import.meta.env.VITE_PREDICTSTREET_ORIGIN   || 'https://app
 const PARTNER_ID  = import.meta.env.VITE_PREDICTSTREET_PARTNER_ID || '';
 const IFRAME_URL  = PARTNER_ID
   ? `${PS_ORIGIN}/widget?partner_id=${encodeURIComponent(PARTNER_ID)}`
-  : (import.meta.env.VITE_GAME_IFRAME_URL || 'about:blank');
+  : (import.meta.env.VITE_GAME_IFRAME_URL || PS_ORIGIN);
 
 export default function GameScreen() {
   const nav       = useNavigate();
