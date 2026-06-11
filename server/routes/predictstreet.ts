@@ -112,7 +112,7 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
   /* ────────────────────────────────────────────────────────────────────────
    * GET /api/predictstreet/users/:provider_user_id/limits
    * Server-to-server. Auth: Bearer PREDICTSTREET_BEARER_TOKEN.
-   * Returns real month-to-date deposit/withdrawal consumed from transactions.
+   * Queries user_limits (CDF values) and converts to USD (÷ 2600).
    * ──────────────────────────────────────────────────────────────────────── */
   app.get<{ Params: { provider_user_id: string } }>(
     '/api/predictstreet/users/:provider_user_id/limits',
@@ -123,59 +123,35 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
 
       const { provider_user_id } = req.params;
 
-      // Verify user exists
-      const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('id', provider_user_id)
+      const DEFAULTS = {
+        deposit_limit_cdf:       180_000,
+        deposit_consumed_cdf:    0,
+        trade_limit_cdf:         720_000,
+        trade_consumed_cdf:      0,
+        withdrawal_limit_cdf:    180_000,
+        withdrawal_consumed_cdf: 0,
+        kyc_status:              'not_started',
+      };
+
+      const { data } = await supabaseAdmin
+        .from('user_limits')
+        .select('deposit_limit_cdf,deposit_consumed_cdf,trade_limit_cdf,trade_consumed_cdf,withdrawal_limit_cdf,withdrawal_consumed_cdf,kyc_status')
+        .eq('user_id', provider_user_id)
         .maybeSingle();
 
-      if (!user) return reply.code(404).send({ error: 'User not found' });
-
-      // Start of current calendar month (UTC)
-      const monthStart = new Date();
-      monthStart.setUTCDate(1);
-      monthStart.setUTCHours(0, 0, 0, 0);
-      const monthStartIso = monthStart.toISOString();
-
-      // Per-user limits row + month-to-date aggregates in parallel
-      const [limitsRes, depositRes, withdrawalRes] = await Promise.all([
-        supabaseAdmin
-          .from('predictstreet_limits')
-          .select('deposit_limit, withdrawal_limit, kyc_status, eligible, updated_at')
-          .eq('user_id', provider_user_id)
-          .maybeSingle(),
-
-        supabaseAdmin
-          .from('transactions')
-          .select('amount')
-          .eq('user_id', provider_user_id)
-          .eq('type', 'deposit')
-          .eq('status', 2)
-          .gte('created_at', monthStartIso),
-
-        supabaseAdmin
-          .from('transactions')
-          .select('amount')
-          .eq('user_id', provider_user_id)
-          .eq('type', 'withdrawal')
-          .eq('status', 2)
-          .gte('created_at', monthStartIso),
-      ]);
-
-      const limits = limitsRes.data;
-      const depositConsumed    = (depositRes.data    ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
-      const withdrawalConsumed = (withdrawalRes.data ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+      const row = data ?? DEFAULTS;
+      const usd = (cdf: number) => Math.round((cdf / 2600) * 100) / 100;
 
       return reply.send({
-        provider_user_id,
-        deposit_limit:         Number(limits?.deposit_limit    ?? 500),
-        deposit_consumed:      depositConsumed,
-        withdrawal_limit:      Number(limits?.withdrawal_limit ?? 500),
-        withdrawal_consumed:   withdrawalConsumed,
-        kyc_status:            limits?.kyc_status ?? 'approved',
-        eligible:              limits?.eligible   ?? true,
-        updated_at:            limits?.updated_at ?? new Date().toISOString(),
+        deposit_limit:       usd(Number(row.deposit_limit_cdf       ?? DEFAULTS.deposit_limit_cdf)),
+        deposit_consumed:    usd(Number(row.deposit_consumed_cdf     ?? DEFAULTS.deposit_consumed_cdf)),
+        trade_limit:         usd(Number(row.trade_limit_cdf          ?? DEFAULTS.trade_limit_cdf)),
+        trade_consumed:      usd(Number(row.trade_consumed_cdf       ?? DEFAULTS.trade_consumed_cdf)),
+        withdrawal_limit:    usd(Number(row.withdrawal_limit_cdf     ?? DEFAULTS.withdrawal_limit_cdf)),
+        withdrawal_consumed: usd(Number(row.withdrawal_consumed_cdf  ?? DEFAULTS.withdrawal_consumed_cdf)),
+        eligible:            (row.kyc_status ?? DEFAULTS.kyc_status) === 'verified',
+        kyc_status:          row.kyc_status ?? DEFAULTS.kyc_status,
+        currency:            'USD',
       });
     },
   );
