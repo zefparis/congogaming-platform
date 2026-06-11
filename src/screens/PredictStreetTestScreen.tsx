@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSession } from '../lib/auth';
 
-const API_BASE    = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
+const API_BASE    = 'https://api.congogaming.com';
 const PS_IFRAME   = 'https://iframe.adipredictstreet.com';
 const IFRAME_SRC  = `${PS_IFRAME}/embed?partner_id=congo-gaming`;
 
