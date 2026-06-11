@@ -50,6 +50,9 @@ export default function PredictStreetTestScreen() {
         }
 
         const { token } = (await res.json()) as { token: string };
+        const parts = token.split('.');
+        const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+        console.log('[PS JWT PAYLOAD]', JSON.stringify(payload, null, 2));
         post({ type: 'PREDICTSTREET_SSO_TOKEN_RESPONSE', nonce, token });
         setStatus('token_sent');
       } catch {
