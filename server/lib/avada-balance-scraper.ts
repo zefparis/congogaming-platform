@@ -89,6 +89,10 @@ export async function runAvadaBalanceScrape(log: Logger = consoleLogger): Promis
     log.info({}, 'Navigating to Avada login');
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 30_000 });
 
+    await page.screenshot({ path: '/tmp/avada-login.png', fullPage: true });
+    const html = await page.content();
+    console.log('[avada-scraper] LOGIN PAGE HTML SNIPPET:', html.slice(0, 3000));
+
     // Selectors are intentionally broad — backoffice may use various frameworks
     await page.fill('input[type="email"], input[name="email"], input[name="login"]', email);
     await page.fill('input[type="password"], input[name="password"]', password);
