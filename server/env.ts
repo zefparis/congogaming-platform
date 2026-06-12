@@ -82,6 +82,10 @@ const envSchema = z.object({
   PREDICTSTREET_BEARER_TOKEN:     z.string().optional(), // Bearer token for limits API (preferred)
   PREDICTSTREET_WEBHOOK_SECRET:   z.string().optional(), // HMAC-SHA256 secret for webhook
   PREDICTSTREET_PARTNER_ID:       z.string().optional(), // Provided by PredictStreet at onboarding
+
+  // Avada Pay backoffice scraper
+  AVADA_EMAIL:    z.string().email().optional(),
+  AVADA_PASSWORD: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
