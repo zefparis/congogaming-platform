@@ -32,7 +32,7 @@ const consoleLogger: Logger = {
 };
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
-const LOGIN_URL   = 'https://backoffice.avadapay.tech';
+const LOGIN_URL   = 'https://backoffice.avadapay.tech'; // used for initial page load
 const BALANCE_URL = 'https://backoffice.avadapay.tech/merchant_brand/134/balance';
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -87,11 +87,29 @@ export async function runAvadaBalanceScrape(log: Logger = consoleLogger): Promis
 
     /* ── 1. Login ──────────────────────────────────────────────────────── */
     log.info({}, 'Navigating to Avada login');
-    await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 30_000 });
+    await page.goto(LOGIN_URL, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2000);
 
     await page.screenshot({ path: '/tmp/avada-login.png', fullPage: true });
-    const html = await page.content();
-    console.log('[avada-scraper] LOGIN PAGE HTML SNIPPET:', html.slice(0, 3000));
+
+    const inputs = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('input')).map(el => ({
+        type: el.type,
+        name: el.name,
+        id: el.id,
+        placeholder: el.placeholder,
+        className: el.className,
+      }))
+    );
+    console.log('[avada-scraper] LOGIN INPUTS:', JSON.stringify(inputs, null, 2));
+
+    const buttons = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('button')).map(el => ({
+        type: el.type,
+        text: el.textContent?.trim(),
+      }))
+    );
+    console.log('[avada-scraper] LOGIN BUTTONS:', JSON.stringify(buttons, null, 2));
 
     // Selectors are intentionally broad — backoffice may use various frameworks
     await page.fill('input[type="email"], input[name="email"], input[name="login"]', email);
