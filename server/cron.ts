@@ -322,7 +322,7 @@ export function startCrons() {
   // Avada Pay balance scraper — every 15 minutes.
   // Disabled when AVADA_EMAIL / AVADA_PASSWORD are absent.
   if (process.env.AVADA_EMAIL && process.env.AVADA_PASSWORD) {
-    startAvadaBalanceScrapeLoop(15 * 60_000);
+    startAvadaBalanceScrapeLoop(60_000); // TODO: restore to 15 * 60_000 after debug
     console.log('[AVADA SCRAPER] Balance scrape loop started — every 15 min');
   } else {
     console.log('[AVADA SCRAPER] Disabled (AVADA_EMAIL / AVADA_PASSWORD not set)');
