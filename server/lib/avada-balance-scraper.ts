@@ -90,32 +90,16 @@ export async function runAvadaBalanceScrape(log: Logger = consoleLogger): Promis
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2000);
 
-    await page.screenshot({ path: '/tmp/avada-login.png', fullPage: true });
+    await page.getByPlaceholder('Email').fill(process.env.AVADA_EMAIL!);
+    await page.getByPlaceholder('Password').fill(process.env.AVADA_PASSWORD!);
+    await page.getByRole('button', { name: 'Login' }).click();
 
-    const inputs = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('input')).map(el => ({
-        type: el.type,
-        name: el.name,
-        id: el.id,
-        placeholder: el.placeholder,
-        className: el.className,
-      }))
-    );
-    console.log('[avada-scraper] LOGIN INPUTS:', JSON.stringify(inputs, null, 2));
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(2000);
 
-    const buttons = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('button')).map(el => ({
-        type: el.type,
-        text: el.textContent?.trim(),
-      }))
-    );
-    console.log('[avada-scraper] LOGIN BUTTONS:', JSON.stringify(buttons, null, 2));
-
-    // Selectors are intentionally broad — backoffice may use various frameworks
-    await page.fill('input[type="email"], input[name="email"], input[name="login"]', email);
-    await page.fill('input[type="password"], input[name="password"]', password);
-    await page.click('button[type="submit"], input[type="submit"]');
-    await page.waitForLoadState('networkidle', { timeout: 20_000 });
+    // Garde temporairement le screenshot pour vérifier qu'on est connecté :
+    await page.screenshot({ path: '/tmp/avada-after-login.png', fullPage: true });
+    console.log('[avada-scraper] Current URL after login:', page.url());
 
     const currentUrl = page.url();
     if (currentUrl.includes('login') || currentUrl.includes('signin')) {
