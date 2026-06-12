@@ -97,6 +97,24 @@ export async function runAvadaBalanceScrape(log: Logger = consoleLogger): Promis
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
+    await page.screenshot({ path: '/tmp/avada-after-submit.png', fullPage: true });
+
+    const errorTexts = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.q-field__messages, .q-notification, [role="alert"]'))
+        .map(el => el.textContent?.trim())
+        .filter(Boolean)
+    );
+    console.log('[avada-scraper] ERROR MESSAGES:', JSON.stringify(errorTexts));
+
+    const inputValues = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('input')).map(el => ({
+        placeholder: el.placeholder,
+        value: el.value,
+        type: el.type,
+      }))
+    );
+    console.log('[avada-scraper] INPUT VALUES AFTER FILL:', JSON.stringify(inputValues));
+
     // Garde temporairement le screenshot pour vérifier qu'on est connecté :
     await page.screenshot({ path: '/tmp/avada-after-login.png', fullPage: true });
     console.log('[avada-scraper] Current URL after login:', page.url());
