@@ -7,6 +7,7 @@ import { acquireJobLock } from './lib/jobLock.js';
 import { isCongoLotoEnabled } from './lib/featureFlags.js';
 import { supabaseAdmin } from './lib/supabase.js';
 import { startReconciliationLoop } from './lib/unipesa-reconciliation.js';
+import { startAvadaBalanceScrapeLoop } from './lib/avada-balance-scraper.js';
 import { env } from './env.js';
 
 /**
@@ -317,4 +318,13 @@ export function startCrons() {
   // every ledger entry guarantee no double credit/debit even if a
   // late callback and a reconciliation tick race each other.
   startReconciliationLoop(60_000);
+
+  // Avada Pay balance scraper — every 15 minutes.
+  // Disabled when AVADA_EMAIL / AVADA_PASSWORD are absent.
+  if (process.env.AVADA_EMAIL && process.env.AVADA_PASSWORD) {
+    startAvadaBalanceScrapeLoop(15 * 60_000);
+    console.log('[AVADA SCRAPER] Balance scrape loop started — every 15 min');
+  } else {
+    console.log('[AVADA SCRAPER] Disabled (AVADA_EMAIL / AVADA_PASSWORD not set)');
+  }
 }
