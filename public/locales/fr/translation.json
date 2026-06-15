@@ -4,7 +4,8 @@
     "flash": "Flash",
     "scratch": "Scratch",
     "climb": "Climb",
-    "account": "Compte"
+    "account": "Compte",
+    "predictions": "Prédictions"
   },
   "common": {
     "balance": "Solde",
@@ -324,7 +325,29 @@
     "color_jackpot": "Jackpot : {{amount}} CDF",
     "scratch_sub": "Grattez et gagnez instantanément",
     "scratch_btn": "GRATTER MAINTENANT →",
-    "legal": "© Congo Gaming Limited SARL — Agréé MJS N°047/2016 — ARPTC N°0573-0574/2023"
+    "legal": "© Congo Gaming Limited SARL — Agréé MJS N°047/2016 — ARPTC N°0573-0574/2023",
+    "predictions_badge": "OFFICIEL FIFA WORLD CUP 2026™",
+    "predictions_title": "Pariez sur la",
+    "predictions_title2": "Coupe du Monde",
+    "predictions_sub": "Marché de prédictions peer-to-peer",
+    "predictions_btn": "VOIR LES MARCHÉS →"
+  },
+  "predictions": {
+    "badge_fifa": "OFFICIEL FIFA WORLD CUP 2026™",
+    "header_title": "MARCHÉS DE",
+    "header_sub": "PRÉDICTIONS",
+    "header_desc": "Peer-to-peer · FIFA World Cup 2026™",
+    "widget_title": "MARCHÉS DISPONIBLES DÈS ACTIVATION",
+    "widget_body": "Le widget ADI PredictStreet sera disponible très prochainement. Pariez sur les matchs de la FIFA World Cup 2026™ en mode peer-to-peer.",
+    "widget_cta": "M'ALERTER À L'OUVERTURE →",
+    "how_title": "COMMENT ÇA MARCHE ?",
+    "step1_title": "Choisissez un marché",
+    "step1_desc": "Sélectionnez un match ou un événement FIFA WC 2026™ et choisissez votre prédiction.",
+    "step2_title": "Misez en CDF",
+    "step2_desc": "Utilisez votre solde Congo Gaming pour placer votre mise directement en francs congolais.",
+    "step3_title": "Gagnez peer-to-peer",
+    "step3_desc": "En cas de bonne prédiction, vous gagnez directement contre d'autres joueurs. Pas de maison — pur P2P.",
+    "legal": "ADI PredictStreet est un partenaire agréé de Congo Gaming Limited SARL. Paris réservés aux 18 ans et plus. Jouez de manière responsable."
   },
   "loto": {
     "balance_display": "💰 Solde : {{amount}} CDF",

@@ -4,7 +4,8 @@
     "flash": "Flash",
     "scratch": "Scratch",
     "climb": "Climb",
-    "account": "Account"
+    "account": "Account",
+    "predictions": "Predictions"
   },
   "common": {
     "balance": "Balance",
