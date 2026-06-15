@@ -269,31 +269,31 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* FIFA WC 2026 — gradient card, no background images */}
+      {/* FIFA WC 2026 — ADI PredictStreet branding */}
       <div style={{ padding: '0 14px 12px' }}>
         <div
           style={{
             position: 'relative',
             overflow: 'hidden',
             borderRadius: 16,
-            background: 'linear-gradient(135deg, #08090f 0%, #0f1a2e 55%, #08090f 100%)',
-            border: '1px solid rgba(255,215,0,0.2)',
+            background: 'linear-gradient(135deg, #010820 0%, #013CFF 100%)',
+            border: '1px solid rgba(1,60,255,0.35)',
             padding: '22px 16px 20px',
           }}
         >
-          {/* Red glow right, gold glow bottom-left */}
+          {/* Electric orange glow right, blue glow bottom-left */}
           <div
             aria-hidden
             style={{
               position: 'absolute',
               inset: 0,
               background:
-                'radial-gradient(circle at 96% 50%, rgba(206,17,38,0.24) 0%, transparent 52%),' +
-                'radial-gradient(circle at 0% 100%, rgba(255,215,0,0.09) 0%, transparent 52%)',
+                'radial-gradient(circle at 92% 44%, rgba(255,113,10,0.35) 0%, transparent 52%),' +
+                'radial-gradient(circle at 4% 92%, rgba(1,60,255,0.18) 0%, transparent 50%)',
               pointerEvents: 'none',
             }}
           />
-          {/* Diagonal stripe pattern */}
+          {/* Subtle diagonal stripe — orange tint */}
           <div
             aria-hidden
             style={{
@@ -301,26 +301,39 @@ export default function HomeScreen() {
               right: 0,
               top: 0,
               bottom: 0,
-              width: '40%',
+              width: '38%',
               background:
-                'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(255,215,0,0.028) 6px, rgba(255,215,0,0.028) 7px)',
+                'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(255,113,10,0.045) 6px, rgba(255,113,10,0.045) 7px)',
               pointerEvents: 'none',
             }}
           />
 
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 4 }}>
-              {t('home.wc26_label')}
-            </div>
+            {/* Official pill badge */}
+            <span
+              style={{
+                display: 'inline-block',
+                background: 'linear-gradient(135deg, #FF710A, #c95500)',
+                color: '#fff',
+                fontSize: 8,
+                fontWeight: 800,
+                letterSpacing: 1.2,
+                padding: '3px 9px',
+                borderRadius: 20,
+                marginBottom: 12,
+                textTransform: 'uppercase' as const,
+              }}
+            >
+              🏆 OFFICIEL FIFA WORLD CUP 2026™
+            </span>
+
             <div style={{ fontFamily: 'Bebas Neue', fontSize: 36, color: 'white', lineHeight: 1 }}>
-              FIFA WORLD CUP
+              PREDICT AT THE SPEED
             </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 52, color: '#FFD700', lineHeight: 1 }}>
-              2026
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 36, color: '#FF710A', lineHeight: 1, marginBottom: 16 }}>
+              OF PLAY
             </div>
-            <div style={{ fontSize: 13, color: '#00A86B', marginTop: 4, marginBottom: 16 }}>
-              {t('home.wc26_sub')}
-            </div>
+
             <motion.button
               whileHover={{ filter: 'brightness(1.1)' }}
               whileTap={{ scale: 0.98, filter: 'brightness(1.1)' }}
@@ -344,9 +357,21 @@ export default function HomeScreen() {
                   nav('/kyc');
                 }
               }}
-              style={ctaStyle}
+              style={{
+                background: 'linear-gradient(135deg, #013CFF 0%, #FF710A 100%)',
+                color: '#fff',
+                fontFamily: 'Bebas Neue',
+                fontSize: 16,
+                letterSpacing: 3,
+                padding: '12px 24px',
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(1,60,255,0.42)',
+                display: 'block',
+              }}
             >
-              {t('home.play_now')}
+              JOUER MAINTENANT
             </motion.button>
           </div>
         </div>
@@ -707,104 +732,6 @@ export default function HomeScreen() {
           </div>
         </div>
 
-        {/* PREDICTION MARKET — ADI PredictStreet × FIFA WC 2026 */}
-        <div
-          onClick={() => nav('/predictions')}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 16,
-            minHeight: 210,
-            cursor: 'pointer',
-            background: 'linear-gradient(140deg, #0a0014 0%, #1c0032 55%, #0a0014 100%)',
-            border: '1px solid rgba(255,215,0,0.28)',
-          }}
-        >
-          {/* Radial glow accents */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'radial-gradient(circle at 80% 40%, rgba(206,17,38,0.28) 0%, transparent 55%),' +
-                'radial-gradient(circle at 5% 85%, rgba(255,215,0,0.12) 0%, transparent 50%)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          {/* Phone mockup illustration */}
-          <img
-            src="/assets/phone mockup.png"
-            alt=""
-            aria-hidden
-            style={{
-              position: 'absolute',
-              right: '-8px',
-              bottom: 0,
-              height: '92%',
-              width: 'auto',
-              objectFit: 'contain',
-              zIndex: 2,
-              filter: 'drop-shadow(0 0 18px rgba(255,215,0,0.22)) drop-shadow(0 0 36px rgba(206,17,38,0.18))',
-            }}
-          />
-
-          {/* Content */}
-          <div style={{ position: 'relative', zIndex: 3, padding: '18px 16px', maxWidth: '58%' }}>
-            {/* Official badge */}
-            <div
-              style={{
-                display: 'inline-block',
-                background: 'linear-gradient(135deg, #CE1126 0%, #8B0000 100%)',
-                color: '#fff',
-                fontSize: 8,
-                fontWeight: 800,
-                letterSpacing: 1.2,
-                padding: '3px 8px',
-                borderRadius: 4,
-                marginBottom: 8,
-                textTransform: 'uppercase' as const,
-              }}
-            >
-              🏆 {t('home.predictions_badge')}
-            </div>
-
-            <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 3 }}>
-              PREDICTION MARKET
-            </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 34, color: 'white', lineHeight: 1 }}>
-              {t('home.predictions_title')}
-            </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 34, color: '#FFD700', lineHeight: 1, marginBottom: 6 }}>
-              {t('home.predictions_title2')}
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 14, lineHeight: 1.4 }}>
-              {t('home.predictions_sub')}
-            </div>
-
-            <motion.button
-              whileHover={{ filter: 'brightness(1.1)' }}
-              whileTap={{ scale: 0.97, filter: 'brightness(1.1)' }}
-              onClick={(e) => { e.stopPropagation(); nav('/predictions'); }}
-              style={{
-                background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
-                color: '#0a0500',
-                fontFamily: 'Bebas Neue',
-                fontSize: 13,
-                letterSpacing: 2,
-                padding: '10px 16px',
-                borderRadius: 12,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(217,164,0,0.38)',
-                display: 'block',
-              }}
-            >
-              {t('home.predictions_btn')}
-            </motion.button>
-          </div>
-        </div>
 
         {/* Ma Wallet UniPay */}
         <motion.button
