@@ -6,7 +6,7 @@ const API_BASE    = import.meta.env.VITE_API_URL || 'https://api.congogaming.com
 const PS_ORIGIN   = (import.meta.env.VITE_PREDICTSTREET_ORIGIN   || 'https://app.dev.predictstreet.sde.adifoundation.ai').replace(/\/$/, '');
 const PARTNER_ID  = import.meta.env.VITE_PREDICTSTREET_PARTNER_ID || '';
 const IFRAME_URL  = PARTNER_ID
-  ? `${PS_ORIGIN}/widget?partner_id=${encodeURIComponent(PARTNER_ID)}`
+  ? `${PS_ORIGIN}/widget?partner_id=${encodeURIComponent(PARTNER_ID)}&currency=CDF&locale=fr-CD`
   : (import.meta.env.VITE_GAME_IFRAME_URL || PS_ORIGIN);
 
 type WalletStatus = 'initializing' | 'ready' | 'error';
