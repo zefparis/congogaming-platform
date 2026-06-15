@@ -35,9 +35,23 @@ function initKeys(log: FastifyInstance['log']): void {
   log.info('[predictstreet] JWKS ready — kid=%s iss=%s aud=%s ttl=%ds', KID, ISS, AUD, TTL);
 }
 
+/* ── Deterministic EVM address — no web3 library needed ────────────────── */
+/**
+ * Derives a stable, unique EVM-format wallet address from the Congo Gaming
+ * user ID. Used as `wallet_address` claim for ADI PredictStreet.
+ *
+ * Not a real on-chain key — it is a deterministic identifier that satisfies
+ * ADI's `wallet_address` requirement (0x + 40 hex chars, unique per user).
+ * Never changes for a given user: hash("cgl:" + userId) is stable.
+ */
+function deriveEVMAddress(userId: string): string {
+  return '0x' + crypto.createHash('sha256').update(`cgl:${userId}`).digest('hex').slice(0, 40);
+}
+
 /* ── RS256 JWT mint — pure Node.js crypto, no external deps ────────────── */
 function mintRS256(userId: string): string {
-  const now  = Math.floor(Date.now() / 1000);
+  const now          = Math.floor(Date.now() / 1000);
+  const walletAddress = deriveEVMAddress(userId);
   const header  = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: KID })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
     iss: ISS,
@@ -45,6 +59,7 @@ function mintRS256(userId: string): string {
     sub: userId,
     partner: 'congo-gaming',
     provider_user_id: userId,
+    wallet_address:   walletAddress,  // required by ADI — fixes no_evm_wallet (401)
     iat: now,
     exp: now + TTL,
     jti: crypto.randomUUID(),
@@ -89,7 +104,11 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
     const jwt = mintRS256(req.user.id);
     // Security: never log the full token — only non-sensitive metadata
     app.log.info(
-      { sub_prefix: req.user.id.slice(0, 8), kid: KID, ttl: TTL },
+      {
+        sub_prefix:     req.user.id.slice(0, 8),
+        wallet_prefix:  deriveEVMAddress(req.user.id).slice(0, 10),
+        kid: KID, ttl: TTL,
+      },
       '[predictstreet] JWT minted',
     );
     return reply.send({ token: jwt });
