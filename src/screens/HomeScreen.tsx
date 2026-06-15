@@ -269,59 +269,53 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, minHeight: 280 }}>
-          {/* Background image */}
-          <img
-            src="/images/worldcup2026.jpg"
-            alt="FIFA World Cup 2026"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center center',
-            }}
-          />
-
-          {/* Dark gradient overlay bottom to top */}
+      {/* FIFA WC 2026 — gradient card, no background images */}
+      <div style={{ padding: '0 14px 12px' }}>
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, #08090f 0%, #0f1a2e 55%, #08090f 100%)',
+            border: '1px solid rgba(255,215,0,0.2)',
+            padding: '22px 16px 20px',
+          }}
+        >
+          {/* Red glow right, gold glow bottom-left */}
           <div
+            aria-hidden
             style={{
               position: 'absolute',
               inset: 0,
               background:
-                'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 55%)',
+                'radial-gradient(circle at 96% 50%, rgba(206,17,38,0.24) 0%, transparent 52%),' +
+                'radial-gradient(circle at 0% 100%, rgba(255,215,0,0.09) 0%, transparent 52%)',
+              pointerEvents: 'none',
             }}
           />
-
-          {/* World Cup trophy */}
-          <img
-            src="/images/okapi/copa.PNG"
-            alt="World Cup Trophy"
-            className="shimmer-gold"
+          {/* Diagonal stripe pattern */}
+          <div
+            aria-hidden
             style={{
               position: 'absolute',
-              right: '-5px',
-              bottom: '20%',
-              height: '72%',
-              width: 'auto',
-              objectFit: 'contain',
-              zIndex: 2,
-              mixBlendMode: 'normal',
-              opacity: 1,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: '40%',
+              background:
+                'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(255,215,0,0.028) 6px, rgba(255,215,0,0.028) 7px)',
+              pointerEvents: 'none',
             }}
           />
 
-          {/* Content on top */}
-          <div style={{ position: 'relative', maxWidth: '55%', zIndex: 3, padding: '20px 16px' }}>
+          <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 4 }}>
               {t('home.wc26_label')}
             </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 38, color: 'white', lineHeight: 1 }}>
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 36, color: 'white', lineHeight: 1 }}>
               FIFA WORLD CUP
             </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 56, color: '#FFD700', lineHeight: 1 }}>
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 52, color: '#FFD700', lineHeight: 1 }}>
               2026
             </div>
             <div style={{ fontSize: 13, color: '#00A86B', marginTop: 4, marginBottom: 16 }}>
@@ -356,6 +350,9 @@ export default function HomeScreen() {
             </motion.button>
           </div>
         </div>
+      </div>
+
+      <div className="p-4 space-y-4">
 
         {/* OKAPI CLIMB card */}
         <div
