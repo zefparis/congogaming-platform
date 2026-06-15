@@ -6,7 +6,7 @@ const API_BASE    = import.meta.env.VITE_API_URL || 'https://api.congogaming.com
 const PS_ORIGIN   = (import.meta.env.VITE_PREDICTSTREET_ORIGIN   || 'https://app.dev.predictstreet.sde.adifoundation.ai').replace(/\/$/, '');
 const PARTNER_ID  = import.meta.env.VITE_PREDICTSTREET_PARTNER_ID || '';
 const IFRAME_URL  = PARTNER_ID
-  ? `${PS_ORIGIN}/widget?partner_id=${encodeURIComponent(PARTNER_ID)}&currency=CDF&locale=fr-CD`
+  ? `${PS_ORIGIN}/widget?partner_id=${encodeURIComponent(PARTNER_ID)}`
   : (import.meta.env.VITE_GAME_IFRAME_URL || PS_ORIGIN);
 
 type WalletStatus = 'initializing' | 'ready' | 'error';
@@ -41,6 +41,17 @@ export default function GameScreen() {
    * (deriveEVMAddress in predictstreet.ts) — fixes ADI no_evm_wallet (401).
    * ─────────────────────────────────────────────────────────────────────────*/
   useEffect(() => {
+    // DEBUG — log every incoming postMessage to identify the real ADI origin
+    // Remove once origin mismatch is resolved
+    console.log('[PS-DEBUG] PS_ORIGIN:', PS_ORIGIN);
+    console.log('[PS-DEBUG] IFRAME_URL:', IFRAME_URL);
+    const debugHandler = (e: MessageEvent) => {
+      if (e.data?.type?.startsWith?.('PREDICTSTREET')) {
+        console.log('[PS-DEBUG] postMessage received — origin:', e.origin, 'type:', e.data?.type);
+      }
+    };
+    window.addEventListener('message', debugHandler);
+
     const handler = async (event: MessageEvent) => {
       if (event.origin !== PS_ORIGIN) return;
       if (event.data?.type !== 'PREDICTSTREET_SSO_TOKEN_REQUEST') return;
@@ -74,7 +85,10 @@ export default function GameScreen() {
     };
 
     window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    return () => {
+      window.removeEventListener('message', handler);
+      window.removeEventListener('message', debugHandler);
+    };
   }, [retryKey]); // re-register on retry so state closure is fresh
 
   const handleRetry = () => {
