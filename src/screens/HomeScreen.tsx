@@ -710,6 +710,105 @@ export default function HomeScreen() {
           </div>
         </div>
 
+        {/* PREDICTION MARKET — ADI PredictStreet × FIFA WC 2026 */}
+        <div
+          onClick={() => nav('/predictions')}
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 16,
+            minHeight: 210,
+            cursor: 'pointer',
+            background: 'linear-gradient(140deg, #0a0014 0%, #1c0032 55%, #0a0014 100%)',
+            border: '1px solid rgba(255,215,0,0.28)',
+          }}
+        >
+          {/* Radial glow accents */}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'radial-gradient(circle at 80% 40%, rgba(206,17,38,0.28) 0%, transparent 55%),' +
+                'radial-gradient(circle at 5% 85%, rgba(255,215,0,0.12) 0%, transparent 50%)',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Phone mockup illustration */}
+          <img
+            src="/assets/phone mockup.png"
+            alt=""
+            aria-hidden
+            style={{
+              position: 'absolute',
+              right: '-8px',
+              bottom: 0,
+              height: '92%',
+              width: 'auto',
+              objectFit: 'contain',
+              zIndex: 2,
+              filter: 'drop-shadow(0 0 18px rgba(255,215,0,0.22)) drop-shadow(0 0 36px rgba(206,17,38,0.18))',
+            }}
+          />
+
+          {/* Content */}
+          <div style={{ position: 'relative', zIndex: 3, padding: '18px 16px', maxWidth: '58%' }}>
+            {/* Official badge */}
+            <div
+              style={{
+                display: 'inline-block',
+                background: 'linear-gradient(135deg, #CE1126 0%, #8B0000 100%)',
+                color: '#fff',
+                fontSize: 8,
+                fontWeight: 800,
+                letterSpacing: 1.2,
+                padding: '3px 8px',
+                borderRadius: 4,
+                marginBottom: 8,
+                textTransform: 'uppercase' as const,
+              }}
+            >
+              🏆 {t('home.predictions_badge')}
+            </div>
+
+            <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 3 }}>
+              PREDICTION MARKET
+            </div>
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 34, color: 'white', lineHeight: 1 }}>
+              {t('home.predictions_title')}
+            </div>
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 34, color: '#FFD700', lineHeight: 1, marginBottom: 6 }}>
+              {t('home.predictions_title2')}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 14, lineHeight: 1.4 }}>
+              {t('home.predictions_sub')}
+            </div>
+
+            <motion.button
+              whileHover={{ filter: 'brightness(1.1)' }}
+              whileTap={{ scale: 0.97, filter: 'brightness(1.1)' }}
+              onClick={(e) => { e.stopPropagation(); nav('/predictions'); }}
+              style={{
+                background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
+                color: '#0a0500',
+                fontFamily: 'Bebas Neue',
+                fontSize: 13,
+                letterSpacing: 2,
+                padding: '10px 16px',
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(217,164,0,0.38)',
+                display: 'block',
+              }}
+            >
+              {t('home.predictions_btn')}
+            </motion.button>
+          </div>
+        </div>
+
         {/* Ma Wallet UniPay */}
         <motion.button
           whileTap={{ scale: 0.96 }}
