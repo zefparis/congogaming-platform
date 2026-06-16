@@ -16,7 +16,7 @@ const items: NavItem[] = [
   { to: '/flash', icon: Zap, label: 'nav.flash' },
   { to: '/scratch', emoji: '🎫', label: 'nav.scratch' },
   { to: '/climb', icon: Mountain, label: 'nav.climb' },
-  { to: '/predictions', emoji: '⚽', label: 'nav.predictions', badge: 'NOUVEAU' },
+  { to: '/jouer', emoji: '⚽', label: 'nav.predictions', badge: 'NOUVEAU' },
   { to: '/compte', icon: User, label: 'nav.account' },
 ];
 
