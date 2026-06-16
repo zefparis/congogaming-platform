@@ -576,23 +576,23 @@ export default function SplashScreen() {
               padding: '24px',
             }}
           >
-            {/* Image layer */}
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                bottom: 0,
-                left: '8%',
-                backgroundImage: 'url(/images/okapiscreen.png)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'right center',
-                opacity: 0.62,
-                filter: 'saturate(0.75) contrast(0.9)',
-                transform: 'scale(1.02)',
-                zIndex: 0,
-              }}
+           {/* Image layer */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: '4%',
+              backgroundImage: 'url(/images/okapiscreen.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'right center',
+              opacity: 0.42,
+              filter: 'saturate(0.9) contrast(1.02)',
+              transform: 'scale(1.03)',
+              zIndex: 0,
+            }}
             />
 
             {/* Dark control overlay */}
