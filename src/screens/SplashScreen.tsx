@@ -447,6 +447,95 @@ export default function SplashScreen() {
           </button>
         </div>
 
+        {/* ── CONGO GAMING TEASER ─────────────────────────────── */}
+        <div style={{ padding: '12px 20px 24px', animation: 'aFadeUp 1.1s ease-out both' }}>
+          <div
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: 24,
+              background: 'linear-gradient(135deg, #0A1120 0%, #050810 100%)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              minHeight: 140,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              padding: '24px 24px',
+            }}
+          >
+            {/* Image Layer */}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: 0, right: 0, bottom: 0, left: '15%',
+                backgroundImage: 'url(/images/okapiscreen.png)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'right center',
+                opacity: 0.16,
+                zIndex: 0,
+              }}
+            />
+            {/* Gradient fade to ensure text readability */}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: 0, right: 0, bottom: 0, left: 0,
+                background: 'linear-gradient(to right, #0A1120 30%, rgba(10,17,32,0.6) 65%, transparent 100%)',
+                zIndex: 1,
+              }}
+            />
+
+            {/* Content Layer */}
+            <div style={{ position: 'relative', zIndex: 2, maxWidth: '80%' }}>
+              <div
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  letterSpacing: 0.2,
+                  color: 'rgba(255,255,255,0.95)',
+                  marginBottom: 6,
+                  lineHeight: 1.25,
+                }}
+              >
+                Découvrez l’univers<br />Congo Gaming
+              </div>
+              <div
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 11.5,
+                  color: 'rgba(255,255,255,0.45)',
+                  lineHeight: 1.45,
+                }}
+              >
+                Loto Express · Okapi Climb<br />Jeux rapides
+              </div>
+
+              {/* Tiny subtle link */}
+              <div
+                onClick={() => nav('/login')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  marginTop: 14,
+                  fontFamily: SANS,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: 'rgba(255,255,255,0.65)',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
+                  cursor: 'pointer',
+                }}
+              >
+                Explorer les jeux <span style={{ marginLeft: 4, color: ORANGE }}>→</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── FOOTER ──────────────────────────────────────────── */}
         <div
           style={{
