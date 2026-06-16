@@ -560,124 +560,143 @@ export default function SplashScreen() {
         </section>
 
         {/* ── CONGO GAMING TEASER ────────────────────────────── */}
-        <section style={{ padding: '12px 20px 22px', animation: 'aFadeUp 1.1s ease-out both' }}>
-          <div
-            style={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 24,
-              background: 'linear-gradient(135deg, #0A1120 0%, #050810 100%)',
-              border: '1px solid rgba(255,255,255,0.075)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.32)',
-              minHeight: 150,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              padding: '24px',
-            }}
-          >
-           {/* Image layer */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              bottom: 0,
-              left: '4%',
-              backgroundImage: 'url(/images/okapiscreen.png)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'right center',
-              opacity: 0.42,
-              filter: 'saturate(0.9) contrast(1.02)',
-              transform: 'scale(1.03)',
-              zIndex: 0,
-            }}
-            />
+<section style={{ padding: '12px 20px 22px', animation: 'aFadeUp 1.1s ease-out both' }}>
+  <div
+    style={{
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 24,
+      background: 'linear-gradient(135deg, #0B1426 0%, #070B15 100%)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      boxShadow: '0 8px 30px rgba(0,0,0,0.34)',
+      minHeight: 150,
+      display: 'flex',
+      alignItems: 'stretch',
+    }}
+  >
+    {/* Text layer */}
+    <div
+      style={{
+        position: 'relative',
+        zIndex: 3,
+        width: '58%',
+        padding: '22px 0 22px 22px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 15,
+          fontWeight: 800,
+          letterSpacing: 0.1,
+          color: 'rgba(255,255,255,0.96)',
+          marginBottom: 7,
+          lineHeight: 1.25,
+        }}
+      >
+        Découvrez
+        <br />
+        Congo Gaming
+      </div>
 
-            {/* Dark control overlay */}
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: `
-                  linear-gradient(to right, #0A1120 0%, rgba(10,17,32,0.94) 38%, rgba(10,17,32,0.62) 68%, rgba(10,17,32,0.32) 100%),
-                  linear-gradient(to bottom, rgba(5,8,16,0.25), rgba(5,8,16,0.88))
-                `,
-                zIndex: 1,
-              }}
-            />
+      <div
+        style={{
+          fontSize: 11.5,
+          color: 'rgba(255,255,255,0.50)',
+          lineHeight: 1.45,
+          marginBottom: 14,
+        }}
+      >
+        Loto Express
+        <br />
+        Okapi Climb
+        <br />
+        Jeux rapides
+      </div>
 
-            {/* Subtle orange accent */}
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 24,
-                width: 3,
-                height: 44,
-                borderRadius: 999,
-                background: ORANGE,
-                opacity: 0.8,
-                zIndex: 2,
-              }}
-            />
+      <button
+        type="button"
+        onClick={() => nav('/login')}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          alignSelf: 'flex-start',
+          padding: '7px 10px',
+          background: 'rgba(255,107,0,0.12)',
+          border: '1px solid rgba(255,107,0,0.28)',
+          borderRadius: 999,
+          fontSize: 9,
+          fontWeight: 800,
+          color: 'rgba(255,255,255,0.78)',
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          cursor: 'pointer',
+        }}
+      >
+        Explorer
+        <span style={{ marginLeft: 5, color: ORANGE }}>→</span>
+      </button>
+    </div>
 
-            <div style={{ position: 'relative', zIndex: 3, maxWidth: '82%' }}>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 800,
-                  letterSpacing: 0.2,
-                  color: 'rgba(255,255,255,0.95)',
-                  marginBottom: 7,
-                  lineHeight: 1.25,
-                }}
-              >
-                Découvrez l’univers
-                <br />
-                Congo Gaming
-              </div>
+    {/* Image layer — visible, but isolated from the text */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: '56%',
+        zIndex: 1,
+        overflow: 'hidden',
+      }}
+    >
+      <img
+        src="/images/okapiscreen.png"
+        alt=""
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: '58% center',
+          opacity: 0.72,
+          filter: 'saturate(0.9) contrast(0.95) brightness(0.78)',
+          transform: 'scale(1.08)',
+        }}
+      />
+    </div>
 
-              <div
-                style={{
-                  fontSize: 11.5,
-                  color: 'rgba(255,255,255,0.48)',
-                  lineHeight: 1.45,
-                }}
-              >
-                Loto Express · Okapi Climb
-                <br />
-                Jeux rapides
-              </div>
+    {/* Left readability fade */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 2,
+        background:
+          'linear-gradient(to right, #0B1426 0%, rgba(11,20,38,0.96) 42%, rgba(11,20,38,0.55) 67%, rgba(11,20,38,0.16) 100%)',
+        pointerEvents: 'none',
+      }}
+    />
 
-              <button
-                type="button"
-                onClick={() => nav('/login')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  marginTop: 15,
-                  padding: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: 10,
-                  fontWeight: 800,
-                  color: 'rgba(255,255,255,0.68)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.6,
-                  cursor: 'pointer',
-                }}
-              >
-                Explorer les jeux
-                <span style={{ marginLeft: 5, color: ORANGE }}>→</span>
-              </button>
-            </div>
-          </div>
-        </section>
-
+    {/* Bottom premium vignette */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: '45%',
+        zIndex: 2,
+        background: 'linear-gradient(to bottom, transparent, rgba(4,7,14,0.55))',
+        pointerEvents: 'none',
+      }}
+    />
+  </div>
+</section>
         {/* ── FOOTER ─────────────────────────────────────────── */}
         <footer
           style={{
