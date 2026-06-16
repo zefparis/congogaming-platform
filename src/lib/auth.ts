@@ -104,38 +104,6 @@ export async function loginUser(phone: string, pin: string): Promise<SessionUser
   return user;
 }
 
-// ── Email Auth Mocks (temporary) ─────────────────────────
-
-export async function registerEmail(email: string, password: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      try {
-        localStorage.setItem('cg_mock_token', 'fake-jwt-token');
-        resolve();
-      } catch (e) {
-        reject(new Error("Impossible de créer le compte."));
-      }
-    }, 800);
-  });
-}
-
-export async function loginEmail(email: string, password: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      try {
-        if (password === 'wrong') {
-          reject(new Error("Mot de passe incorrect."));
-          return;
-        }
-        localStorage.setItem('cg_mock_token', 'fake-jwt-token');
-        resolve();
-      } catch (e) {
-        reject(new Error("Impossible de se connecter."));
-      }
-    }, 800);
-  });
-}
-
 export async function resetPinByPhone(phone: string, newPin: string): Promise<void> {
   await authRequest<{ ok: boolean; message: string }>('/api/auth/reset-pin', {
     method: 'POST',
