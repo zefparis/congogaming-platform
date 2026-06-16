@@ -9,6 +9,11 @@ const ORANGE = '#FF6B00';
 const SANS = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
 const BEBAS = "'Bebas Neue', Impact, sans-serif";
 
+/* ── Helper animations ─────────────────────────────────────── */
+const fadeUp = (delay = 0) => ({
+  animation: `aFadeUp 0.4s ease-out ${delay}s both`
+});
+
 /* ── ADI logo mark ─────────────────────────────────────────── */
 function AdiMark({ size = 28 }: { size?: number }) {
   return (
@@ -121,14 +126,7 @@ export default function SplashScreen() {
           }}
         >
           {/* Left content */}
-          <section
-            style={{
-              width: '53%',
-              flexShrink: 0,
-              paddingTop: 8,
-              animation: 'aFadeUp 0.4s ease-out both',
-            }}
-          >
+          <section style={{ width: '53%', flexShrink: 0, paddingTop: 8, ...fadeUp(0) }}>
             <div
               style={{
                 fontFamily: BEBAS,
@@ -149,7 +147,7 @@ export default function SplashScreen() {
                 color: ORANGE,
                 marginTop: 14,
                 lineHeight: 1.45,
-                animation: 'aFadeUp 0.52s ease-out both',
+                ...fadeUp(0.12)
               }}
             >
               Prédisez · Jouez
@@ -161,10 +159,10 @@ export default function SplashScreen() {
               style={{
                 fontSize: 11.5,
                 fontWeight: 400,
-                color: 'rgba(255,255,255,0.43)',
+                color: 'rgba(255,255,255,0.6)',
                 marginTop: 11,
                 lineHeight: 1.65,
-                animation: 'aFadeUp 0.64s ease-out both',
+                ...fadeUp(0.24)
               }}
             >
               La nouvelle expérience
@@ -174,7 +172,7 @@ export default function SplashScreen() {
               pour la CdM 2026.
             </div>
 
-            <div style={{ marginTop: 17, animation: 'aFadeUp 0.74s ease-out both' }}>
+            <div style={{ marginTop: 17, ...fadeUp(0.34) }}>
               <span
                 style={{
                   display: 'inline-flex',
@@ -198,15 +196,14 @@ export default function SplashScreen() {
           {/* Phone mockup */}
           <section
             aria-label="Aperçu PredictStreet"
-            style={{
-              flex: 1,
-              position: 'relative',
-              animation: 'aFadeUp 0.56s ease-out both',
-            }}
+            style={{ flex: 1, position: 'relative', ...fadeUp(0.16) }}
           >
             <img
-              src="/assets/phone mockup.png"
+              src="/assets/phone-mockup.png"
               alt="Aperçu mobile PredictStreet"
+              width={400}
+              height={800}
+              loading="eager"
               style={{
                 width: '100%',
                 height: 'auto',
@@ -374,7 +371,7 @@ export default function SplashScreen() {
                   color: '#fff',
                 }}
               >
-                Predict now
+                Prédire maintenant
               </div>
             </div>
 
@@ -428,6 +425,9 @@ export default function SplashScreen() {
 
                 <span
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
                     fontSize: 7,
                     fontWeight: 800,
                     letterSpacing: 0.5,
@@ -437,6 +437,15 @@ export default function SplashScreen() {
                     borderRadius: 4,
                   }}
                 >
+                  <span
+                    style={{
+                      width: 4,
+                      height: 4,
+                      borderRadius: '50%',
+                      background: '#22c55e',
+                      animation: 'aPulse 1.6s ease-in-out infinite',
+                    }}
+                  />
                   LIVE
                 </span>
               </div>
@@ -543,6 +552,7 @@ export default function SplashScreen() {
           <button
             type="button"
             onClick={() => nav('/login')}
+            aria-label="Se connecter"
             style={{
               width: '100%',
               padding: '13px 0',
@@ -555,133 +565,137 @@ export default function SplashScreen() {
               cursor: 'pointer',
             }}
           >
-            En savoir plus — Se connecter
+            Se connecter
           </button>
         </section>
 
         {/* ── CONGO GAMING TEASER ────────────────────────────── */}
-<section style={{ padding: '12px 20px 22px', animation: 'aFadeUp 1.1s ease-out both' }}>
-  <div
-    style={{
-      position: 'relative',
-      overflow: 'hidden',
-      borderRadius: 24,
-      background: 'linear-gradient(135deg, #0B1426 0%, #070B15 100%)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.34)',
-      minHeight: 150,
-      display: 'flex',
-      alignItems: 'stretch',
-    }}
-  >
-    {/* Image layer — visible and not over-darkened */}
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: '60%',
-        zIndex: 1,
-        overflow: 'hidden',
-      }}
-    >
-      <img
-        src="/images/okapiscreen.png"
-        alt=""
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: '58% center',
-          opacity: 1,
-          filter: 'saturate(1.05) contrast(1.02) brightness(0.98)',
-          transform: 'scale(1.06)',
-        }}
-      />
-    </div>
+        <section style={{ padding: '12px 20px 22px', ...fadeUp(0.7) }}>
+          <div
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: 24,
+              background: 'linear-gradient(135deg, #0B1426 0%, #070B15 100%)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.34)',
+              minHeight: 150,
+              display: 'flex',
+              alignItems: 'stretch',
+            }}
+          >
+            {/* Image layer */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: '60%',
+                zIndex: 1,
+                overflow: 'hidden',
+              }}
+            >
+              <img
+                src="/images/okapi-screen.png"
+                alt=""
+                width={400}
+                height={300}
+                loading="lazy"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: '58% center',
+                  opacity: 1,
+                  filter: 'saturate(1.05) contrast(1.02) brightness(0.98)',
+                  transform: 'scale(1.06)',
+                }}
+              />
+            </div>
 
-    {/* Single readability overlay only */}
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 2,
-        background:
-          'linear-gradient(to right, #0B1426 0%, rgba(11,20,38,0.96) 34%, rgba(11,20,38,0.58) 52%, rgba(11,20,38,0.16) 72%, rgba(11,20,38,0) 100%)',
-        pointerEvents: 'none',
-      }}
-    />
+            {/* Readability overlay */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 2,
+                background:
+                  'linear-gradient(to right, #0B1426 0%, rgba(11,20,38,0.96) 34%, rgba(11,20,38,0.58) 52%, rgba(11,20,38,0.16) 72%, rgba(11,20,38,0) 100%)',
+                pointerEvents: 'none',
+              }}
+            />
 
-    {/* Content layer */}
-    <div
-      style={{
-        position: 'relative',
-        zIndex: 3,
-        width: '56%',
-        padding: '22px 0 22px 22px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 15,
-          fontWeight: 800,
-          letterSpacing: 0.1,
-          color: 'rgba(255,255,255,0.96)',
-          marginBottom: 7,
-          lineHeight: 1.25,
-        }}
-      >
-        Découvrez
-        <br />
-        Congo Gaming
-      </div>
+            {/* Content layer */}
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 3,
+                width: '56%',
+                padding: '22px 0 22px 22px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  letterSpacing: 0.1,
+                  color: 'rgba(255,255,255,0.96)',
+                  marginBottom: 7,
+                  lineHeight: 1.25,
+                }}
+              >
+                Découvrez
+                <br />
+                Congo Gaming
+              </div>
 
-      <div
-        style={{
-          fontSize: 11.5,
-          color: 'rgba(255,255,255,0.54)',
-          lineHeight: 1.45,
-          marginBottom: 14,
-        }}
-      >
-        Loto Express
-        <br />
-        Okapi Climb
-        <br />
-        Jeux rapides
-      </div>
+              <div
+                style={{
+                  fontSize: 11.5,
+                  color: 'rgba(255,255,255,0.54)',
+                  lineHeight: 1.45,
+                  marginBottom: 14,
+                }}
+              >
+                Loto Express
+                <br />
+                Okapi Climb
+                <br />
+                Jeux rapides
+              </div>
 
-      <button
-        type="button"
-        onClick={() => nav('/login')}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          alignSelf: 'flex-start',
-          padding: '7px 10px',
-          background: 'rgba(255,107,0,0.12)',
-          border: '1px solid rgba(255,107,0,0.28)',
-          borderRadius: 999,
-          fontSize: 9,
-          fontWeight: 800,
-          color: 'rgba(255,255,255,0.78)',
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-          cursor: 'pointer',
-        }}
-      >
-        Explorer
-        <span style={{ marginLeft: 5, color: ORANGE }}>→</span>
-      </button>
-    </div>
-  </div>
-</section>
+              <button
+                type="button"
+                onClick={() => nav('/login')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
+                  padding: '7px 10px',
+                  background: 'rgba(255,107,0,0.12)',
+                  border: '1px solid rgba(255,107,0,0.28)',
+                  borderRadius: 999,
+                  fontSize: 9,
+                  fontWeight: 800,
+                  color: 'rgba(255,255,255,0.78)',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  cursor: 'pointer',
+                }}
+              >
+                Explorer
+                <span style={{ marginLeft: 5, color: ORANGE }}>→</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* ── FOOTER ─────────────────────────────────────────── */}
         <footer
           style={{
@@ -694,7 +708,7 @@ export default function SplashScreen() {
         >
           Congo Gaming × ADI PredictStreet
           <br />
-          Agréé MJS N°047/2016 · DRC Officiel · FIFA WC 2026™
+          Agré MJS N°047/2016 · DRC Officiel · FIFA WC 2026™
         </footer>
       </div>
     </div>
@@ -707,7 +721,6 @@ const KEYFRAMES = `
     opacity: 0;
     transform: translateY(10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -715,12 +728,11 @@ const KEYFRAMES = `
 }
 
 @keyframes aPulse {
-  0%, 100% {
+ 0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
-
-  50% {
+ 50% {
     opacity: 0.32;
     transform: scale(0.64);
   }
