@@ -1,121 +1,53 @@
 import { useNavigate } from 'react-router-dom';
-import { useMemo } from 'react';
 import { getSession } from '../lib/auth';
 
-const E_BLUE   = '#013CFF';
-const E_ORANGE = '#FF710A';
-const NAVY     = '#010820';
-const BEBAS    = "'Bebas Neue', Impact, sans-serif";
+/* ── Design tokens ─────────────────────────────────────────── */
+const BG     = '#080E1C';
+const ORANGE = '#FF6B00';
+const SANS   = "-apple-system, 'Inter', 'Segoe UI', sans-serif";
+const BEBAS  = "'Bebas Neue', Impact, sans-serif";
 
-/* ── Inline ADI logo mark (diamond + prediction arrow) ── */
-function AdiLogoMark({ size = 40 }: { size?: number }) {
+/* ── ADI logo mark — minimal, clean ───────────────────────── */
+function AdiMark({ size = 26 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 80 80"
-      fill="none"
-      aria-label="ADI PredictStreet"
-    >
-      <defs>
-        <linearGradient id="adiMarkG" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor={E_BLUE} />
-          <stop offset="100%" stopColor={E_ORANGE} />
-        </linearGradient>
-      </defs>
-      {/* Diamond / losange */}
-      <polygon points="40,2 78,40 40,78 2,40" fill="url(#adiMarkG)" />
-      {/* Prediction arrow — upward triangle */}
-      <polygon points="40,19 58,54 22,54" fill="white" opacity="0.95" />
-      {/* Center pin notch */}
-      <rect x="36.5" y="42" width="7" height="11" rx="2.5" fill={NAVY} />
-      {/* Highlight dot at tip */}
-      <circle cx="40" cy="23" r="2.5" fill="white" opacity="0.55" />
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none" aria-hidden>
+      <polygon points="40,2 78,40 40,78 2,40" fill="#1a42ff" />
+      <polygon points="40,20 57,53 23,53" fill="white" opacity="0.95" />
+      <rect x="37" y="42" width="6" height="10" rx="2" fill={BG} />
     </svg>
   );
 }
 
 export default function SplashScreen() {
   const nav = useNavigate();
-
-  if (getSession()) {
-    nav('/', { replace: true });
-  }
-
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 18 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: 1.5 + Math.random() * 2.5,
-        isBlue: i % 3 !== 2,
-        opacity: 0.07 + Math.random() * 0.2,
-        dur: 7 + Math.random() * 9,
-        del: Math.random() * 7,
-      })),
-    [],
-  );
+  if (getSession()) nav('/', { replace: true });
 
   return (
     <div
       style={{
-        position: 'relative',
         minHeight: '100dvh',
-        background: `linear-gradient(160deg, ${NAVY} 0%, ${E_BLUE} 65%, ${E_ORANGE} 100%)`,
+        background: `linear-gradient(180deg, ${BG} 0%, #0C1628 100%)`,
         color: '#fff',
-        overflowX: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: "'Barlow Condensed', sans-serif",
+        fontFamily: SANS,
+        overflowX: 'hidden',
       }}
     >
       <style>{KEYFRAMES}</style>
 
-      {/* — Noise texture overlay — */}
+      {/* Subtle top spotlight — barely-visible blue arc */}
       <div
         aria-hidden
         style={{
-          position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-          opacity: 0.045,
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: '256px',
+          position: 'fixed', top: 0, left: '25%',
+          width: '50%', height: 180,
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(26,66,255,0.11) 0%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0,
         }}
       />
 
-      {/* — Ambient glow orbs — */}
-      <div
-        aria-hidden
-        style={{
-          position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-          background:
-            `radial-gradient(ellipse at 78% 28%, rgba(1,60,255,0.22) 0%, transparent 55%),` +
-            `radial-gradient(ellipse at 18% 72%, rgba(255,113,10,0.15) 0%, transparent 50%)`,
-        }}
-      />
-
-      {/* — Particles — */}
-      <div aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        {particles.map((p) => (
-          <span
-            key={p.id}
-            style={{
-              position: 'absolute',
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: p.size,
-              height: p.size,
-              borderRadius: '50%',
-              background: p.isBlue ? E_BLUE : E_ORANGE,
-              opacity: p.opacity,
-              boxShadow: `0 0 ${p.size * 5}px ${p.isBlue ? E_BLUE : E_ORANGE}99`,
-              animation: `aDrift ${p.dur}s ease-in-out ${p.del}s infinite alternate`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* ════ CONTENT ════ */}
+      {/* ════ MAIN CONTENT ════ */}
       <div
         style={{
           position: 'relative', zIndex: 1,
@@ -124,315 +56,289 @@ export default function SplashScreen() {
         }}
       >
 
-        {/* ── TOP BAR ── */}
+        {/* ── HEADER ──────────────────────────────────────────── */}
         <div
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px 6px',
+            padding: '14px 20px 10px',
           }}
         >
           <span
             style={{
-              fontFamily: BEBAS,
-              fontSize: 20, letterSpacing: 3,
-              textShadow: `0 0 28px rgba(1,60,255,0.75)`,
+              fontFamily: SANS,
+              fontSize: 12, fontWeight: 700, letterSpacing: 2.5,
+              textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.85)',
             }}
           >
-            CONGO GAMING
+            Congo Gaming
           </span>
           <span
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04))',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,215,0,0.32)',
-              borderRadius: 20,
-              padding: '3px 9px',
-              fontSize: 8, fontWeight: 800, letterSpacing: 1,
-              color: '#FFD700',
-              whiteSpace: 'nowrap',
+              display: 'inline-flex', alignItems: 'center',
+              border: '1px solid rgba(255,215,0,0.22)',
+              borderRadius: 6, padding: '3px 8px',
+              fontSize: 8.5, fontWeight: 700, letterSpacing: 0.6,
+              color: 'rgba(255,215,0,0.65)',
             }}
           >
-            🏆 OFFICIEL FIFA WC 2026™
+            🏆 FIFA WC 2026™
           </span>
         </div>
 
-        {/* ── HERO + PHONE (split layout) ── */}
+        {/* ── HERO — horizontal split ──────────────────────────── */}
         <div
           style={{
-            flex: 1, position: 'relative',
+            flex: 1,
             display: 'flex', alignItems: 'flex-start',
-            padding: '6px 16px 0',
+            padding: '4px 0 0 20px',
             overflow: 'hidden',
-            minHeight: 220,
+            minHeight: 240,
           }}
         >
-          {/* Left: Hero text */}
-          <div style={{ width: '55%', paddingTop: 6, position: 'relative', zIndex: 2 }}>
+          {/* Left: headline + text */}
+          <div
+            style={{
+              width: '53%', flexShrink: 0, paddingTop: 6,
+              animation: 'aFadeUp 0.4s ease-out both',
+            }}
+          >
+            {/* PREDICT wordmark */}
             <div
               style={{
                 fontFamily: BEBAS,
-                fontSize: 'clamp(66px, 19vw, 84px)',
-                fontWeight: 900,
-                lineHeight: 0.88,
-                letterSpacing: -1,
-                textShadow: `0 0 55px rgba(1,60,255,0.65), 0 3px 18px rgba(0,0,0,0.45)`,
-                animation: 'aFadeUp 0.5s ease-out both',
+                fontSize: 'clamp(54px, 14vw, 68px)',
+                fontWeight: 900, lineHeight: 0.88,
+                letterSpacing: -0.5, color: '#fff',
               }}
             >
               PREDICT
             </div>
 
+            {/* Tagline */}
             <div
               style={{
-                fontFamily: BEBAS,
-                fontSize: 'clamp(13px, 3.8vw, 16px)',
-                fontWeight: 900,
-                letterSpacing: 2,
-                color: E_ORANGE,
-                textShadow: `0 0 18px rgba(255,113,10,0.75)`,
-                marginTop: 6,
-                lineHeight: 1.15,
-                animation: 'aFadeUp 0.62s ease-out both',
+                fontFamily: SANS,
+                fontSize: 13, fontWeight: 600,
+                color: ORANGE, letterSpacing: 0.1,
+                marginTop: 12, lineHeight: 1.45,
+                animation: 'aFadeUp 0.52s ease-out both',
               }}
             >
-              AT THE SPEED<br />OF PLAY
+              Prédisez · Jouez<br />Gagnez en CDF.
             </div>
 
+            {/* Sub-text */}
             <div
               style={{
-                fontSize: 11,
-                color: 'rgba(255,255,255,0.58)',
-                marginTop: 8,
-                lineHeight: 1.5,
-                animation: 'aFadeUp 0.74s ease-out both',
+                fontFamily: SANS,
+                fontSize: 11.5, fontWeight: 400,
+                color: 'rgba(255,255,255,0.42)',
+                marginTop: 10, lineHeight: 1.6,
+                animation: 'aFadeUp 0.64s ease-out both',
               }}
             >
-              Pariez sur la Coupe<br />du Monde en CDF
+              La nouvelle expérience<br />de prédiction sportive<br />pour la CdM 2026.
+            </div>
+
+            {/* Official badge */}
+            <div style={{ marginTop: 16, animation: 'aFadeUp 0.74s ease-out both' }}>
+              <span
+                style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  background: 'rgba(255,215,0,0.05)',
+                  border: '1px solid rgba(255,215,0,0.18)',
+                  borderRadius: 5, padding: '4px 9px',
+                  fontSize: 8.5, fontWeight: 700, letterSpacing: 0.5,
+                  color: 'rgba(255,215,0,0.65)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                🏆 Official FIFA WC 2026™
+              </span>
             </div>
           </div>
 
-          {/* Right: Phone mockup + P2P market overlay */}
+          {/* Right: phone mockup */}
           <div
             style={{
-              position: 'absolute',
-              right: 0, top: 0, bottom: 0,
-              width: '52%',
-              animation: 'aFadeUp 0.78s ease-out both',
+              flex: 1, position: 'relative',
+              animation: 'aFadeUp 0.56s ease-out both',
             }}
           >
-            {/* Glow behind phone */}
-            <div
-              aria-hidden
-              style={{
-                position: 'absolute',
-                top: '8%', left: '8%',
-                width: '84%', height: '76%',
-                borderRadius: '50%',
-                background: `radial-gradient(ellipse, rgba(1,60,255,0.4) 0%, rgba(255,113,10,0.2) 52%, transparent 70%)`,
-                filter: 'blur(24px)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            {/* Phone image */}
             <img
               src="/assets/phone mockup.png"
-              alt="ADI PredictStreet app"
+              alt="PredictStreet"
               style={{
-                position: 'absolute',
-                top: 0, right: 0,
-                height: '100%', width: 'auto',
-                objectFit: 'contain',
-                objectPosition: 'right top',
-                zIndex: 1,
-                filter:
-                  `drop-shadow(0 0 16px rgba(1,60,255,0.55))` +
-                  ` drop-shadow(0 6px 22px rgba(0,0,0,0.42))`,
+                width: '100%', height: 'auto',
+                objectFit: 'contain', objectPosition: 'right top',
+                display: 'block',
+                filter: 'drop-shadow(0 10px 28px rgba(0,0,0,0.55))',
               }}
             />
 
-            {/* P2P market simulation card — overlaid on phone screen area */}
+            {/* Mini prediction card overlaid on phone screen */}
             <div
               style={{
-                position: 'absolute',
-                top: '14%',
-                right: '10%',
-                left: '12%',
-                zIndex: 3,
-                background: 'rgba(1,8,32,0.91)',
-                border: `1px solid rgba(1,60,255,0.55)`,
-                borderRadius: 10,
-                padding: '8px 8px 7px',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.55)',
+                position: 'absolute', top: '13%', left: '9%', right: '9%', zIndex: 3,
+                background: 'rgba(8,14,28,0.96)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 10, padding: '9px 10px',
               }}
             >
               {/* Live indicator */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                 <span
                   style={{
-                    width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
-                    background: '#00ff88',
-                    boxShadow: '0 0 6px #00ff88',
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: '#22c55e', flexShrink: 0,
                     display: 'inline-block',
-                    animation: 'aPulse 1.4s ease-in-out infinite',
+                    animation: 'aPulse 1.6s ease-in-out infinite',
                   }}
                 />
-                <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: 1, color: E_ORANGE }}>
+                <span
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: 8, fontWeight: 600, letterSpacing: 0.4,
+                    color: 'rgba(255,255,255,0.38)',
+                  }}
+                >
                   P2P · JUNE 15
                 </span>
               </div>
 
-              {/* Match flags */}
-              <div style={{ textAlign: 'center', fontSize: 15, marginBottom: 5, letterSpacing: 1 }}>
+              {/* Teams */}
+              <div
+                style={{
+                  textAlign: 'center', fontSize: 14,
+                  letterSpacing: 0.5, marginBottom: 7, fontWeight: 600,
+                }}
+              >
                 🇨🇩 vs 🇧🇷
               </div>
 
-              {/* Odds bar */}
-              <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', height: 7, marginBottom: 3 }}>
-                <div
-                  style={{
-                    width: '54%',
-                    background: `linear-gradient(90deg, ${E_BLUE}aa, ${E_BLUE})`,
-                  }}
-                />
-                <div
-                  style={{
-                    flex: 1,
-                    background: 'linear-gradient(90deg, #166534, #22c55e)',
-                  }}
-                />
+              {/* Probability bar — flat, no gradient */}
+              <div
+                style={{
+                  display: 'flex', borderRadius: 3, overflow: 'hidden',
+                  height: 4, marginBottom: 5,
+                }}
+              >
+                <div style={{ width: '54%', background: '#2563eb' }} />
+                <div style={{ flex: 1, background: '#15803d' }} />
               </div>
               <div
                 style={{
                   display: 'flex', justifyContent: 'space-between',
-                  fontSize: 9, marginBottom: 6,
+                  fontFamily: SANS,
+                  fontSize: 8.5, color: 'rgba(255,255,255,0.38)',
+                  marginBottom: 8,
                 }}
               >
-                <span style={{ color: '#93c5fd' }}>🇨🇩 54%</span>
-                <span style={{ color: '#86efac' }}>🇧🇷 46%</span>
+                <span>🇨🇩 54%</span>
+                <span>🇧🇷 46%</span>
               </div>
 
-              {/* PREDICT NOW CTA inside phone */}
+              {/* PREDICT NOW — solid orange, no gradient */}
               <div
                 style={{
-                  background: `linear-gradient(135deg, ${E_BLUE}, ${E_ORANGE})`,
-                  borderRadius: 5,
-                  padding: '5px 0',
+                  background: ORANGE, borderRadius: 6, padding: '6px 0',
                   textAlign: 'center',
-                  fontSize: 9, fontWeight: 900, letterSpacing: 1.5,
+                  fontFamily: SANS, fontSize: 9, fontWeight: 700, letterSpacing: 0.8,
                   color: '#fff',
-                  fontFamily: BEBAS,
                 }}
               >
-                PREDICT NOW
+                Predict now
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── ADI CO-BRANDING ── */}
+        {/* ── SEPARATOR ───────────────────────────────────────── */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '16px 0 0' }} />
+
+        {/* ── ADI CO-BRANDING ──────────────────────────────────── */}
         <div
           style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: '10px 16px 8px',
-            borderTop: '1px solid rgba(255,255,255,0.07)',
-            animation: 'aFadeUp 0.9s ease-out both',
+            display: 'flex', alignItems: 'center', gap: 11,
+            padding: '13px 20px 11px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
-            <AdiLogoMark size={34} />
-            <div>
-              <div
-                style={{
-                  fontFamily: BEBAS,
-                  fontSize: 17, letterSpacing: 2, color: '#fff', lineHeight: 1,
-                }}
-              >
-                ADI PREDICTSTREET
-              </div>
-              <div
-                style={{
-                  fontSize: 9.5, color: 'rgba(255,255,255,0.42)',
-                  letterSpacing: 0.4, marginTop: 1,
-                }}
-              >
-                Powered by ADI PredictStreet
-              </div>
+          <AdiMark size={28} />
+          <div>
+            <div
+              style={{
+                fontFamily: SANS,
+                fontSize: 11, fontWeight: 700, letterSpacing: 1.6,
+                textTransform: 'uppercase', color: 'rgba(255,255,255,0.82)',
+              }}
+            >
+              ADI PredictStreet
+            </div>
+            <div
+              style={{
+                fontFamily: SANS,
+                fontSize: 10, color: 'rgba(255,255,255,0.33)',
+                marginTop: 2,
+              }}
+            >
+              Powered by ADI PredictStreet
             </div>
           </div>
-          <span
-            style={{
-              background: 'rgba(255,215,0,0.08)',
-              border: '1px solid rgba(255,215,0,0.22)',
-              borderRadius: 20,
-              padding: '3px 11px',
-              fontSize: 8, fontWeight: 700, letterSpacing: 1, color: '#FFD700',
-            }}
-          >
-            Official Partner FIFA World Cup 2026™
-          </span>
         </div>
 
-        {/* ── CTA BUTTONS ── */}
+        {/* ── CTA BUTTONS ─────────────────────────────────────── */}
         <div
           style={{
-            padding: '4px 16px 8px',
-            display: 'flex', flexDirection: 'column', gap: 9,
-            animation: 'aFadeUp 1.0s ease-out both',
+            padding: '2px 20px 10px',
+            display: 'flex', flexDirection: 'column', gap: 10,
           }}
         >
+          {/* Primary — solid orange, no gradient */}
           <button
             type="button"
             onClick={() => nav('/register')}
             style={{
-              width: '100%', padding: '15px 0',
-              border: 'none', borderRadius: 12,
-              background: `linear-gradient(135deg, ${E_BLUE} 0%, ${E_ORANGE} 100%)`,
-              color: '#fff',
-              fontFamily: BEBAS,
-              fontSize: 22, letterSpacing: 5,
+              width: '100%', padding: '16px 0',
+              background: ORANGE, border: 'none', borderRadius: 14,
+              color: '#fff', fontFamily: SANS,
+              fontSize: 15, fontWeight: 700, letterSpacing: 0.8,
               cursor: 'pointer',
-              boxShadow: `0 6px 28px rgba(1,60,255,0.44), 0 2px 12px rgba(255,113,10,0.24)`,
+              boxShadow: '0 4px 20px rgba(255,107,0,0.28)',
             }}
           >
-            JOUER MAINTENANT
+            Jouer maintenant
           </button>
 
+          {/* Secondary — ghost */}
           <button
             type="button"
             onClick={() => nav('/login')}
             style={{
-              width: '100%', padding: '11px 0',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.26)',
-              borderRadius: 12,
-              color: 'rgba(255,255,255,0.6)',
-              fontFamily: BEBAS,
-              fontSize: 15, letterSpacing: 3,
+              width: '100%', padding: '13px 0',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 14,
+              color: 'rgba(255,255,255,0.48)',
+              fontFamily: SANS,
+              fontSize: 13, fontWeight: 500,
               cursor: 'pointer',
             }}
           >
-            EN SAVOIR PLUS — SE CONNECTER
+            En savoir plus — Se connecter
           </button>
         </div>
 
-        {/* ── FOOTER ── */}
+        {/* ── FOOTER ──────────────────────────────────────────── */}
         <div
           style={{
-            textAlign: 'center',
-            fontSize: 8.5, letterSpacing: 1,
-            color: 'rgba(255,255,255,0.17)',
-            textTransform: 'uppercase',
-            padding: '2px 16px 14px',
-            lineHeight: 1.9,
+            textAlign: 'center', fontFamily: SANS,
+            fontSize: 10, color: 'rgba(255,255,255,0.2)',
+            padding: '2px 20px 16px', lineHeight: 1.85,
           }}
         >
-          <div>Congo Gaming × ADI PredictStreet</div>
-          <div>Agréé MJS N°047/2016 · DRC Officiel</div>
-          <div>FIFA World Cup 2026™ Official Licensed Partner</div>
+          Congo Gaming × ADI PredictStreet<br />
+          Agréé MJS N°047/2016 · DRC Officiel · FIFA WC 2026™
         </div>
 
       </div>
@@ -442,16 +348,11 @@ export default function SplashScreen() {
 
 const KEYFRAMES = `
 @keyframes aFadeUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes aDrift {
-  0%   { transform: translate(0px,    0px)   scale(1);   }
-  50%  { transform: translate(5px,  -15px)   scale(1.1); }
-  100% { transform: translate(-3px,   6px)   scale(0.9); }
 }
 @keyframes aPulse {
   0%, 100% { opacity: 1;   transform: scale(1);   }
-  50%       { opacity: 0.4; transform: scale(0.7); }
+  50%       { opacity: 0.3; transform: scale(0.6); }
 }
 `;
