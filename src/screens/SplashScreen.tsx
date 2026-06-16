@@ -177,7 +177,65 @@ export default function SplashScreen() {
               }}
             />
 
-            {/* Mini prediction card overlaid on phone screen */}
+            {/* ── In-phone screen background — stadium atmosphere ── */}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute', top: '12%', bottom: '8%',
+                left: '8%', right: '8%',
+                zIndex: 2,
+                background: '#06101E',
+                borderRadius: '3% / 2%',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Floodlight bloom — top center (cold white, very faint) */}
+              <div
+                style={{
+                  position: 'absolute', top: '-5%', left: '15%', right: '15%', height: '55%',
+                  background: 'radial-gradient(ellipse at 50% 0%, rgba(200,220,255,0.10) 0%, transparent 65%)',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* Second bloom — top right corner */}
+              <div
+                style={{
+                  position: 'absolute', top: '-5%', right: '-15%', width: '65%', height: '45%',
+                  background: 'radial-gradient(ellipse at 90% 0%, rgba(140,180,255,0.07) 0%, transparent 60%)',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* Pitch markings — SVG, barely visible */}
+              <svg
+                style={{
+                  position: 'absolute', top: '22%', left: 0, width: '100%', height: '55%',
+                  opacity: 0.045,
+                }}
+                viewBox="0 0 100 70"
+                fill="none"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {/* Center line */}
+                <line x1="0" y1="35" x2="100" y2="35" stroke="white" strokeWidth="0.6" />
+                {/* Center circle */}
+                <circle cx="50" cy="35" r="16" stroke="white" strokeWidth="0.6" fill="none" />
+                {/* Center spot */}
+                <circle cx="50" cy="35" r="1.2" fill="white" />
+                {/* Penalty areas */}
+                <rect x="30" y="0" width="40" height="18" stroke="white" strokeWidth="0.6" fill="none" />
+                <rect x="30" y="52" width="40" height="18" stroke="white" strokeWidth="0.6" fill="none" />
+              </svg>
+              {/* Bottom fade — dark vignette to ground the screen */}
+              <div
+                style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
+                  background: 'linear-gradient(to bottom, transparent, rgba(6,16,30,0.75) 60%, #06101E 100%)',
+                  pointerEvents: 'none',
+                }}
+              />
+            </div>
+
+            {/* ── Top prediction card (unchanged) ── */}
             <div
               style={{
                 position: 'absolute', top: '13%', left: '9%', right: '9%', zIndex: 3,
@@ -217,7 +275,7 @@ export default function SplashScreen() {
                 🇨🇩 vs 🇧🇷
               </div>
 
-              {/* Probability bar — flat, no gradient */}
+              {/* Probability bar */}
               <div
                 style={{
                   display: 'flex', borderRadius: 3, overflow: 'hidden',
@@ -239,7 +297,7 @@ export default function SplashScreen() {
                 <span>🇧🇷 46%</span>
               </div>
 
-              {/* PREDICT NOW — solid orange, no gradient */}
+              {/* PREDICT NOW */}
               <div
                 style={{
                   background: ORANGE, borderRadius: 6, padding: '6px 0',
@@ -249,6 +307,66 @@ export default function SplashScreen() {
                 }}
               >
                 Predict now
+              </div>
+            </div>
+
+            {/* ── Lower strip — live matches ── */}
+            <div
+              style={{
+                position: 'absolute', bottom: '10%', left: '9%', right: '9%', zIndex: 3,
+                background: 'rgba(6,16,30,0.88)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 8, padding: '7px 9px',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+              }}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  fontFamily: SANS, fontSize: 7, fontWeight: 700,
+                  letterSpacing: 1.2, color: 'rgba(255,255,255,0.3)',
+                  textTransform: 'uppercase', marginBottom: 6,
+                }}
+              >
+                Marchés en direct
+              </div>
+
+              {/* Row 1 — LIVE */}
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', marginBottom: 5,
+                }}
+              >
+                <span style={{ fontFamily: SANS, fontSize: 9, color: 'rgba(255,255,255,0.72)', letterSpacing: 0.2 }}>
+                  🇧🇷 BR · PT 🇵🇹
+                </span>
+                <span
+                  style={{
+                    fontFamily: SANS, fontSize: 7, fontWeight: 700, letterSpacing: 0.5,
+                    color: '#22c55e',
+                    background: 'rgba(34,197,94,0.12)',
+                    padding: '1px 5px', borderRadius: 3,
+                  }}
+                >
+                  LIVE
+                </span>
+              </div>
+
+              {/* Row 2 — upcoming */}
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontFamily: SANS, fontSize: 9, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.2 }}>
+                  🇫🇷 FR · DE 🇩🇪
+                </span>
+                <span style={{ fontFamily: SANS, fontSize: 7.5, color: 'rgba(255,255,255,0.25)' }}>
+                  21:00
+                </span>
               </div>
             </div>
           </div>
