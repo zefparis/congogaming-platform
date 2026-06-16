@@ -199,7 +199,7 @@ export default function SplashScreen() {
             style={{ flex: 1, position: 'relative', ...fadeUp(0.16) }}
           >
             <img
-              src="/assets/phone-mockup.png"
+              src="/assets/phone mockup.png"
               alt="Aperçu mobile PredictStreet"
               width={400}
               height={800}
@@ -598,7 +598,7 @@ export default function SplashScreen() {
               }}
             >
               <img
-                src="/images/okapi-screen.png"
+                src="/images/okapiscreen.png"
                 alt=""
                 width={400}
                 height={300}
