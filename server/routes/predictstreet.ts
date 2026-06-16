@@ -99,6 +99,21 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
   });
 
   /* ────────────────────────────────────────────────────────────────────────
+   * POST /api/predictstreet/debug
+   * Collect a one-off diagnostic payload for SSO/iframe issues.
+   * Auth required to tie logs to a user; body is arbitrary JSON.
+   * ──────────────────────────────────────────────────────────────────────── */
+  app.post('/api/predictstreet/debug', { preHandler: app.requireAuth }, async (req, reply) => {
+    const body = req.body as unknown;
+    app.log.info({
+      sub_prefix: req.user.id.slice(0, 8),
+      kind: 'predictstreet_debug',
+      payload: body,
+    }, '[predictstreet] debug payload received');
+    return reply.send({ ok: true });
+  });
+
+  /* ────────────────────────────────────────────────────────────────────────
    * Bearer-token auth helper — constant-time, supports both vars.
    * ──────────────────────────────────────────────────────────────────────── */
   function verifyBearerToken(authHeader: string | undefined): boolean {

@@ -19,6 +19,22 @@ export default function GameScreen() {
   const iframeRef                          = useRef<HTMLIFrameElement>(null);
   const [walletStatus, setWalletStatus]    = useState<WalletStatus>('initializing');
   const [retryKey,     setRetryKey]        = useState(0);
+  const [iframeLoaded, setIframeLoaded]    = useState(false);
+  const [lastMsgOrigin, setLastMsgOrigin]  = useState<string | null>(null);
+  const [lastMsgType,   setLastMsgType]    = useState<string | null>(null);
+  const [lastTokenOk,   setLastTokenOk]    = useState<boolean | null>(null);
+  const [lastTokenStatus, setLastTokenStatus] = useState<number | null>(null);
+
+  // ── Basic webview detection (best-effort): FB/IG/WA/TG/TikTok/Twitter/Snap etc.
+  const isInAppWebView = (() => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    // Android WebView has 'wv' or 'Version/' tokens; iOS FB/IG contain FBAN/FB_IAB
+    const needles = [
+      'FBAN', 'FB_IAB', 'Instagram', 'Line/', 'WhatsApp', 'Telegram', 'TikTok', 'Twitter', 'Snapchat', 'WeChat',
+      'wv; ', ' wv)', 'Version/', 'GSA/'];
+    return needles.some(n => ua.includes(n));
+  })();
 
   /* ── Auto-timeout: if widget never sends a token request, show error ── */
   useEffect(() => {
@@ -41,18 +57,28 @@ export default function GameScreen() {
    * (deriveEVMAddress in predictstreet.ts) — fixes ADI no_evm_wallet (401).
    * ─────────────────────────────────────────────────────────────────────────*/
   useEffect(() => {
-    // DEBUG — log every incoming postMessage to identify the real ADI origin
-    // Remove once origin mismatch is resolved
-    console.log('[PS-DEBUG] PS_ORIGIN:', PS_ORIGIN);
-    console.log('[PS-DEBUG] IFRAME_URL:', IFRAME_URL);
+    if (import.meta.env.DEV) {
+      // DEBUG — log key values
+      console.log('[PS-DEBUG] PS_ORIGIN =', PS_ORIGIN);
+      console.log('[PS-DEBUG] IFRAME_URL =', IFRAME_URL);
+    }
     const debugHandler = (e: MessageEvent) => {
       if (e.data?.type?.startsWith?.('PREDICTSTREET')) {
-        console.log('[PS-DEBUG] postMessage received — origin:', e.origin, 'type:', e.data?.type);
+        if (import.meta.env.DEV) console.log('[PS-DEBUG] postMessage received — origin:', e.origin, 'type:', e.data?.type);
       }
     };
     window.addEventListener('message', debugHandler);
 
     const handler = async (event: MessageEvent) => {
+      // Record last message for diagnostics
+      setLastMsgOrigin(event.origin);
+      setLastMsgType(event.data?.type);
+      try {
+        sessionStorage.setItem('ps:lastOrigin', String(event.origin || ''));
+        sessionStorage.setItem('ps:lastType', String(event.data?.type || ''));
+      } catch {}
+
+      // Strict origin gate: only the exact configured origin
       if (event.origin !== PS_ORIGIN) return;
       if (event.data?.type !== 'PREDICTSTREET_SSO_TOKEN_REQUEST') return;
 
@@ -65,21 +91,32 @@ export default function GameScreen() {
         } else {
           setWalletStatus('error');
         }
+        if (import.meta.env.DEV) console.log('[PS-DEBUG] posting SSO_TOKEN_RESPONSE to', PS_ORIGIN, 'hasToken=', Boolean(token));
         iframe?.contentWindow?.postMessage(
           { type: 'PREDICTSTREET_SSO_TOKEN_RESPONSE', nonce, token },
           PS_ORIGIN,
         );
+        try { sessionStorage.setItem('ps:lastPostOk', String(Boolean(token))); } catch {}
       };
 
       try {
+        if (import.meta.env.DEV) console.log('[PS-DEBUG] fetching /api/predictstreet/token ...');
         const res = await fetch(`${API_BASE}/api/predictstreet/token`, {
           method:      'POST',
           credentials: 'include', // sends cg_access_token httpOnly cookie
         });
-        if (!res.ok) { sendResponse(null); return; }
+        setLastTokenOk(res.ok);
+        setLastTokenStatus(res.status);
+        try {
+          sessionStorage.setItem('ps:lastTokenOk', String(res.ok));
+          sessionStorage.setItem('ps:lastTokenStatus', String(res.status));
+        } catch {}
+        if (!res.ok) { if (import.meta.env.DEV) console.log('[PS-DEBUG] token fetch not ok:', res.status); sendResponse(null); return; }
         const { token } = await res.json() as { token: string };
+        if (import.meta.env.DEV) console.log('[PS-DEBUG] token fetched ✓, length=', token?.length ?? 0);
         sendResponse(token);
       } catch {
+        if (import.meta.env.DEV) console.log('[PS-DEBUG] token fetch failed (network)');
         sendResponse(null);
       }
     };
@@ -95,6 +132,28 @@ export default function GameScreen() {
     setWalletStatus('initializing');
     setRetryKey(k => k + 1);
   };
+
+  // ── Hard-block unsupported in-app webviews where embedded wallets fail
+  if (isInAppWebView) {
+    return (
+      <div className="fixed inset-0 mx-auto max-w-app bg-bg z-40 flex flex-col items-center justify-center" style={{ padding: 24 }}>
+        <header className="flex items-center justify-center mb-6">
+          <img src="/images/logo/logo.svg" alt="Congo Gaming" width={120} height={40} loading="lazy" />
+        </header>
+        <div style={{
+          maxWidth: 520,
+          textAlign: 'center',
+          color: '#fff',
+          fontFamily: "-apple-system, 'Inter', 'Segoe UI', sans-serif",
+        }}>
+          <h1 style={{ fontSize: 20, margin: 0, marginBottom: 8, letterSpacing: 1, fontWeight: 800 }}>Ouvrir dans votre navigateur</h1>
+          <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.6 }}>
+            La création du wallet PredictStreet nécessite un navigateur complet. Veuillez ouvrir cette page dans Chrome (Android) ou Safari (iOS).
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 mx-auto max-w-app bg-bg z-40 flex flex-col">
@@ -126,6 +185,11 @@ export default function GameScreen() {
           title="PredictStreet"
           className="absolute inset-0 w-full h-full bg-black"
           allow="clipboard-read; clipboard-write; payment; autoplay; fullscreen"
+          onLoad={() => {
+            setIframeLoaded(true);
+            try { sessionStorage.setItem('ps:iframeLoaded', '1'); } catch {}
+            if (import.meta.env.DEV) console.log('[PS-DEBUG] iframe onLoad ✓');
+          }}
         />
 
         {/* ── Loading overlay: wallet initializing ── */}

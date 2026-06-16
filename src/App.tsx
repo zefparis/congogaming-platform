@@ -22,6 +22,7 @@ import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
 import PredictStreetTestScreen from './screens/PredictStreetTestScreen';
 import PredictionsScreen from './screens/PredictionsScreen';
+import DebugPredictStreetScreen from './screens/DebugPredictStreetScreen';
 import BottomNav from './components/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
 import { LanguageToggle } from './components/LanguageToggle';
@@ -141,6 +142,7 @@ function AppRoutes() {
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />
           <Route path="/predictions" element={<Protected><PageWrap><PredictionsScreen /></PageWrap></Protected>} />
           <Route path="/predictstreet-test" element={<PredictStreetTestScreen />} />
+          <Route path="/debug/predictstreet" element={<Protected><PageWrap><DebugPredictStreetScreen /></PageWrap></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
