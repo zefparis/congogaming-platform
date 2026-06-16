@@ -469,11 +469,11 @@ export default function SplashScreen() {
               aria-hidden
               style={{
                 position: 'absolute',
-                top: 0, right: 0, bottom: 0, left: '15%',
+                top: 0, right: 0, bottom: 0, left: '10%',
                 backgroundImage: 'url(/images/okapiscreen.png)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'right center',
-                opacity: 0.16,
+                opacity: 0.55,
                 zIndex: 0,
               }}
             />
@@ -483,7 +483,7 @@ export default function SplashScreen() {
               style={{
                 position: 'absolute',
                 top: 0, right: 0, bottom: 0, left: 0,
-                background: 'linear-gradient(to right, #0A1120 30%, rgba(10,17,32,0.6) 65%, transparent 100%)',
+                background: 'linear-gradient(to right, #0A1120 15%, rgba(10,17,32,0.6) 50%, transparent 85%)',
                 zIndex: 1,
               }}
             />
