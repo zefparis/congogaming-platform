@@ -574,12 +574,53 @@ export default function SplashScreen() {
       alignItems: 'stretch',
     }}
   >
-    {/* Text layer */}
+    {/* Image layer — visible and not over-darkened */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: '60%',
+        zIndex: 1,
+        overflow: 'hidden',
+      }}
+    >
+      <img
+        src="/images/okapiscreen.png"
+        alt=""
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: '58% center',
+          opacity: 1,
+          filter: 'saturate(1.05) contrast(1.02) brightness(0.98)',
+          transform: 'scale(1.06)',
+        }}
+      />
+    </div>
+
+    {/* Single readability overlay only */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 2,
+        background:
+          'linear-gradient(to right, #0B1426 0%, rgba(11,20,38,0.96) 34%, rgba(11,20,38,0.58) 52%, rgba(11,20,38,0.16) 72%, rgba(11,20,38,0) 100%)',
+        pointerEvents: 'none',
+      }}
+    />
+
+    {/* Content layer */}
     <div
       style={{
         position: 'relative',
         zIndex: 3,
-        width: '58%',
+        width: '56%',
         padding: '22px 0 22px 22px',
         display: 'flex',
         flexDirection: 'column',
@@ -604,7 +645,7 @@ export default function SplashScreen() {
       <div
         style={{
           fontSize: 11.5,
-          color: 'rgba(255,255,255,0.50)',
+          color: 'rgba(255,255,255,0.54)',
           lineHeight: 1.45,
           marginBottom: 14,
         }}
@@ -639,62 +680,6 @@ export default function SplashScreen() {
         <span style={{ marginLeft: 5, color: ORANGE }}>→</span>
       </button>
     </div>
-
-    {/* Image layer — visible, but isolated from the text */}
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: '56%',
-        zIndex: 1,
-        overflow: 'hidden',
-      }}
-    >
-      <img
-        src="/images/okapiscreen.png"
-        alt=""
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: '58% center',
-          opacity: 0.72,
-          filter: 'saturate(0.9) contrast(0.95) brightness(0.78)',
-          transform: 'scale(1.08)',
-        }}
-      />
-    </div>
-
-    {/* Left readability fade */}
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 2,
-        background:
-          'linear-gradient(to right, #0B1426 0%, rgba(11,20,38,0.96) 42%, rgba(11,20,38,0.55) 67%, rgba(11,20,38,0.16) 100%)',
-        pointerEvents: 'none',
-      }}
-    />
-
-    {/* Bottom premium vignette */}
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: '45%',
-        zIndex: 2,
-        background: 'linear-gradient(to bottom, transparent, rgba(4,7,14,0.55))',
-        pointerEvents: 'none',
-      }}
-    />
   </div>
 </section>
         {/* ── FOOTER ─────────────────────────────────────────── */}
