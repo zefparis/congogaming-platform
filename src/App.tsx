@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import SplashScreen from './screens/SplashScreen';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
 import ResetPinScreen from './screens/ResetPinScreen';
 import HomeScreen from './screens/HomeScreen';
 import GameScreen from './screens/GameScreen';
@@ -115,8 +115,8 @@ function AppRoutes() {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/splash" element={<PageWrap><SplashScreen /></PageWrap>} />
-          <Route path="/login" element={<PageWrap><LoginPage /></PageWrap>} />
-          <Route path="/register" element={<PageWrap><RegisterPage /></PageWrap>} />
+          <Route path="/login" element={<PageWrap><LoginScreen /></PageWrap>} />
+          <Route path="/register" element={<PageWrap><RegisterScreen /></PageWrap>} />
           <Route path="/reset-pin" element={<PageWrap><ResetPinScreen /></PageWrap>} />
           <Route path="/" element={<Protected><PageWrap><HomeScreen /></PageWrap></Protected>} />
           <Route
