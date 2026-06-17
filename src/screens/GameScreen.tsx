@@ -81,7 +81,7 @@ export default function GameScreen() {
       if (event.data?.type !== 'PREDICTSTREET_SSO_TOKEN_REQUEST') return;
 
       const nonce  = event.data?.nonce as string | undefined;
-      const iframe = iframeRef.current;
+      const source = event.source as Window | null;
 
       const sendResponse = (token: string | null) => {
         if (token) {
@@ -89,10 +89,10 @@ export default function GameScreen() {
         } else {
           setWalletStatus('error');
         }
-        if (import.meta.env.DEV) console.log('[PS-DEBUG] posting SSO_TOKEN_RESPONSE to', PS_ORIGIN, 'hasToken=', Boolean(token));
-        iframe?.contentWindow?.postMessage(
+        if (import.meta.env.DEV) console.log('[PS-DEBUG] posting SSO_TOKEN_RESPONSE to', event.origin, 'hasToken=', Boolean(token));
+        source?.postMessage(
           { type: 'PREDICTSTREET_SSO_TOKEN_RESPONSE', nonce, token },
-          PS_ORIGIN,
+          event.origin,
         );
         try { sessionStorage.setItem('ps:lastPostOk', String(Boolean(token))); } catch {}
       };
