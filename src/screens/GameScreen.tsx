@@ -3,11 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 
 const API_BASE    = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
-const PS_ORIGIN   = (import.meta.env.VITE_PREDICTSTREET_ORIGIN   || 'https://app.dev.predictstreet.sde.adifoundation.ai').replace(/\/$/, '');
-const PARTNER_ID  = import.meta.env.VITE_PREDICTSTREET_PARTNER_ID || '';
-const IFRAME_URL  = PARTNER_ID
-  ? `${PS_ORIGIN}/widget?partner_id=${encodeURIComponent(PARTNER_ID)}`
-  : (import.meta.env.VITE_GAME_IFRAME_URL || PS_ORIGIN);
+const PS_ORIGIN   = (import.meta.env.VITE_PREDICTSTREET_ORIGIN ?? 'https://iframe.adipredictstreet.com').replace(/\/$/, '');
+const IFRAME_SRC  = `${PS_ORIGIN}/embed?partner_id=congo-gaming`;
 
 type WalletStatus = 'initializing' | 'ready' | 'error';
 
@@ -58,7 +55,7 @@ export default function GameScreen() {
     if (import.meta.env.DEV) {
       // DEBUG — log key values
       console.log('[PS-DEBUG] PS_ORIGIN =', PS_ORIGIN);
-      console.log('[PS-DEBUG] IFRAME_URL =', IFRAME_URL);
+      console.log('[PS-DEBUG] IFRAME_SRC =', IFRAME_SRC);
     }
     const debugHandler = (e: MessageEvent) => {
       if (e.data?.type?.startsWith?.('PREDICTSTREET')) {
@@ -179,7 +176,7 @@ export default function GameScreen() {
           key={retryKey}
           ref={iframeRef}
           id="predictstreet-widget"
-          src={IFRAME_URL}
+          src={IFRAME_SRC}
           title="PredictStreet"
           className="absolute inset-0 w-full h-full bg-black"
           allow="clipboard-read; clipboard-write; payment; autoplay; fullscreen"
