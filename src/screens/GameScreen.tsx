@@ -53,8 +53,6 @@ export default function GameScreen() {
    *  • Token minted fresh on every request (no caching)
    *  • JWT sent only to PS_ORIGIN, never logged
    *
-   * wallet_address is now included in the JWT by the backend
-   * (deriveEVMAddress in predictstreet.ts) — fixes ADI no_evm_wallet (401).
    * ─────────────────────────────────────────────────────────────────────────*/
   useEffect(() => {
     if (import.meta.env.DEV) {
