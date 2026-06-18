@@ -3,7 +3,7 @@ import { getSession } from '../lib/auth';
 
 const API_BASE    = 'https://api.congogaming.com';
 const PS_IFRAME   = 'https://iframe.adipredictstreet.com';
-const IFRAME_SRC  = `${PS_IFRAME}/embed?partner_id=congo-gaming`;
+const IFRAME_SRC  = `${PS_IFRAME}/embed?partner_id=congo-gaming&locale=fr`;
 
 type Status = 'waiting' | 'token_sent' | 'not_logged_in';
 
