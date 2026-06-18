@@ -4,7 +4,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 
 const API_BASE    = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 const PS_ORIGIN   = (import.meta.env.VITE_PREDICTSTREET_ORIGIN ?? 'https://iframe.adipredictstreet.com').replace(/\/$/, '');
-const IFRAME_SRC  = `${PS_ORIGIN}/embed?partner_id=congo-gaming`;
+const IFRAME_SRC  = `${PS_ORIGIN}/embed?partner_id=congo-gaming&locale=fr`;
 
 type WalletStatus = 'initializing' | 'ready' | 'error';
 

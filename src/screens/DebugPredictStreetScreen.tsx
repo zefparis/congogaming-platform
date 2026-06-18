@@ -96,7 +96,7 @@ export default function DebugPredictStreetScreen() {
         {PS_ORIGIN ? (
           <iframe
             ref={iframeRef}
-            src={`${PS_ORIGIN}/widget?partner_id=congo-gaming`}
+            src={`${PS_ORIGIN}/widget?partner_id=congo-gaming&locale=fr`}
             title="PS Debug Iframe"
             width="100%"
             height="520"
