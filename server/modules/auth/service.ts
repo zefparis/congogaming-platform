@@ -141,10 +141,12 @@ export async function loginUser(input: { phone: string; pin: string }): Promise<
   if (!data) throw new Error('INVALID_CREDENTIALS');
   if (data.blocked) throw new Error('ACCOUNT_BLOCKED');
 
-  // Legacy SHA-256 hashes cannot be verified with Argon2; force the user
-  // through the reset-PIN flow before any login attempt.
   const pinHash = String(data.pin_hash || '');
   const isLegacyHash = /^[a-f0-9]{64}$/i.test(pinHash);
+
+  // If the account is flagged for reset (migration) or has a legacy SHA-256 hash
+  // that cannot be verified with Argon2, skip PIN verification and force the
+  // user through the phone-based reset flow immediately.
   if (data.pin_must_reset || isLegacyHash) throw new Error('PIN_RESET_REQUIRED');
 
   const lockedUntil = data.auth_locked_until ? new Date(String(data.auth_locked_until)) : null;
@@ -243,10 +245,15 @@ export async function changePin(input: { userId: string; currentPin: string; new
 
   const pinHash = String(data.pin_hash || '');
   const isLegacyHash = /^[a-f0-9]{64}$/i.test(pinHash);
-  if (data.pin_must_reset || isLegacyHash) throw new Error('PIN_RESET_REQUIRED');
+
+  // Legacy SHA-256: must go through the phone-based reset flow, not change-pin.
+  if (isLegacyHash) throw new Error('PIN_RESET_REQUIRED');
 
   const ok = await argon2.verify(pinHash, input.currentPin).catch(() => false);
   if (!ok) throw new Error('CURRENT_PIN_INVALID');
+
+  // Current PIN verified; check if a full reset is still required.
+  if (data.pin_must_reset) throw new Error('PIN_RESET_REQUIRED');
 
   await resetPin(String(data.id), input.newPin);
 }

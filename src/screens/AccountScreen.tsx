@@ -164,6 +164,11 @@ export default function AccountScreen() {
       setPinSuccess(true);
       setTimeout(() => closePinModal(), 1500);
     } catch (e: any) {
+      if (e instanceof AuthApiError && e.code === 'PIN_RESET_REQUIRED') {
+        closePinModal();
+        nav('/reset-pin', { state: { phone: getSession()?.phone ?? '' } });
+        return;
+      }
       setPinError(displayError(t, e instanceof AuthApiError ? e.code : undefined, e.message));
     } finally {
       setPinSaving(false);
