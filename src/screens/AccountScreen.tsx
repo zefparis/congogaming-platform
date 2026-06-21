@@ -152,7 +152,7 @@ export default function AccountScreen() {
 
   const submitPinChange = async () => {
     if (pinSaving) return;
-    if (!/^\d{6}$/.test(currentPin)) return setPinError(t('account.pin_error_current'));
+    if (!/^\d{4,6}$/.test(currentPin)) return setPinError(t('account.pin_error_current'));
     if (!/^\d{6}$/.test(newPin)) return setPinError(t('account.pin_error_new'));
     if (newPin !== confirmPin) return setPinError(t('account.pin_error_mismatch'));
     if (currentPin === newPin) return setPinError(t('account.pin_error_same'));
@@ -766,7 +766,7 @@ export default function AccountScreen() {
                 <button
                   type="button"
                   onClick={submitPinChange}
-                  disabled={pinSaving || currentPin.length !== 6 || newPin.length !== 6 || confirmPin.length !== 6}
+                  disabled={pinSaving || currentPin.length < 4 || newPin.length !== 6 || confirmPin.length !== 6}
                   className="mt-4 w-full h-12 rounded-xl bg-gold text-black font-display text-lg tracking-wider disabled:opacity-50"
                 >
                   {pinSaving ? t('account.pin_saving') : t('account.pin_validate')}
