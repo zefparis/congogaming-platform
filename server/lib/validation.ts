@@ -43,7 +43,14 @@ export const OkapiCashoutBodySchema = z.object({
 });
 
 export const KycScanBodySchema = z.object({
-  selfie_b64: z.string().min(100).max(7_000_000),
+  selfie_b64: z
+    .string()
+    .min(100)
+    .max(2_800_000)
+    .refine(
+      (v) => /^[A-Za-z0-9+/]+=*$/.test(v),
+      'selfie_b64 must be valid base64',
+    ),
 });
 
 export const OkapiAutoStartBodySchema = z.object({

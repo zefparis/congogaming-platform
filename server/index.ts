@@ -75,6 +75,12 @@ await app.register(authPlugin);
 
 await app.register(websocket);
 
+app.addHook('onSend', async (_req, reply) => {
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Frame-Options', 'DENY');
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+});
+
 app.get('/health', async () => ({ ok: true, service: 'congo-gaming-api' }));
 
 if (!isProduction) {
@@ -124,5 +130,4 @@ const gracefulShutdown = async (signal: string) => {
 };
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
