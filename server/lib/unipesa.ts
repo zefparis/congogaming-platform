@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { ProxyAgent, fetch as undiciFetch } from 'undici';
 import { env as appEnv } from '../env.js';
 import { callUnipesaResilient, type CallResult, type ResilientCallOptions } from './unipesa-resilience.js';
@@ -180,8 +180,15 @@ export async function getMerchantBalance(): Promise<{ balance_cdf: number; raw: 
 
 export function verifyCallbackSignature(body: Record<string, any>): boolean {
   const secret = env('UNIPESA_SECRET_KEY');
-  const provided = String(body?.signature || '');
+  const provided = String(body?.signature || '').toLowerCase();
   if (!provided) return false;
-  const expected = calculateSignature(body, secret);
-  return provided.toLowerCase() === expected.toLowerCase();
+  const expected = calculateSignature(body, secret).toLowerCase();
+  try {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }

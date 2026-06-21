@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { supabaseAdmin } from '../lib/supabase.js';
 
 const KID = 'cgl-ps-v1';
-const ISS = 'congo-gaming';
+const ISS = 'https://api.congogaming.com';
 const AUD = 'predictstreet-prod';
 const TTL = 300; // 5 minutes
 
@@ -104,12 +104,10 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
    * Auth required to tie logs to a user; body is arbitrary JSON.
    * ──────────────────────────────────────────────────────────────────────── */
   app.post('/api/predictstreet/debug', { preHandler: app.requireAuth }, async (req, reply) => {
-    const body = req.body as unknown;
     app.log.info({
       sub_prefix: req.user.id.slice(0, 8),
       kind: 'predictstreet_debug',
-      payload: body,
-    }, '[predictstreet] debug payload received');
+    }, '[predictstreet] debug payload received (body not logged)');
     return reply.send({ ok: true });
   });
 

@@ -70,7 +70,10 @@ function mapVerdict(pg: PgScanResult): {
 export default async function kycRoutes(app: FastifyInstance) {
   app.post(
     '/api/kyc/scan',
-    { preHandler: app.requireAuth },
+    {
+      preHandler: app.requireAuth,
+      config: { rateLimit: { max: 3, timeWindow: '1 hour' } },
+    },
     async (req, reply) => {
       const parsed = KycScanBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -133,23 +136,13 @@ export default async function kycRoutes(app: FastifyInstance) {
         });
       } catch (e: any) {
         req.log.error({ err: e, upstreamUrl }, 'PlayGuard upstream unreachable');
-        return reply.code(502).send({
-          error: 'PlayGuard unreachable',
-          detail: e?.message || String(e),
-          upstream: upstreamUrl,
-        });
+        return reply.code(502).send({ error: 'KYC service temporarily unavailable' });
       }
 
       if (!pgRes.ok) {
         const text = await pgRes.text().catch(() => '');
-        req.log.warn({ status: pgRes.status, body: text, upstreamUrl }, 'PlayGuard error');
-        return reply.code(502).send({
-          error: `PlayGuard scan failed (${pgRes.status})`,
-          // Surface the upstream body so we can debug in the SPA console.
-          // Capped at 500 chars to avoid leaking large stack traces.
-          detail: text.slice(0, 500),
-          upstream: upstreamUrl,
-        });
+        req.log.warn({ status: pgRes.status, body: text.slice(0, 500), upstreamUrl }, 'PlayGuard error');
+        return reply.code(502).send({ error: 'KYC scan failed — please retry' });
       }
 
       const pgJson = (await pgRes.json().catch(() => null)) as

@@ -7,3 +7,5 @@ dist
 *.log
 .vercel
 .commit-msg.tmp
+token.json
+webhook-test.mjs

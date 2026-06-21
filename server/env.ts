@@ -4,7 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('3001'),
   HOST: z.string().default('0.0.0.0'),
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_SECRET: z.string().min(64, 'JWT_SECRET must be at least 64 characters'),
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
   SUPABASE_SERVICE_KEY: z.string().min(1, 'SUPABASE_SERVICE_KEY is required'),
   UNIPESA_PUBLIC_ID: z.string().min(1, 'UNIPESA_PUBLIC_ID is required'),
@@ -23,9 +23,9 @@ const envSchema = z.object({
   FLASH_MIN_TICKETS: z.string().transform((val) => Number(val)).pipe(z.number().int().nonnegative()).optional(),
   AUTH_MAX_FAILURES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('5'),
   AUTH_LOCKOUT_MINUTES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('15'),
-  // Mobile gaming app: long-lived sessions reduce friction. Defaults to
-  // 7 days; can be overridden per-environment via the env var.
-  ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('604800'),
+  // Mobile gaming app: default to 15 min; override via env var for longer sessions.
+  // Never raise above 86400 (24h) without a token revocation mechanism.
+  ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('900'),
   VITE_API_URL: z.string().optional(),
   VITE_WS_URL: z.string().optional(),
   // UniPay CGLT gaming integration (server-to-server; key must NOT be bundled)
@@ -81,6 +81,7 @@ const envSchema = z.object({
   PREDICTSTREET_SERVER_SECRET:    z.string().optional(), // Legacy alias for bearer token
   PREDICTSTREET_BEARER_TOKEN:     z.string().optional(), // Bearer token for limits API (preferred)
   PREDICTSTREET_WEBHOOK_SECRET:   z.string().optional(), // HMAC-SHA256 secret for webhook
+  PREDICTSTREET_SIGNING_SECRET:   z.string().optional(), // Legacy signing secret (tracked, rotate if exposed)
   PREDICTSTREET_PARTNER_ID:       z.string().optional(), // Provided by PredictStreet at onboarding
 });
 
