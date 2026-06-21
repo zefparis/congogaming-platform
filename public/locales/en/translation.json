@@ -207,7 +207,7 @@
     "pin_updated": "PIN updated successfully",
     "pin_saving": "SAVING…",
     "pin_validate": "VALIDATE",
-    "pin_error_current": "Current code: 6 digits required",
+    "pin_error_current": "Current code invalid",
     "pin_error_new": "New code: 6 digits required",
     "pin_error_mismatch": "New PINs do not match",
     "pin_error_same": "New PIN must be different",

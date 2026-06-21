@@ -207,7 +207,7 @@
     "pin_updated": "PIN imebadilishwa",
     "pin_saving": "INAHIFADHI…",
     "pin_validate": "THIBITISHA",
-    "pin_error_current": "Nambari ya sasa: nambari 6 zinahitajika",
+    "pin_error_current": "Nambari ya sasa si sahihi",
     "pin_error_new": "Nambari mpya: nambari 6 zinahitajika",
     "pin_error_mismatch": "PIN mpya hazilingani",
     "pin_error_same": "PIN mpya lazima iwe tofauti",
