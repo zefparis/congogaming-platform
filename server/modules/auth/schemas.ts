@@ -15,7 +15,13 @@ export const CongoPhoneSchema = z
 
 export const PinSchema = z
   .string()
-  .regex(/^\d{4}$/, 'PIN invalide');
+  .regex(/^\d{6}$/, 'PIN invalide');
+
+// Transition: accept 4 OR 6 digits so existing users with a 4-digit PIN
+// can still log in and be auto-redirected to create a new 6-digit PIN.
+export const LoginPinTransitionSchema = z
+  .string()
+  .regex(/^\d{4,6}$/, 'PIN invalide');
 
 export const RegisterSchema = z.object({
   phone: CongoPhoneSchema,
@@ -41,8 +47,8 @@ export const RegisterSchema = z.object({
 
 export const LoginSchema = z.object({
   phone: CongoPhoneSchema,
-  pin: PinSchema,
+  pin: LoginPinTransitionSchema,
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;
-export type LoginInput = z.infer<typeof LoginSchema>;
+export type LoginInput  = z.infer<typeof LoginSchema>;

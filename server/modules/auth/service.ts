@@ -179,7 +179,7 @@ export async function loginUser(input: { phone: string; pin: string }): Promise<
  * pattern). Always uses Argon2id for the new hash.
  */
 export async function resetPinByPhone(input: { phone: string; newPin: string }): Promise<void> {
-  if (!/^\d{4}$/.test(input.newPin)) throw new Error('INVALID_PIN_FORMAT');
+  if (!/^\d{6}$/.test(input.newPin)) throw new Error('INVALID_PIN_FORMAT');
 
   const { data, error } = await supabaseAdmin
     .from('users')
@@ -229,7 +229,7 @@ export async function resetPin(userId: string, newPin: string): Promise<void> {
 }
 
 export async function changePin(input: { userId: string; currentPin: string; newPin: string }): Promise<void> {
-  if (!/^\d{4}$/.test(input.newPin)) throw new Error('INVALID_PIN_FORMAT');
+  if (!/^\d{6}$/.test(input.newPin)) throw new Error('INVALID_PIN_FORMAT');
   if (input.currentPin === input.newPin) throw new Error('PIN_SAME_AS_CURRENT');
 
   const { data, error } = await supabaseAdmin

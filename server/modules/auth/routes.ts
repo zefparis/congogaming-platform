@@ -7,7 +7,7 @@ import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
 
 const ResetPinSchema = z.object({
   phone: CongoPhoneSchema,
-  newPin: z.string().regex(/^\d{4}$/, 'INVALID_PIN_FORMAT'),
+  newPin: z.string().regex(/^\d{6}$/, 'INVALID_PIN_FORMAT'),
 });
 
 // Key auth limiters by the phone number in the body (identity) rather
@@ -128,8 +128,8 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   const ChangePinSchema = z.object({
-    currentPin: z.string().regex(/^\d{4}$/, 'INVALID_PIN_FORMAT'),
-    newPin: z.string().regex(/^\d{4}$/, 'INVALID_PIN_FORMAT'),
+    currentPin: z.string().regex(/^\d{4,6}$/, 'INVALID_PIN_FORMAT'),
+    newPin: z.string().regex(/^\d{6}$/, 'INVALID_PIN_FORMAT'),
   });
 
   app.post('/api/auth/me/change-pin', {
