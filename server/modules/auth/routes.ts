@@ -101,6 +101,9 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   }, async (req, reply) => {
     const parsed = ResetPinSchema.safeParse(req.body);
     if (!parsed.success) {
+      req.log.warn({ issues: parsed.error.issues, body: req.body }, 'reset-pin schema validation failed');
+      const isPhoneError = parsed.error.issues.some((i) => i.path[0] === 'phone');
+      if (isPhoneError) return reply.code(400).send({ error: 'INVALID_PHONE', code: 'INVALID_PHONE' });
       return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
     }
     try {
