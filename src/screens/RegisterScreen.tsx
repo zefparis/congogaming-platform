@@ -42,11 +42,11 @@ export default function RegisterScreen() {
   const onPhoneDelete = () => setPhone((prev) => prev.slice(0, -1));
   const onPinDelete = () => setPin((prev) => prev.slice(0, -1));
   const onPinDigit = (d: string) => {
-    setPin((prev) => (prev.length < 4 ? prev + d : prev));
+    setPin((prev) => (prev.length < 6 ? prev + d : prev));
     setErr(null);
   };
   const handleRegister = async () => {
-    if (pin.length !== 4 || loading) return;
+    if (pin.length !== 6 || loading) return;
     try {
       setLoading(true);
       const user = await registerUser(phone, pin, referralCode || null, agentRef);
@@ -89,10 +89,20 @@ export default function RegisterScreen() {
           }}
         />
       </div>
-      <h1 className="font-display text-4xl text-gold tracking-wide">{t('register.title')}</h1>
-      <p className="text-zinc-400 text-sm mt-1 mb-6">
-        {step === 'phone' ? t('register.subtitle_phone') : t('register.subtitle_pin')}
-      </p>
+      {step === 'phone' && (
+        <>
+          <h1 className="font-display text-4xl text-gold tracking-wide">{t('register.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1 mb-6">{t('register.subtitle_phone')}</p>
+        </>
+      )}
+      {step === 'pin' && (
+        <>
+          <h1 className="font-display text-3xl text-gold tracking-wide mb-3">{t('register.pin_create_title')}</h1>
+          <div className="bg-amber-900/30 border border-amber-700/40 rounded-2xl p-4 mb-5">
+            <p className="text-amber-100/90 text-sm leading-relaxed whitespace-pre-line">{t('register.pin_create_body')}</p>
+          </div>
+        </>
+      )}
 
       {agentRef && (
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/8 p-4">
@@ -191,11 +201,11 @@ export default function RegisterScreen() {
             <Lock className="w-6 h-6 text-gold" />
             <div className="flex-1">
               <div className="text-xs text-zinc-500">{t('register.pin_label')}</div>
-              <div className="flex gap-3 mt-2">
-                {[0, 1, 2, 3].map((i) => (
+              <div className="flex gap-2 mt-2">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
-                    className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center font-display text-2xl ${
+                    className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center font-display text-2xl ${
                       pin.length > i ? 'bg-gold border-gold text-black' : 'border-zinc-700 text-zinc-700'
                     }`}
                   >
@@ -213,14 +223,14 @@ export default function RegisterScreen() {
             <NumPad onDigit={onPinDigit} onDelete={onPinDelete} />
           </div>
 
-          {pin.length === 4 && (
+          {pin.length === 6 && (
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={handleRegister}
               disabled={loading}
-              className="w-full mt-6 py-5 bg-amber-600 text-white font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
+              className="w-full mt-6 py-5 bg-gold text-black font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
             >
-              {t('common.validate')}
+              {t('register.pin_confirm_btn')}
             </motion.button>
           )}
 

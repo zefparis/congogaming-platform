@@ -23,6 +23,7 @@ export default function LoginScreen() {
   const [step, setStep] = useState<'phone' | 'pin'>('phone');
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [forgotPinMode, setForgotPinMode] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
 
@@ -58,7 +59,7 @@ export default function LoginScreen() {
 
   const onPinDelete = () => setPin((prev) => prev.slice(0, -1));
   const onPinDigit = (d: string) => {
-    setPin((prev) => (prev.length < 4 ? prev + d : prev));
+    setPin((prev) => (prev.length < 6 ? prev + d : prev));
     setErr(null);
   };
   const goToResetPin = () => {
@@ -66,7 +67,7 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (pin.length !== 4 || loading || isLocked) return;
+    if (pin.length < 4 || loading || isLocked) return;
     try {
       setLoading(true);
       await loginUser(phone, pin);
@@ -153,11 +154,11 @@ export default function LoginScreen() {
             <Lock className="w-6 h-6 text-gold" />
             <div className="flex-1">
               <div className="text-xs text-zinc-500">{t('login.pin_label')}</div>
-              <div className="flex gap-3 mt-2">
-                {[0, 1, 2, 3].map((i) => (
+              <div className="flex gap-2 mt-2">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
-                    className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center font-display text-2xl ${
+                    className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center font-display text-2xl ${
                       pin.length > i ? 'bg-gold border-gold text-black' : 'border-zinc-700 text-zinc-700'
                     }`}
                   >
@@ -181,15 +182,28 @@ export default function LoginScreen() {
               </div>
             </div>
           )}
-          {err && !isLocked && (
+          {err && !isLocked && !forgotPinMode && (
             <div className="mt-3">
               <div className="text-red-400 text-sm">{err}</div>
               <button
                 type="button"
-                onClick={goToResetPin}
+                onClick={() => setForgotPinMode(true)}
                 className="mt-2 text-gold font-semibold text-sm underline underline-offset-4"
               >
                 {t('login.change_pin')}
+              </button>
+            </div>
+          )}
+          {forgotPinMode && (
+            <div className="mt-3 rounded-2xl bg-zinc-900 border border-amber-700/40 p-4">
+              <div className="font-display text-base text-gold tracking-wide">{t('login.forgot_pin_title')}</div>
+              <div className="text-zinc-300 text-sm mt-2 leading-relaxed">{t('login.forgot_pin_body')}</div>
+              <button
+                type="button"
+                onClick={() => setForgotPinMode(false)}
+                className="mt-3 text-zinc-400 text-sm"
+              >
+                {t('login.forgot_pin_close')}
               </button>
             </div>
           )}
@@ -197,7 +211,7 @@ export default function LoginScreen() {
           <div className="mt-5">
             <NumPad onDigit={onPinDigit} onDelete={onPinDelete} />
           </div>
-          {pin.length === 4 && (
+          {pin.length >= 4 && (
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={handleLogin}

@@ -31,7 +31,7 @@ export default function ResetPinScreen() {
 
   const onDigit = (d: string) => {
     setErr(null);
-    setActivePin((prev) => (prev.length < 4 ? prev + d : prev));
+    setActivePin((prev) => (prev.length < 6 ? prev + d : prev));
   };
   const onDelete = () => {
     setErr(null);
@@ -39,14 +39,14 @@ export default function ResetPinScreen() {
   };
 
   const goConfirm = () => {
-    if (newPin.length !== 4) return;
+    if (newPin.length !== 6) return;
     setStep('confirm');
     setErr(null);
   };
 
   const submit = async () => {
     if (loading) return;
-    if (confirmPin.length !== 4) return;
+    if (confirmPin.length !== 6) return;
     if (newPin !== confirmPin) {
       setErr(t('reset_pin.error_mismatch'));
       setConfirmPin('');
@@ -103,11 +103,11 @@ export default function ResetPinScreen() {
       </div>
 
       <div className="bg-amber-900/30 border border-amber-700/40 rounded-2xl p-4 mb-5">
-        <div className="text-amber-200 font-display text-lg mb-1">{t('reset_pin.warning_title')}</div>
-        <div className="text-amber-100/80 text-sm">
-          {step === 'new'
-            ? t('reset_pin.warning_new')
-            : t('reset_pin.warning_confirm')}
+        <div className="text-amber-200 font-display text-lg mb-1">
+          {step === 'new' ? t('reset_pin.create_title') : t('reset_pin.confirm_title')}
+        </div>
+        <div className="text-amber-100/80 text-sm whitespace-pre-line">
+          {step === 'new' ? t('reset_pin.create_body') : t('reset_pin.warning_confirm')}
         </div>
       </div>
 
@@ -117,11 +117,11 @@ export default function ResetPinScreen() {
           <div className="text-xs text-zinc-500">
             {step === 'new' ? t('reset_pin.field_new') : t('reset_pin.field_confirm')}
           </div>
-          <div className="flex gap-3 mt-2">
-            {[0, 1, 2, 3].map((i) => (
+          <div className="flex gap-2 mt-2">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center font-display text-2xl ${
+                className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center font-display text-2xl ${
                   activePin.length > i
                     ? 'bg-gold border-gold text-black'
                     : 'border-zinc-700 text-zinc-700'
@@ -139,9 +139,9 @@ export default function ResetPinScreen() {
         type="tel"
         inputMode="numeric"
         pattern="\d*"
-        maxLength={4}
+        maxLength={6}
         value={activePin}
-        onChange={(e) => setActivePin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        onChange={(e) => setActivePin(e.target.value.replace(/\D/g, '').slice(0, 6))}
         className="sr-only"
         aria-hidden="true"
       />
@@ -153,7 +153,7 @@ export default function ResetPinScreen() {
         <NumPad onDigit={onDigit} onDelete={onDelete} />
       </div>
 
-      {step === 'new' && newPin.length === 4 && (
+      {step === 'new' && newPin.length === 6 && (
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={goConfirm}
@@ -163,14 +163,14 @@ export default function ResetPinScreen() {
         </motion.button>
       )}
 
-      {step === 'confirm' && confirmPin.length === 4 && (
+      {step === 'confirm' && confirmPin.length === 6 && (
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={submit}
           disabled={loading}
-          className="w-full mt-6 py-5 bg-amber-600 text-white font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
+          className="w-full mt-6 py-5 bg-gold text-black font-black text-xl rounded-2xl tracking-widest disabled:opacity-60"
         >
-          {t('reset_pin.change_pin')}
+          {t('reset_pin.confirm_btn')}
         </motion.button>
       )}
 

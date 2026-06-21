@@ -152,8 +152,8 @@ export default function AccountScreen() {
 
   const submitPinChange = async () => {
     if (pinSaving) return;
-    if (!/^\d{4}$/.test(currentPin)) return setPinError(t('account.pin_error_current'));
-    if (!/^\d{4}$/.test(newPin)) return setPinError(t('account.pin_error_new'));
+    if (!/^\d{6}$/.test(currentPin)) return setPinError(t('account.pin_error_current'));
+    if (!/^\d{6}$/.test(newPin)) return setPinError(t('account.pin_error_new'));
     if (newPin !== confirmPin) return setPinError(t('account.pin_error_mismatch'));
     if (currentPin === newPin) return setPinError(t('account.pin_error_same'));
 
@@ -723,11 +723,11 @@ export default function AccountScreen() {
                     <input
                       type="password"
                       inputMode="numeric"
-                      maxLength={4}
+                      maxLength={6}
                       value={currentPin}
-                      onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-3 text-white font-display text-2xl tracking-[0.5em] text-center outline-none focus:border-gold"
-                      placeholder="••••"
+                      placeholder="••••••"
                     />
                   </div>
                   <div>
@@ -735,11 +735,11 @@ export default function AccountScreen() {
                     <input
                       type="password"
                       inputMode="numeric"
-                      maxLength={4}
+                      maxLength={6}
                       value={newPin}
-                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-3 text-white font-display text-2xl tracking-[0.5em] text-center outline-none focus:border-gold"
-                      placeholder="••••"
+                      placeholder="••••••"
                     />
                   </div>
                   <div>
@@ -747,11 +747,11 @@ export default function AccountScreen() {
                     <input
                       type="password"
                       inputMode="numeric"
-                      maxLength={4}
+                      maxLength={6}
                       value={confirmPin}
-                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="w-full mt-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-3 text-white font-display text-2xl tracking-[0.5em] text-center outline-none focus:border-gold"
-                      placeholder="••••"
+                      placeholder="••••••"
                     />
                   </div>
                 </div>
@@ -766,7 +766,7 @@ export default function AccountScreen() {
                 <button
                   type="button"
                   onClick={submitPinChange}
-                  disabled={pinSaving || currentPin.length !== 4 || newPin.length !== 4 || confirmPin.length !== 4}
+                  disabled={pinSaving || currentPin.length !== 6 || newPin.length !== 6 || confirmPin.length !== 6}
                   className="mt-4 w-full h-12 rounded-xl bg-gold text-black font-display text-lg tracking-wider disabled:opacity-50"
                 >
                   {pinSaving ? t('account.pin_saving') : t('account.pin_validate')}
