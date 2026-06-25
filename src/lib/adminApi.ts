@@ -11,6 +11,7 @@ const BASE = BASE_URL;
 console.log('BASE_URL:', BASE_URL);
 const TOKEN_KEY = 'cg_admin_token';
 const SECRET_KEY = 'cg_admin_secret';
+const PHONE_KEY = 'cg_admin_phone';
 const FALLBACK_SECRET = 'cg_admin_loto_2026';
 // Toggle verbose Authorization logging by setting localStorage.cg_admin_debug = '1'.
 const DEBUG = (() => {
@@ -55,6 +56,23 @@ export function setAdminSecret(secret: string | null) {
   }
 }
 
+export function getAdminPhone(): string | null {
+  try {
+    return sessionStorage.getItem(PHONE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAdminPhone(phone: string | null) {
+  try {
+    if (phone) sessionStorage.setItem(PHONE_KEY, phone);
+    else sessionStorage.removeItem(PHONE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export class AdminAuthError extends Error {
   constructor(message = 'Unauthorized') {
     super(message);
@@ -89,7 +107,7 @@ async function silentReauth(): Promise<string | null> {
     const res = await fetch(`${BASE}/api/admin/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret }),
+      body: JSON.stringify({ secret, phone: getAdminPhone() || undefined }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { token?: string };
