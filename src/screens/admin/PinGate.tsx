@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
-import { adminApi, setAdminSecret, setAdminToken } from '../../lib/adminApi';
+import { adminApi, setAdminPhone, setAdminSecret, setAdminToken } from '../../lib/adminApi';
 
 export default function PinGate({ onAuthed }: { onAuthed: () => void }) {
   const [phone, setPhone] = useState('');
@@ -22,6 +22,7 @@ export default function PinGate({ onAuthed }: { onAuthed: () => void }) {
       // Persist the secret in sessionStorage so request() can silently
       // re-acquire a fresh token if the current one expires mid-session.
       setAdminSecret(secret);
+      setAdminPhone(phone.trim());
       // Cache role so the UI can hide sensitive blocks for non-super-admins.
       try {
         sessionStorage.setItem('cg_admin_role', role || 'admin');

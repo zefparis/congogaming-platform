@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LogOut } from 'lucide-react';
-import { adminApi, getAdminToken, setAdminSecret, setAdminToken } from '../lib/adminApi';
+import { adminApi, getAdminToken, setAdminPhone, setAdminSecret, setAdminToken } from '../lib/adminApi';
 import PinGate from './admin/PinGate';
 import OverviewTab from './admin/OverviewTab';
 import PlayersTab from './admin/PlayersTab';
@@ -45,6 +45,7 @@ export default function AdminScreen() {
   function logout() {
     setAdminToken(null);
     setAdminSecret(null);
+    setAdminPhone(null);
     setAuthed(false);
   }
 
