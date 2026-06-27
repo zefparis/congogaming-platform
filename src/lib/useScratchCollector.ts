@@ -296,21 +296,20 @@ export function useScratchCollector(userId?: string) {
       url,
     });
 
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' });
-      const queued = navigator.sendBeacon(url, blob);
-      console.log('[HCS-SCRATCH] sendBeacon queued:', queued, '(true=accepted by browser, false=rejected)');
-    } else {
-      console.log('[HCS-SCRATCH] sendBeacon not available, using fetch fallback');
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      })
-        .then((r) => console.log('[HCS-SCRATCH] fetch response status:', r.status))
-        .catch((err) => console.error('[HCS-SCRATCH] fetch error:', err));
-    }
+    // credentials: 'omit' — anonymous endpoint, no cookies needed.
+    // keepalive: true    — survives page navigation / unload (like sendBeacon).
+    // sendBeacon with a JSON Blob sends cookies implicitly and fails with
+    // Access-Control-Allow-Origin: * (wildcard + credentials = CORS error).
+    console.log('[HCS-SCRATCH] fetch (credentials:omit, keepalive:true) →', url);
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      credentials: 'omit',
+      keepalive: true,
+    })
+      .then((r) => console.log('[HCS-SCRATCH] fetch response status:', r.status))
+      .catch((err) => console.error('[HCS-SCRATCH] fetch error:', err));
   }, [userId]);
 
   /** Call when the ticket is purchased and the card is displayed */
