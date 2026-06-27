@@ -12,7 +12,7 @@
  *  - Optimised for Xiaomi 4G: payload < 2 KB, no images
  */
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -185,28 +185,28 @@ function detectDeviceType(): 'mobile' | 'desktop' {
 
 export function useScratchCollector(userId?: string) {
   const stateRef = useRef<CollectorState | null>(null);
-  // Idle timer lives INSIDE the hook so React re-renders in ScratchScreen
-  // cannot cancel it. The 2s countdown starts on touchend/mouseup.
+  // Dedicated dedup ref — survives stateRef resets, cleared only by onCardDisplayed
+  const submittedRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Internal submit (stable ref-based, safe to call from any closure) ──────
   // Declared as a useCallback so onFullScratch/onSessionEnd can capture it
   // without stale-closure issues (it only depends on stable refs).
   const submitSession = useCallback((coveredPct: number) => {
+    if (submittedRef.current) {
+      console.log('[HCS-SCRATCH] submit prevented - already submitted this session');
+      return;
+    }
     const s = stateRef.current;
     if (!s) {
       console.log('[HCS-SCRATCH] submitSession: no state, skipping');
-      return;
-    }
-    if (s.submitted) {
-      console.log('[HCS-SCRATCH] submitSession: already submitted, skipping');
       return;
     }
     if (s.touchPoints.length < 1) {
       console.log('[HCS-SCRATCH] submitSession: no touch points, skipping');
       return;
     }
-    s.submitted = true;
+    submittedRef.current = true;
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
 
     const pts = s.touchPoints;
@@ -326,6 +326,7 @@ export function useScratchCollector(userId?: string) {
   const onCardDisplayed = useCallback(() => {
     console.log('[HCS-SCRATCH] onCardDisplayed — new session started');
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    submittedRef.current = false;
     stateRef.current = {
       sessionId: generateId(),
       sessionStartTs: performance.now(),
@@ -345,6 +346,19 @@ export function useScratchCollector(userId?: string) {
       submitted: false,
     };
   }, []);
+
+  // TRIGGER 4 — visibilitychange: fires when user switches app or locks phone
+  // Most reliable mobile signal — registered once, cleaned up on unmount
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('[HCS-SCRATCH] visibilitychange: page hidden — submitting');
+        submitSession(stateRef.current?.coveredAreaPct ?? 0);
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => window.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [submitSession]);
 
   /** Call inside mouseenter / mouseover on the canvas (desktop hover) */
   const onMouseEnter = useCallback(() => {
@@ -424,7 +438,7 @@ export function useScratchCollector(userId?: string) {
     [],
   );
 
-  /** Call inside the touchend / mouseup handler — starts the 2s idle countdown */
+  /** Call inside the touchend / mouseup handler — starts adaptive idle countdown */
   const onTouchEnd = useCallback(() => {
     const s = stateRef.current;
     if (!s) return;
@@ -435,12 +449,15 @@ export function useScratchCollector(userId?: string) {
       s.stopAfterRevealTs = s.lastTouchTs;
     }
 
-    // Start 2s idle countdown — if user doesn't touch again, submit
+    // TRIGGER 2 — adaptive idle delay: 500ms mobile, 2000ms desktop
+    const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+    const idleDelay = isMobile ? 500 : 2000;
+    console.log('[HCS-SCRATCH] idle timer delay:', idleDelay, 'ms');
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
-      console.log('[HCS-SCRATCH] Idle timer fired (2s) — submitting');
+      console.log('[HCS-SCRATCH] idle timer fired (', idleDelay, 'ms) — submitting');
       submitSession(s.coveredAreaPct);
-    }, 2000);
+    }, idleDelay);
 
     console.log('[HCS-SCRATCH] onTouchEnd — points so far:', s.touchPoints.length, ', idle timer armed');
   }, [submitSession]);
@@ -475,17 +492,21 @@ export function useScratchCollector(userId?: string) {
     }
   }, []);
 
-  /** Call when full scratch completes (all cells revealed) — submits immediately */
+  /** Call when full scratch completes (all cells revealed) — TRIGGER 1: submit immediately */
   const onFullScratch = useCallback((coveredPct: number) => {
     const s = stateRef.current;
     if (!s) return;
-    console.log('[HCS-SCRATCH] onFullScratch — submitting immediately');
+    console.log('[HCS-SCRATCH] onFullScratch triggered - submitting immediately');
     s.completedFullScratch = true;
     s.coveredAreaPct = 100;
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
     submitSession(coveredPct);
   }, [submitSession]);
 
-  /** Explicit submit — called by ScratchScreen on unmount */
+  /** TRIGGER 3 — onSessionEnd: called by ScratchScreen useEffect cleanup on unmount */
   const onSessionEnd = useCallback((coveredPct?: number) => {
     console.log('[HCS-SCRATCH] onSessionEnd called');
     submitSession(coveredPct ?? stateRef.current?.coveredAreaPct ?? 0);
