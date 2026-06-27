@@ -6,6 +6,7 @@ import { ArrowLeft, Wallet } from 'lucide-react';
 import { api } from '../lib/api';
 import { getSession, refreshBalance } from '../lib/auth';
 import FarmingBar from '../components/FarmingBar';
+import FreePlayUnlock from '../components/FreePlayUnlock';
 
 type Sym = 'okapi' | 'diamond' | 'lightning' | 'star' | 'coin' | 'flame';
 
@@ -45,6 +46,8 @@ const cellRect = (i: number) => {
   };
 };
 
+const FREE_PLAYS_KEY = 'cg_free_plays_pending';
+
 export default function ScratchScreen() {
   const { t } = useTranslation();
   const nav = useNavigate();
@@ -56,6 +59,16 @@ export default function ScratchScreen() {
   const [grid, setGrid] = useState<Sym[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ win: number; bet: number } | null>(null);
+
+  // Free Play Unlock gate — show once per page-load if not already completed
+  const [showFreePlay, setShowFreePlay] = useState<boolean>(() => {
+    // Skip if user already has pending free plays from a previous visit
+    const pending = parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
+    return pending === 0;
+  });
+  const [freePlaysAvailable, setFreePlaysAvailable] = useState<number>(() => {
+    return parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
+  });
   // Visual cue: flash the header balance green for ~2s after the server
   // credits a winning ticket so the user has an unambiguous confirmation
   // that the new balance has landed.
@@ -448,8 +461,17 @@ export default function ScratchScreen() {
     setResult(null);
     setGrid(null);
     setTicketId(null);
+
+    // Consume a free play if available, otherwise charge CDF balance as usual
+    const usingFreePlay = freePlaysAvailable > 0 && balance < bet;
+    if (usingFreePlay) {
+      const remaining = freePlaysAvailable - 1;
+      localStorage.setItem(FREE_PLAYS_KEY, String(remaining));
+      setFreePlaysAvailable(remaining);
+    }
+
     try {
-      const r = await api.scratchBuy(userId, bet);
+      const r = await api.scratchBuy(userId, usingFreePlay ? 0 : bet);
       const newBal = await refreshBalance(userId).catch(() => null);
       if (newBal != null) setBalance(newBal);
       setTicketId(r.ticket_id);
@@ -469,9 +491,27 @@ export default function ScratchScreen() {
     setTicketId(null);
   };
 
-  const canBuy = balance >= bet && !busy && !ticketId;
+  const canBuy = (balance >= bet || freePlaysAvailable > 0) && !busy && !ticketId;
+
+  const handleFreePlayComplete = (awarded: number) => {
+    const total = freePlaysAvailable + awarded;
+    localStorage.setItem(FREE_PLAYS_KEY, String(total));
+    setFreePlaysAvailable(total);
+    setShowFreePlay(false);
+  };
+
+  const handleFreePlaySkip = () => {
+    setShowFreePlay(false);
+  };
 
   return (
+    <>
+      {showFreePlay && (
+        <FreePlayUnlock
+          onComplete={handleFreePlayComplete}
+          onSkip={handleFreePlaySkip}
+        />
+      )}
     <div
       style={{
         overflowY: 'auto',
@@ -556,6 +596,27 @@ export default function ScratchScreen() {
           </span>
         </div>
       </div>
+
+      {/* Free Plays badge */}
+      {freePlaysAvailable > 0 && (
+        <div
+          style={{
+            margin: '10px 14px 0',
+            padding: '8px 14px',
+            borderRadius: 10,
+            background: 'rgba(255,215,0,0.1)',
+            border: '1px solid rgba(255,215,0,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>🎟️</span>
+          <span style={{ color: '#FFD700', fontWeight: 800, fontSize: 14 }}>
+            {freePlaysAvailable} Free Play{freePlaysAvailable > 1 ? 's' : ''} disponible{freePlaysAvailable > 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
 
       {/* FARMING MINI-BAR — sticky, just under the header */}
       <FarmingBar top={56} zIndex={5} />
@@ -974,5 +1035,6 @@ export default function ScratchScreen() {
         </div>
       )}
     </div>
+    </>
   );
 }
