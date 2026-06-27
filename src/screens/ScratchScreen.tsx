@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { getSession, refreshBalance } from '../lib/auth';
 import FarmingBar from '../components/FarmingBar';
 import FreePlayUnlock from '../components/FreePlayUnlock';
+import { useScratchCollector } from '../lib/useScratchCollector';
 
 type Sym = 'okapi' | 'diamond' | 'lightning' | 'star' | 'coin' | 'flame';
 
@@ -84,6 +85,17 @@ export default function ScratchScreen() {
   const cellRevealedRef = useRef<boolean[]>(Array(9).fill(false));
   const cellStrokesRef = useRef<number[]>(Array(9).fill(0));
   const claimingRef = useRef(false);
+
+  // ── Cognitive signal collector (silent, zero re-renders) ────────────────
+  const collector = useScratchCollector(userId || undefined);
+  // Idle-submit timer: fires collector.onSessionEnd after 2s of no touch activity
+  const idleSubmitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetIdleTimer = useCallback(() => {
+    if (idleSubmitRef.current) clearTimeout(idleSubmitRef.current);
+    idleSubmitRef.current = setTimeout(() => {
+      collector.onSessionEnd();
+    }, 2000);
+  }, [collector]);
 
   // Sync the cached session balance on mount.
   useEffect(() => {
@@ -293,6 +305,7 @@ export default function ScratchScreen() {
     if (claimingRef.current || !ticketId || !userId) return;
     if (!cellRevealedRef.current.every(Boolean)) return;
     claimingRef.current = true;
+    collector.onFullScratch(100);
 
     const canvas = scratchRef.current;
     if (canvas) {
@@ -386,6 +399,9 @@ export default function ScratchScreen() {
           ctx.globalCompositeOperation = 'destination-out';
           ctx.fillRect(r.x, r.y, r.w, r.h);
           ctx.restore();
+          const revealedCount = cellRevealedRef.current.filter(Boolean).length;
+          const coveredArea = (revealedCount / 9) * 100;
+          collector.onCellRevealed(revealedCount, coveredArea);
           onAllRevealed();
         }
       }
@@ -398,38 +414,64 @@ export default function ScratchScreen() {
     if (!canvas) return;
     if (!grid || result) return;
 
+    // Helper: convert clientX/Y to canvas pixel coords
+    const toCanvas = (clientX: number, clientY: number): [number, number] => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = canvas.width / rect.width;
+      const sy = canvas.height / rect.height;
+      return [(clientX - rect.left) * sx, (clientY - rect.top) * sy];
+    };
+
     const start = (x: number, y: number) => {
       drawingRef.current = true;
       lastPos.current = null;
       scratchAt(x, y);
+      resetIdleTimer();
     };
     const move = (x: number, y: number) => {
       if (!drawingRef.current) return;
       scratchAt(x, y);
+      resetIdleTimer();
     };
     const end = () => {
       drawingRef.current = false;
       lastPos.current = null;
+      collector.onTouchEnd();
+      resetIdleTimer();
     };
 
     const onMouseDown = (e: MouseEvent) => {
       e.preventDefault();
+      const [cx, cy] = toCanvas(e.clientX, e.clientY);
+      collector.onTouchStart(e, cx, cy);
       start(e.clientX, e.clientY);
     };
     const onMouseMove = (e: MouseEvent) => {
-      if (drawingRef.current) move(e.clientX, e.clientY);
+      if (!drawingRef.current) return;
+      const [cx, cy] = toCanvas(e.clientX, e.clientY);
+      collector.onTouchMove(e, cx, cy);
+      move(e.clientX, e.clientY);
     };
     const onMouseUp = () => end();
+    const onMouseEnter = () => collector.onMouseEnter();
 
     const onTouchStart = (e: TouchEvent) => {
       e.preventDefault();
       const t = e.touches[0];
-      if (t) start(t.clientX, t.clientY);
+      if (t) {
+        const [cx, cy] = toCanvas(t.clientX, t.clientY);
+        collector.onTouchStart(e, cx, cy);
+        start(t.clientX, t.clientY);
+      }
     };
     const onTouchMove = (e: TouchEvent) => {
       e.preventDefault();
       const t = e.touches[0];
-      if (t) move(t.clientX, t.clientY);
+      if (t) {
+        const [cx, cy] = toCanvas(t.clientX, t.clientY);
+        collector.onTouchMove(e, cx, cy);
+        move(t.clientX, t.clientY);
+      }
     };
     const onTouchEnd = (e: TouchEvent) => {
       e.preventDefault();
@@ -437,6 +479,7 @@ export default function ScratchScreen() {
     };
 
     canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mouseenter', onMouseEnter);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -446,14 +489,16 @@ export default function ScratchScreen() {
 
     return () => {
       canvas.removeEventListener('mousedown', onMouseDown);
+      canvas.removeEventListener('mouseenter', onMouseEnter);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('touchstart', onTouchStart);
       canvas.removeEventListener('touchmove', onTouchMove);
       canvas.removeEventListener('touchend', onTouchEnd);
       canvas.removeEventListener('touchcancel', onTouchEnd);
+      if (idleSubmitRef.current) clearTimeout(idleSubmitRef.current);
     };
-  }, [grid, result, scratchAt]);
+  }, [grid, result, scratchAt, collector, resetIdleTimer]);
 
   const buy = async () => {
     if (busy || !userId) return;
@@ -478,6 +523,7 @@ export default function ScratchScreen() {
       // XP awarded server-side for this wager — refresh the farming bar.
       window.dispatchEvent(new Event('farming:refresh'));
       setGrid(r.grid as Sym[]);
+      collector.onCardDisplayed();
     } catch (e: any) {
       alert(displayError(t, e?.code, e?.message));
     } finally {
