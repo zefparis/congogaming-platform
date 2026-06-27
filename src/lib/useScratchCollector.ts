@@ -174,8 +174,11 @@ function computeAccelerations(vels: number[], pts: ScratchTouchPoint[]): number[
   return accels;
 }
 
-function deviceType(): 'mobile' | 'desktop' {
-  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+function detectDeviceType(): 'mobile' | 'desktop' {
+  // maxTouchPoints > 0 is the reliable signal — UA regex misses Xiaomi/Android Chrome
+  const hasTouchPoints = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
+  const hasOntouchstart = 'ontouchstart' in window;
+  return (hasTouchPoints || hasOntouchstart) ? 'mobile' : 'desktop';
 }
 
 // ─── The hook ────────────────────────────────────────────────────────────────
@@ -212,13 +215,20 @@ export function useScratchCollector(userId?: string) {
     // Pressure stats
     const pressures = pts.map((p) => p.p);
     const pAvg = pressures.reduce((a, b) => a + b, 0) / pressures.length;
-    const pStd = stdDev(pressures);
+    const pStdRaw = stdDev(pressures);
     const pMin = Math.min(...pressures);
     const pMax = Math.max(...pressures);
 
     // Touch radius
     const radii = pts.map((p) => p.r);
     const rAvg = radii.reduce((a, b) => a + b, 0) / radii.length;
+    const rStd = stdDev(radii);
+
+    // Android normalises Touch.force to a constant 0.5, making pressureStd always 0.
+    // When on mobile with flat pressure, substitute touch-radius std-dev as the
+    // pressure-variance proxy — it carries a real human signal (contact area variation).
+    const isMobile = detectDeviceType() === 'mobile';
+    const pStd = (isMobile && pStdRaw < 0.01) ? rStd : pStdRaw;
 
     // Velocity / acceleration
     const vels = computeVelocities(pts);
@@ -253,7 +263,7 @@ export function useScratchCollector(userId?: string) {
       widgetId: HCS_WIDGET_ID,
       sessionId: s.sessionId,
       userId: userId || undefined,
-      deviceType: deviceType(),
+      deviceType: detectDeviceType(),
       timestamp: new Date().toISOString(),
 
       timeBeforeFirstScratchMs: timeBeforeFirst,
