@@ -87,14 +87,12 @@ export default function ScratchScreen() {
   const claimingRef = useRef(false);
 
   // ── Cognitive signal collector (silent, zero re-renders) ────────────────
+  // The idle timer and submit logic live entirely inside the hook.
   const collector = useScratchCollector(userId || undefined);
-  // Idle-submit timer: fires collector.onSessionEnd after 2s of no touch activity
-  const idleSubmitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resetIdleTimer = useCallback(() => {
-    if (idleSubmitRef.current) clearTimeout(idleSubmitRef.current);
-    idleSubmitRef.current = setTimeout(() => {
-      collector.onSessionEnd();
-    }, 2000);
+
+  // Submit whatever has been collected if the user navigates away mid-session
+  useEffect(() => {
+    return () => { collector.onSessionEnd(); };
   }, [collector]);
 
   // Sync the cached session balance on mount.
@@ -426,18 +424,15 @@ export default function ScratchScreen() {
       drawingRef.current = true;
       lastPos.current = null;
       scratchAt(x, y);
-      resetIdleTimer();
     };
     const move = (x: number, y: number) => {
       if (!drawingRef.current) return;
       scratchAt(x, y);
-      resetIdleTimer();
     };
     const end = () => {
       drawingRef.current = false;
       lastPos.current = null;
-      collector.onTouchEnd();
-      resetIdleTimer();
+      collector.onTouchEnd(); // arms the 2s idle timer inside the hook
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -496,9 +491,8 @@ export default function ScratchScreen() {
       canvas.removeEventListener('touchmove', onTouchMove);
       canvas.removeEventListener('touchend', onTouchEnd);
       canvas.removeEventListener('touchcancel', onTouchEnd);
-      if (idleSubmitRef.current) clearTimeout(idleSubmitRef.current);
     };
-  }, [grid, result, scratchAt, collector, resetIdleTimer]);
+  }, [grid, result, scratchAt, collector]);
 
   const buy = async () => {
     if (busy || !userId) return;
