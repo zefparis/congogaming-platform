@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Wallet, Plus, ArrowDownToLine } from 'lucide-react';
 import { getSession, refreshBalance } from '../lib/auth';
+import { useCGLTBalance } from '../hooks/useCGLTBalance';
 import { api } from '../lib/api';
 
 // Shared style for primary home CTAs (glassmorphism, white text).
@@ -35,6 +36,7 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const session = getSession();
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
+  const { balanceCglt, refresh: refreshCglt } = useCGLTBalance(true);
   const [flashPot, setFlashPot] = useState<number>(0);
   const [flashData, setFlashData] = useState<FlashLatest | null>(null);
   const [okapiColorPot, setOkapiColorPot] = useState<number>(0);
@@ -47,6 +49,7 @@ export default function HomeScreen() {
     };
 
     doRefresh();
+    void refreshCglt();
     api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
     api
       .flashLatest()
@@ -57,7 +60,7 @@ export default function HomeScreen() {
       .catch(() => {});
 
     // Refresh immediately when the tab regains visibility (app focus / tab switch back).
-    const onVisible = () => { if (document.visibilityState === 'visible') doRefresh(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') { doRefresh(); void refreshCglt(); } };
     document.addEventListener('visibilitychange', onVisible);
 
     // Refresh every 15 seconds to catch admin adjustments promptly.
@@ -175,14 +178,13 @@ export default function HomeScreen() {
               {t('home.balance_label')}
             </div>
 
-            {/* Balance — dominant */}
+            {/* CDF Balance — dominant */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'baseline',
                 gap: 10,
                 marginTop: 6,
-                marginBottom: 16,
               }}
             >
               <Wallet style={{ color: '#FFD54A', width: 22, height: 22, alignSelf: 'center' }} />
@@ -208,6 +210,67 @@ export default function HomeScreen() {
                 }}
               >
                 CDF
+              </span>
+              <span
+                style={{
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.35)',
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  alignSelf: 'center',
+                  marginLeft: 2,
+                }}
+              >
+                Argent réel
+              </span>
+            </div>
+
+            {/* CGLT Token Balance — secondary */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 7,
+                marginBottom: 16,
+                padding: '6px 10px',
+                borderRadius: 10,
+                background: 'rgba(56,189,248,0.07)',
+                border: '1px solid rgba(56,189,248,0.2)',
+              }}
+            >
+              <span style={{ fontSize: 15, lineHeight: 1 }}>🔷</span>
+              <span
+                style={{
+                  color: '#38BDF8',
+                  fontSize: 18,
+                  fontWeight: 800,
+                  fontVariantNumeric: 'tabular-nums',
+                  letterSpacing: 0.2,
+                }}
+              >
+                {balanceCglt.toLocaleString('fr-FR')}
+              </span>
+              <span
+                style={{
+                  color: 'rgba(56,189,248,0.65)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                }}
+              >
+                CGLT
+              </span>
+              <span
+                style={{
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.3)',
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  marginLeft: 2,
+                }}
+              >
+                Jetons de jeu
               </span>
             </div>
 
