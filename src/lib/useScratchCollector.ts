@@ -182,155 +182,29 @@ function deviceType(): 'mobile' | 'desktop' {
 
 export function useScratchCollector(userId?: string) {
   const stateRef = useRef<CollectorState | null>(null);
+  // Idle timer lives INSIDE the hook so React re-renders in ScratchScreen
+  // cannot cancel it. The 2s countdown starts on touchend/mouseup.
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Call when the ticket is purchased and the card is displayed */
-  const onCardDisplayed = useCallback(() => {
-    stateRef.current = {
-      sessionId: generateId(),
-      sessionStartTs: performance.now(),
-      firstTouchTs: -1,
-      lastTouchTs: -1,
-      touchPoints: [],
-      mouseHoverStartTs: -1,
-      hoverDurationMs: 0,
-      idlePeriods: 0,
-      revealedAt: -1,
-      revealedSymbolCount: 0,
-      velocityBeforeReveal: 0,
-      velocityAfterReveal: 0,
-      stopAfterRevealTs: -1,
-      completedFullScratch: false,
-      coveredAreaPct: 0,
-      submitted: false,
-    };
-  }, []);
-
-  /** Call inside mouseenter / mouseover on the canvas (desktop hover) */
-  const onMouseEnter = useCallback(() => {
+  // ── Internal submit (stable ref-based, safe to call from any closure) ──────
+  // Declared as a useCallback so onFullScratch/onSessionEnd can capture it
+  // without stale-closure issues (it only depends on stable refs).
+  const submitSession = useCallback((coveredPct: number) => {
     const s = stateRef.current;
-    if (!s || s.firstTouchTs !== -1) return; // only track pre-scratch hover
-    if (s.mouseHoverStartTs === -1) {
-      s.mouseHoverStartTs = performance.now();
+    if (!s) {
+      console.log('[HCS-SCRATCH] submitSession: no state, skipping');
+      return;
     }
-  }, []);
-
-  /** Call inside the touchstart / mousedown handler — before scratchAt() */
-  const onTouchStart = useCallback(
-    (e: TouchEvent | MouseEvent, canvasX: number, canvasY: number) => {
-      const s = stateRef.current;
-      if (!s) return;
-
-      const now = performance.now();
-
-      // Record hover end on first touch
-      if (s.firstTouchTs === -1) {
-        s.firstTouchTs = now;
-        if (s.mouseHoverStartTs !== -1) {
-          s.hoverDurationMs = now - s.mouseHoverStartTs;
-        }
-      } else if (s.lastTouchTs !== -1 && now - s.lastTouchTs > IDLE_THRESHOLD_MS) {
-        s.idlePeriods++;
-      }
-
-      s.lastTouchTs = now;
-
-      // Extract pressure & radius from TouchEvent when available
-      let pressure = 0.5;
-      let radius = 10;
-      if ('touches' in e && e.touches.length > 0) {
-        const t = e.touches[0];
-        pressure = (t as any).force ?? (t as any).webkitForce ?? 0.5;
-        radius = t.radiusX ?? 10;
-      }
-
-      s.touchPoints.push({ t: now, x: canvasX, y: canvasY, p: pressure, r: radius });
-    },
-    [],
-  );
-
-  /** Call inside the touchmove / mousemove handler — after scratchAt() */
-  const onTouchMove = useCallback(
-    (e: TouchEvent | MouseEvent, canvasX: number, canvasY: number) => {
-      const s = stateRef.current;
-      if (!s || s.firstTouchTs === -1) return;
-
-      const now = performance.now();
-      s.lastTouchTs = now;
-
-      let pressure = 0.5;
-      let radius = 10;
-      if ('touches' in e && e.touches.length > 0) {
-        const t = e.touches[0];
-        pressure = (t as any).force ?? (t as any).webkitForce ?? 0.5;
-        radius = t.radiusX ?? 10;
-      }
-
-      s.touchPoints.push({ t: now, x: canvasX, y: canvasY, p: pressure, r: radius });
-    },
-    [],
-  );
-
-  /** Call inside the touchend / mouseup handler */
-  const onTouchEnd = useCallback(() => {
-    const s = stateRef.current;
-    if (!s) return;
-    s.lastTouchTs = performance.now();
-
-    // If user lifts finger after reveal, record stop time
-    if (s.revealedAt !== -1 && s.stopAfterRevealTs === -1) {
-      s.stopAfterRevealTs = s.lastTouchTs;
+    if (s.submitted) {
+      console.log('[HCS-SCRATCH] submitSession: already submitted, skipping');
+      return;
     }
-  }, []);
-
-  /** Call when a cell becomes revealed (from measureCell / onAllRevealed) */
-  const onCellRevealed = useCallback((revealedCount: number, coveredPct: number) => {
-    const s = stateRef.current;
-    if (!s) return;
-
-    s.revealedSymbolCount = revealedCount;
-    s.coveredAreaPct = Math.round(coveredPct);
-
-    if (s.revealedAt === -1 && revealedCount > 0) {
-      // First reveal — capture velocity context window
-      const now = performance.now();
-      s.revealedAt = now;
-
-      // Velocity just before reveal: average last 3 segments
-      const vels = computeVelocities(s.touchPoints);
-      const pre = vels.slice(-3);
-      s.velocityBeforeReveal = pre.length
-        ? pre.reduce((a, b) => a + b, 0) / pre.length
-        : 0;
-    } else if (s.revealedAt !== -1 && revealedCount > 1) {
-      // Subsequent reveal — update post-reveal velocity
-      const vels = computeVelocities(s.touchPoints);
-      const post = vels.slice(-3);
-      s.velocityAfterReveal = post.length
-        ? post.reduce((a, b) => a + b, 0) / post.length
-        : 0;
+    if (s.touchPoints.length < 1) {
+      console.log('[HCS-SCRATCH] submitSession: no touch points, skipping');
+      return;
     }
-  }, []);
-
-  /** Call when full scratch completes (all cells revealed) */
-  const onFullScratch = useCallback((coveredPct: number) => {
-    const s = stateRef.current;
-    if (!s) return;
-    s.completedFullScratch = true;
-    s.coveredAreaPct = 100;
-    submitSession(coveredPct);
-  }, []);
-
-  /** Call after 2s idle OR on component unmount — fires the POST */
-  const onSessionEnd = useCallback((coveredPct?: number) => {
-    submitSession(coveredPct ?? stateRef.current?.coveredAreaPct ?? 0);
-  }, []);
-
-  // ── Internal submit (fire-and-forget) ──────────────────────────────────────
-
-  function submitSession(coveredPct: number) {
-    const s = stateRef.current;
-    if (!s || s.submitted || s.touchPoints.length < 2) return;
     s.submitted = true;
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
 
     const pts = s.touchPoints;
     const now = performance.now();
@@ -412,19 +286,201 @@ export function useScratchCollector(userId?: string) {
     const body = JSON.stringify(payload);
     const url = `${HCS_API}/api/cognitive/scratch-interaction`;
 
+    console.log('[HCS-SCRATCH] Submitting payload:', {
+      sessionId: payload.sessionId.slice(0, 8) + '…',
+      touchEvents: payload.totalTouchEvents,
+      durationMs: payload.totalScratchDurationMs,
+      pattern: payload.scratchPattern,
+      coveredPct: payload.coveredAreaPct,
+      pressureStd: payload.pressureStd,
+      url,
+    });
+
     if (navigator.sendBeacon) {
       const blob = new Blob([body], { type: 'application/json' });
-      navigator.sendBeacon(url, blob);
+      const queued = navigator.sendBeacon(url, blob);
+      console.log('[HCS-SCRATCH] sendBeacon queued:', queued, '(true=accepted by browser, false=rejected)');
     } else {
+      console.log('[HCS-SCRATCH] sendBeacon not available, using fetch fallback');
       fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
         keepalive: true,
-        signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined,
-      }).catch(() => {});
+      })
+        .then((r) => console.log('[HCS-SCRATCH] fetch response status:', r.status))
+        .catch((err) => console.error('[HCS-SCRATCH] fetch error:', err));
     }
-  }
+  }, [userId]);
+
+  /** Call when the ticket is purchased and the card is displayed */
+  const onCardDisplayed = useCallback(() => {
+    console.log('[HCS-SCRATCH] onCardDisplayed — new session started');
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    stateRef.current = {
+      sessionId: generateId(),
+      sessionStartTs: performance.now(),
+      firstTouchTs: -1,
+      lastTouchTs: -1,
+      touchPoints: [],
+      mouseHoverStartTs: -1,
+      hoverDurationMs: 0,
+      idlePeriods: 0,
+      revealedAt: -1,
+      revealedSymbolCount: 0,
+      velocityBeforeReveal: 0,
+      velocityAfterReveal: 0,
+      stopAfterRevealTs: -1,
+      completedFullScratch: false,
+      coveredAreaPct: 0,
+      submitted: false,
+    };
+  }, []);
+
+  /** Call inside mouseenter / mouseover on the canvas (desktop hover) */
+  const onMouseEnter = useCallback(() => {
+    const s = stateRef.current;
+    if (!s || s.firstTouchTs !== -1) return; // only track pre-scratch hover
+    if (s.mouseHoverStartTs === -1) {
+      s.mouseHoverStartTs = performance.now();
+    }
+  }, []);
+
+  /** Call inside the touchstart / mousedown handler — before scratchAt() */
+  const onTouchStart = useCallback(
+    (e: TouchEvent | MouseEvent, canvasX: number, canvasY: number) => {
+      const s = stateRef.current;
+      if (!s) {
+        console.log('[HCS-SCRATCH] onTouchStart: no session state — onCardDisplayed not called?');
+        return;
+      }
+
+      // Cancel any pending idle-submit when user touches again
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+
+      const now = performance.now();
+
+      // Record hover end on first touch
+      if (s.firstTouchTs === -1) {
+        s.firstTouchTs = now;
+        console.log('[HCS-SCRATCH] onTouchStart: first touch, timeBeforeFirst=', Math.round(now - s.sessionStartTs), 'ms');
+        if (s.mouseHoverStartTs !== -1) {
+          s.hoverDurationMs = now - s.mouseHoverStartTs;
+        }
+      } else if (s.lastTouchTs !== -1 && now - s.lastTouchTs > IDLE_THRESHOLD_MS) {
+        s.idlePeriods++;
+      }
+
+      s.lastTouchTs = now;
+
+      // Extract pressure & radius from TouchEvent when available
+      let pressure = 0.5;
+      let radius = 10;
+      if ('touches' in e && e.touches.length > 0) {
+        const t = e.touches[0];
+        pressure = (t as any).force ?? (t as any).webkitForce ?? 0.5;
+        radius = t.radiusX ?? 10;
+      }
+
+      s.touchPoints.push({ t: now, x: canvasX, y: canvasY, p: pressure, r: radius });
+      if (s.touchPoints.length % 20 === 0) {
+        console.log('[HCS-SCRATCH] touchPoints count:', s.touchPoints.length, 'pressure:', pressure.toFixed(3));
+      }
+    },
+    [],
+  );
+
+  /** Call inside the touchmove / mousemove handler — after scratchAt() */
+  const onTouchMove = useCallback(
+    (e: TouchEvent | MouseEvent, canvasX: number, canvasY: number) => {
+      const s = stateRef.current;
+      if (!s || s.firstTouchTs === -1) return;
+
+      const now = performance.now();
+      s.lastTouchTs = now;
+
+      let pressure = 0.5;
+      let radius = 10;
+      if ('touches' in e && e.touches.length > 0) {
+        const t = e.touches[0];
+        pressure = (t as any).force ?? (t as any).webkitForce ?? 0.5;
+        radius = t.radiusX ?? 10;
+      }
+
+      s.touchPoints.push({ t: now, x: canvasX, y: canvasY, p: pressure, r: radius });
+    },
+    [],
+  );
+
+  /** Call inside the touchend / mouseup handler — starts the 2s idle countdown */
+  const onTouchEnd = useCallback(() => {
+    const s = stateRef.current;
+    if (!s) return;
+    s.lastTouchTs = performance.now();
+
+    // If user lifts finger after reveal, record stop time
+    if (s.revealedAt !== -1 && s.stopAfterRevealTs === -1) {
+      s.stopAfterRevealTs = s.lastTouchTs;
+    }
+
+    // Start 2s idle countdown — if user doesn't touch again, submit
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      console.log('[HCS-SCRATCH] Idle timer fired (2s) — submitting');
+      submitSession(s.coveredAreaPct);
+    }, 2000);
+
+    console.log('[HCS-SCRATCH] onTouchEnd — points so far:', s.touchPoints.length, ', idle timer armed');
+  }, [submitSession]);
+
+  /** Call when a cell becomes revealed (from measureCell / onAllRevealed) */
+  const onCellRevealed = useCallback((revealedCount: number, coveredPct: number) => {
+    const s = stateRef.current;
+    if (!s) return;
+
+    s.revealedSymbolCount = revealedCount;
+    s.coveredAreaPct = Math.round(coveredPct);
+
+    if (s.revealedAt === -1 && revealedCount > 0) {
+      // First reveal — capture velocity context window
+      const now = performance.now();
+      s.revealedAt = now;
+      console.log('[HCS-SCRATCH] First cell revealed, count=', revealedCount);
+
+      // Velocity just before reveal: average last 3 segments
+      const vels = computeVelocities(s.touchPoints);
+      const pre = vels.slice(-3);
+      s.velocityBeforeReveal = pre.length
+        ? pre.reduce((a, b) => a + b, 0) / pre.length
+        : 0;
+    } else if (s.revealedAt !== -1 && revealedCount > 1) {
+      // Subsequent reveal — update post-reveal velocity
+      const vels = computeVelocities(s.touchPoints);
+      const post = vels.slice(-3);
+      s.velocityAfterReveal = post.length
+        ? post.reduce((a, b) => a + b, 0) / post.length
+        : 0;
+    }
+  }, []);
+
+  /** Call when full scratch completes (all cells revealed) — submits immediately */
+  const onFullScratch = useCallback((coveredPct: number) => {
+    const s = stateRef.current;
+    if (!s) return;
+    console.log('[HCS-SCRATCH] onFullScratch — submitting immediately');
+    s.completedFullScratch = true;
+    s.coveredAreaPct = 100;
+    submitSession(coveredPct);
+  }, [submitSession]);
+
+  /** Explicit submit — called by ScratchScreen on unmount */
+  const onSessionEnd = useCallback((coveredPct?: number) => {
+    console.log('[HCS-SCRATCH] onSessionEnd called');
+    submitSession(coveredPct ?? stateRef.current?.coveredAreaPct ?? 0);
+  }, [submitSession]);
 
   return {
     onCardDisplayed,
