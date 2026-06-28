@@ -544,6 +544,10 @@ export default function ScratchScreen() {
     setShowFreePlay(false);
   };
 
+  const reopenFreePlay = () => {
+    setShowFreePlay(true);
+  };
+
   return (
     <>
       {showFreePlay && (
@@ -637,25 +641,33 @@ export default function ScratchScreen() {
         </div>
       </div>
 
-      {/* Free Plays badge */}
+      {/* Free Plays badge — tappable to re-open the FreePlayUnlock modal */}
       {freePlaysAvailable > 0 && (
-        <div
+        <button
+          onClick={reopenFreePlay}
           style={{
             margin: '10px 14px 0',
-            padding: '8px 14px',
+            padding: '10px 14px',
             borderRadius: 10,
             background: 'rgba(255,215,0,0.1)',
             border: '1px solid rgba(255,215,0,0.35)',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
+            width: 'calc(100% - 28px)',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+            minHeight: 48,
+            WebkitTapHighlightColor: 'transparent',
           }}
+          aria-label="Ouvrir les Free Plays"
         >
           <span style={{ fontSize: 20 }}>🎟️</span>
-          <span style={{ color: '#FFD700', fontWeight: 800, fontSize: 14 }}>
+          <span style={{ color: '#FFD700', fontWeight: 800, fontSize: 14, flex: 1, textAlign: 'left' }}>
             {freePlaysAvailable} Free Play{freePlaysAvailable > 1 ? 's' : ''} disponible{freePlaysAvailable > 1 ? 's' : ''}
           </span>
-        </div>
+          <span style={{ color: '#FFD700', fontSize: 18, opacity: 0.7 }}>▶</span>
+        </button>
       )}
 
       {/* FARMING MINI-BAR — sticky, just under the header */}
