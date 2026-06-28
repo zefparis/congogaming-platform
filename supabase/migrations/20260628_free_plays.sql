@@ -1,6 +1,4 @@
--- ─────────────────────────────────────────────────────────────────────────────
--- free_plays table — server-side tracking for cognitive test free plays
--- ─────────────────────────────────────────────────────────────────────────────
+﻿-- free_plays table - server-side tracking for cognitive test free plays
 
 CREATE TABLE IF NOT EXISTS public.free_plays (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,11 +35,9 @@ CREATE POLICY "rls_app_backend_free_plays"
   ON public.free_plays FOR ALL TO app_backend
   USING (true) WITH CHECK (true);
 
--- ─────────────────────────────────────────────────────────────────────────────
 -- RPC: consume_free_play(p_user_id)
 -- Atomically decrements plays_remaining by 1 for the user's active row.
 -- Returns TRUE if a free play was consumed, FALSE otherwise.
--- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.consume_free_play(p_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
