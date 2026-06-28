@@ -287,16 +287,6 @@ export function useScratchCollector(userId?: string) {
     const body = JSON.stringify(payload);
     const url = `${HCS_API}/api/cognitive/scratch-interaction`;
 
-    if (process.env.NODE_ENV === 'development') console.debug('[HCS-SCRATCH] payload:', {
-      sessionId: payload.sessionId.slice(0, 8) + '…',
-      touchEvents: payload.totalTouchEvents,
-      durationMs: payload.totalScratchDurationMs,
-      pattern: payload.scratchPattern,
-      coveredPct: payload.coveredAreaPct,
-      pressureStd: payload.pressureStd,
-      url,
-    });
-
     // credentials: 'omit' — anonymous endpoint, no cookies needed.
     // keepalive: true    — survives page navigation / unload (like sendBeacon).
     // sendBeacon with a JSON Blob sends cookies implicitly and fails with
