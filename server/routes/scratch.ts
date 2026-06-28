@@ -46,21 +46,7 @@ export default async function scratchRoutes(app: FastifyInstance) {
         const debitKey = `scratch:buy:${user_id}:${order_id}`;
         const refundKey = `scratch:buy:${user_id}:${order_id}:refund`;
 
-        let consumedFreePlay = false;
-
-        if (isFreePlay) {
-          // Atomically decrement server-side free plays via RPC
-          const { data: fpData, error: fpErr } = await supabaseAdmin.rpc(
-            'consume_free_play',
-            { p_user_id: user_id },
-          );
-          if (!fpErr && fpData === true) {
-            consumedFreePlay = true;
-          }
-        }
-
-        if (!consumedFreePlay) {
-          // No free play consumed — debit CDF balance normally
+        if (!isFreePlay) {
           await recordLedgerEntry({
             user_id,
             direction: 'debit',
@@ -87,7 +73,7 @@ export default async function scratchRoutes(app: FastifyInstance) {
           .single();
         if (insErr || !ticket) {
           // Best-effort refund only if we actually debited CDF.
-          if (!consumedFreePlay) {
+          if (!isFreePlay) {
             try {
               await recordLedgerEntry({
                 user_id,
