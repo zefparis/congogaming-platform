@@ -31,7 +31,7 @@ export default async function scratchRoutes(app: FastifyInstance) {
   // POST /api/scratch/buy — debits the bet, generates a grid, returns the
   // ticket id + symbols (win amount is stored server-side and only revealed
   // on /claim, so a tampered client can't short-circuit the outcome).
-  app.post<{ Body: { bet_amount_cdf?: number } }>(
+  app.post<{ Body: { bet_amount_cdf?: number; is_free_play?: boolean } }>(
     '/api/scratch/buy',
     { preHandler: app.requireAuth },
     async (req, reply) => {
@@ -39,22 +39,25 @@ export default async function scratchRoutes(app: FastifyInstance) {
         const user_id = req.user.id;
         const parsed = ScratchBuyBodySchema.safeParse(req.body);
         const bet = parsed.success ? parsed.data.bet_amount_cdf : 0;
+        const isFreePlay = parsed.success ? parsed.data.is_free_play : false;
         if (!ALLOWED_BETS.has(bet)) return reply.code(400).send({ error: 'invalid_bet' });
 
         const order_id = randomUUID();
         const debitKey = `scratch:buy:${user_id}:${order_id}`;
         const refundKey = `scratch:buy:${user_id}:${order_id}:refund`;
 
-        await recordLedgerEntry({
-          user_id,
-          direction: 'debit',
-          amount: Number(bet),
-          currency: 'CDF',
-          reason: 'scratch_buy',
-          reference_type: 'scratch_ticket',
-          reference_id: order_id,
-          idempotency_key: debitKey,
-        });
+        if (!isFreePlay) {
+          await recordLedgerEntry({
+            user_id,
+            direction: 'debit',
+            amount: Number(bet),
+            currency: 'CDF',
+            reason: 'scratch_buy',
+            reference_type: 'scratch_ticket',
+            reference_id: order_id,
+            idempotency_key: debitKey,
+          });
+        }
 
         const { grid, win } = generateGrid(bet);
         const { data: ticket, error: insErr } = await supabaseAdmin
@@ -69,20 +72,22 @@ export default async function scratchRoutes(app: FastifyInstance) {
           .select('id')
           .single();
         if (insErr || !ticket) {
-          // Best-effort refund if we couldn't persist the ticket.
-          try {
-            await recordLedgerEntry({
-              user_id,
-              direction: 'credit',
-              amount: Number(bet),
-              currency: 'CDF',
-              reason: 'scratch_buy_refund',
-              reference_type: 'scratch_ticket',
-              reference_id: order_id,
-              idempotency_key: refundKey,
-            });
-          } catch {
-            /* ignore refund failure */
+          // Best-effort refund only if we actually debited CDF.
+          if (!isFreePlay) {
+            try {
+              await recordLedgerEntry({
+                user_id,
+                direction: 'credit',
+                amount: Number(bet),
+                currency: 'CDF',
+                reason: 'scratch_buy_refund',
+                reference_type: 'scratch_ticket',
+                reference_id: order_id,
+                idempotency_key: refundKey,
+              });
+            } catch {
+              /* ignore refund failure */
+            }
           }
           return reply.code(500).send({ error: insErr?.message || 'ticket_insert_failed' });
         }

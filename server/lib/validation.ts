@@ -82,6 +82,7 @@ export const FlashTicketBodySchema = z.object({
 
 export const ScratchBuyBodySchema = z.object({
   bet_amount_cdf: z.number().int(),
+  is_free_play: z.boolean().optional().default(false),
 });
 
 export const ScratchClaimBodySchema = z.object({
