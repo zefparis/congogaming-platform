@@ -26,10 +26,6 @@ CREATE POLICY "rls_postgres_free_plays"
   ON public.free_plays FOR ALL TO postgres
   USING (true) WITH CHECK (true);
 
-DROP POLICY IF EXISTS "rls_app_backend_free_plays" ON public.free_plays;
-CREATE POLICY "rls_app_backend_free_plays"
-  ON public.free_plays FOR ALL TO app_backend
-  USING (true) WITH CHECK (true);
 
 -- RPC: consume_free_play(p_user_id)
 -- Atomically decrements plays_remaining by 1 for the user's active row.
