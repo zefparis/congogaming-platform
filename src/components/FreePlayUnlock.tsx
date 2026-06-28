@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSession } from '../lib/auth';
+import { api } from '../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,10 +98,11 @@ function deviceType(): 'mobile' | 'desktop' {
 }
 
 const FREE_PLAYS_KEY = 'cg_free_plays_pending';
+const FREE_PLAY_COMPLETED_KEY = 'cg_free_play_completed';
 
-function creditFreePlays(n: number) {
-  const existing = parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
-  localStorage.setItem(FREE_PLAYS_KEY, String(existing + n));
+function setLocalFreePlays(n: number) {
+  localStorage.setItem(FREE_PLAYS_KEY, String(n));
+  localStorage.setItem(FREE_PLAY_COMPLETED_KEY, 'true');
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -272,8 +274,14 @@ export default function FreePlayUnlock({ onComplete, onSkip }: Props) {
       // Fail silently — data collection is best-effort
     }
 
-    // Credit free plays — logged-in user OR localStorage pending
-    creditFreePlays(5);
+    // Credit free plays server-side (idempotent), then sync localStorage
+    try {
+      const result = await api.freePlaysCredit('cognitive_test');
+      setLocalFreePlays(result.plays_remaining);
+    } catch {
+      // Fallback: credit localStorage only so the UI still works offline
+      setLocalFreePlays(5);
+    }
   }, []);
 
   // ─── Render helpers ───────────────────────────────────────────────────────

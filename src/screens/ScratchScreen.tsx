@@ -71,6 +71,20 @@ export default function ScratchScreen() {
   const [freePlaysAvailable, setFreePlaysAvailable] = useState<number>(() => {
     return parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
   });
+  // Sync free plays count from server on mount (source of truth)
+  useEffect(() => {
+    if (!userId) return;
+    api.freePlaysBalance().then((res) => {
+      const serverCount = res.plays_remaining;
+      localStorage.setItem(FREE_PLAYS_KEY, String(serverCount));
+      setFreePlaysAvailable(serverCount);
+      // If server says 0 and test not yet completed, show the modal
+      if (serverCount === 0 && !localStorage.getItem(FREE_PLAY_COMPLETED_KEY)) {
+        setShowFreePlay(true);
+      }
+    }).catch(() => { /* best-effort */ });
+  }, [userId]);
+
   // Visual cue: flash the header balance green for ~2s after the server
   // credits a winning ticket so the user has an unambiguous confirmation
   // that the new balance has landed.
@@ -534,11 +548,11 @@ export default function ScratchScreen() {
 
   const canBuy = (balance >= bet || freePlaysAvailable > 0) && !busy && !ticketId;
 
-  const handleFreePlayComplete = (awarded: number) => {
-    localStorage.setItem(FREE_PLAY_COMPLETED_KEY, 'true');
-    const total = freePlaysAvailable + awarded;
-    localStorage.setItem(FREE_PLAYS_KEY, String(total));
-    setFreePlaysAvailable(total);
+  const handleFreePlayComplete = (_awarded: number) => {
+    // FreePlayUnlock already credited server-side and set localStorage.
+    // Read the authoritative count from localStorage (set by FreePlayUnlock).
+    const synced = parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
+    setFreePlaysAvailable(synced);
     setShowFreePlay(false);
   };
 

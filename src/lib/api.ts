@@ -102,6 +102,10 @@ export const api = {
     req<{ tirage: null | { id: string; numeros: number[]; hash_pre: string; jackpot_paye: boolean; drawn_at: string }; pot_cdf: number }>('/api/flash/tirage/latest'),
   flashMesTickets: (_user_id?: string) =>
     req<{ tickets: Array<{ id: string; numeros: number[]; prix_cdf: number; gains_cdf: number; nb_bons: number; status: 'pending' | 'gagnant' | 'perdant' | 'jackpot_attente'; jackpot_en_attente: boolean; tirage_id: string | null; created_at: string }> }>('/api/flash/mes-tickets'),
+  freePlaysBalance: () =>
+    req<{ plays_remaining: number }>('/api/free-plays/balance'),
+  freePlaysCredit: (source = 'cognitive_test') =>
+    req<{ plays_remaining: number; credited: boolean }>('/api/free-plays/credit', { method: 'POST', body: JSON.stringify({ source }) }),
   scratchBuy: (_user_id: string, bet_amount_cdf: number, is_free_play = false) =>
     req<{ ticket_id: string; grid_hidden: true; bet_amount_cdf: number; grid: string[] }>('/api/scratch/buy', { method: 'POST', body: JSON.stringify({ bet_amount_cdf, is_free_play }) }),
   scratchClaim: (_user_id: string, ticket_id: string) =>
