@@ -174,23 +174,6 @@ function computeAccelerations(vels: number[], pts: ScratchTouchPoint[]): number[
   return accels;
 }
 
-// ─── Debug toast (remove after mobile debugging) ────────────────────────────
-function showToast(msg: string) {
-  const div = document.createElement('div');
-  div.style.cssText = [
-    'position:fixed', 'bottom:80px', 'left:50%',
-    'transform:translateX(-50%)',
-    'background:rgba(0,0,0,0.85)', 'color:#FFD700',
-    'padding:8px 16px', 'border-radius:8px',
-    'font-size:12px', 'z-index:99999',
-    'max-width:90vw', 'text-align:center',
-    'pointer-events:none',
-  ].join(';');
-  div.textContent = msg;
-  document.body.appendChild(div);
-  setTimeout(() => div.remove(), 3000);
-}
-
 function detectDeviceType(): 'mobile' | 'desktop' {
   // maxTouchPoints > 0 is the reliable signal — UA regex misses Xiaomi/Android Chrome
   const hasTouchPoints = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
@@ -210,20 +193,10 @@ export function useScratchCollector(userId?: string) {
   // Declared as a useCallback so onFullScratch/onSessionEnd can capture it
   // without stale-closure issues (it only depends on stable refs).
   const submitSession = useCallback((coveredPct: number) => {
-    if (submittedRef.current) {
-      console.log('[HCS-SCRATCH] submit prevented - already submitted this session');
-      return;
-    }
+    if (submittedRef.current) return;
     const s = stateRef.current;
-    if (!s) {
-      console.log('[HCS-SCRATCH] submitSession: no state, skipping');
-      return;
-    }
-    if (s.touchPoints.length < 1) {
-      console.log('[HCS-SCRATCH] submitSession: no touch points, skipping');
-      return;
-    }
-    showToast('📤 Submitting to HCS...');
+    if (!s) return;
+    if (s.touchPoints.length < 1) return;
     submittedRef.current = true;
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
 
@@ -314,7 +287,7 @@ export function useScratchCollector(userId?: string) {
     const body = JSON.stringify(payload);
     const url = `${HCS_API}/api/cognitive/scratch-interaction`;
 
-    console.log('[HCS-SCRATCH] Submitting payload:', {
+    if (process.env.NODE_ENV === 'development') console.debug('[HCS-SCRATCH] payload:', {
       sessionId: payload.sessionId.slice(0, 8) + '…',
       touchEvents: payload.totalTouchEvents,
       durationMs: payload.totalScratchDurationMs,
@@ -328,7 +301,6 @@ export function useScratchCollector(userId?: string) {
     // keepalive: true    — survives page navigation / unload (like sendBeacon).
     // sendBeacon with a JSON Blob sends cookies implicitly and fails with
     // Access-Control-Allow-Origin: * (wildcard + credentials = CORS error).
-    console.log('[HCS-SCRATCH] fetch (credentials:omit, keepalive:true) →', url);
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -336,14 +308,11 @@ export function useScratchCollector(userId?: string) {
       credentials: 'omit',
       keepalive: true,
     })
-      .then((r) => { console.log('[HCS-SCRATCH] fetch response status:', r.status); showToast('✅ HCS received: ' + r.status); })
-      .catch((err) => { console.error('[HCS-SCRATCH] fetch error:', err); showToast('❌ Fetch error: ' + (err instanceof Error ? err.message : String(err))); });
+      .catch((err) => { console.error('[HCS-SCRATCH] fetch error:', err); });
   }, [userId]);
 
   /** Call when the ticket is purchased and the card is displayed */
   const onCardDisplayed = useCallback(() => {
-    console.log('[HCS-SCRATCH] onCardDisplayed — new session started');
-    showToast('🎯 Card displayed - session started');
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     submittedRef.current = false;
     stateRef.current = {
@@ -371,8 +340,6 @@ export function useScratchCollector(userId?: string) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        console.log('[HCS-SCRATCH] visibilitychange: page hidden — submitting');
-        showToast('👁 Visibility hidden - submitting');
         submitSession(stateRef.current?.coveredAreaPct ?? 0);
       }
     };
@@ -393,10 +360,7 @@ export function useScratchCollector(userId?: string) {
   const onTouchStart = useCallback(
     (e: TouchEvent | MouseEvent, canvasX: number, canvasY: number) => {
       const s = stateRef.current;
-      if (!s) {
-        console.log('[HCS-SCRATCH] onTouchStart: no session state — onCardDisplayed not called?');
-        return;
-      }
+      if (!s) return;
 
       // Cancel any pending idle-submit when user touches again
       if (idleTimerRef.current) {
@@ -409,8 +373,6 @@ export function useScratchCollector(userId?: string) {
       // Record hover end on first touch
       if (s.firstTouchTs === -1) {
         s.firstTouchTs = now;
-        showToast('👆 First touch detected');
-        console.log('[HCS-SCRATCH] onTouchStart: first touch, timeBeforeFirst=', Math.round(now - s.sessionStartTs), 'ms');
         if (s.mouseHoverStartTs !== -1) {
           s.hoverDurationMs = now - s.mouseHoverStartTs;
         }
@@ -430,9 +392,6 @@ export function useScratchCollector(userId?: string) {
       }
 
       s.touchPoints.push({ t: now, x: canvasX, y: canvasY, p: pressure, r: radius });
-      if (s.touchPoints.length % 20 === 0) {
-        console.log('[HCS-SCRATCH] touchPoints count:', s.touchPoints.length, 'pressure:', pressure.toFixed(3));
-      }
     },
     [],
   );
@@ -473,14 +432,10 @@ export function useScratchCollector(userId?: string) {
     // TRIGGER 2 — adaptive idle delay: 500ms mobile, 2000ms desktop
     const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
     const idleDelay = isMobile ? 500 : 2000;
-    console.log('[HCS-SCRATCH] idle timer delay:', idleDelay, 'ms');
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
-      console.log('[HCS-SCRATCH] idle timer fired (', idleDelay, 'ms) — submitting');
       submitSession(s.coveredAreaPct);
     }, idleDelay);
-
-    console.log('[HCS-SCRATCH] onTouchEnd — points so far:', s.touchPoints.length, ', idle timer armed');
   }, [submitSession]);
 
   /** Call when a cell becomes revealed (from measureCell / onAllRevealed) */
@@ -495,7 +450,6 @@ export function useScratchCollector(userId?: string) {
       // First reveal — capture velocity context window
       const now = performance.now();
       s.revealedAt = now;
-      console.log('[HCS-SCRATCH] First cell revealed, count=', revealedCount);
 
       // Velocity just before reveal: average last 3 segments
       const vels = computeVelocities(s.touchPoints);
@@ -517,8 +471,6 @@ export function useScratchCollector(userId?: string) {
   const onFullScratch = useCallback((coveredPct: number) => {
     const s = stateRef.current;
     if (!s) return;
-    console.log('[HCS-SCRATCH] onFullScratch triggered - submitting immediately');
-    showToast('✅ Full scratch - submitting now');
     s.completedFullScratch = true;
     s.coveredAreaPct = 100;
     if (idleTimerRef.current) {
@@ -530,7 +482,6 @@ export function useScratchCollector(userId?: string) {
 
   /** TRIGGER 3 — onSessionEnd: called by ScratchScreen useEffect cleanup on unmount */
   const onSessionEnd = useCallback((coveredPct?: number) => {
-    console.log('[HCS-SCRATCH] onSessionEnd called');
     submitSession(coveredPct ?? stateRef.current?.coveredAreaPct ?? 0);
   }, [submitSession]);
 
