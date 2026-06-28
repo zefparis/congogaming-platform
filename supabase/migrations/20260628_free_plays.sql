@@ -12,10 +12,6 @@ CREATE TABLE IF NOT EXISTS public.free_plays (
 CREATE INDEX IF NOT EXISTS free_plays_user_id_idx ON public.free_plays (user_id);
 CREATE INDEX IF NOT EXISTS free_plays_expires_at_idx ON public.free_plays (expires_at);
 
--- Ensure only one active (non-expired) row per user
-CREATE UNIQUE INDEX IF NOT EXISTS free_plays_user_active_uniq
-  ON public.free_plays (user_id)
-  WHERE expires_at > now();
 
 -- RLS
 ALTER TABLE public.free_plays ENABLE ROW LEVEL SECURITY;
