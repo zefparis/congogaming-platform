@@ -43,6 +43,7 @@
     "react-router-dom": "^6.27.0",
     "recharts": "^3.8.1",
     "undici": "^8.3.0",
+    "ws": "^8.18.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
