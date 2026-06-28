@@ -502,8 +502,8 @@ export default function ScratchScreen() {
     setGrid(null);
     setTicketId(null);
 
-    // Consume a free play if available, otherwise charge CDF balance as usual
-    const usingFreePlay = freePlaysAvailable > 0 && balance < bet;
+    // Always prefer free play over CDF when available
+    const usingFreePlay = freePlaysAvailable > 0;
     if (usingFreePlay) {
       const remaining = freePlaysAvailable - 1;
       localStorage.setItem(FREE_PLAYS_KEY, String(remaining));
@@ -992,7 +992,7 @@ export default function ScratchScreen() {
       {/* Result overlay */}
       {result && (
         <div
-          onClick={playAgain}
+          onClick={freePlaysAvailable > 0 ? undefined : playAgain}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1067,7 +1067,7 @@ export default function ScratchScreen() {
               </>
             )}
             <button
-              onClick={playAgain}
+              onClick={freePlaysAvailable > 0 ? buy : playAgain}
               style={{
                 width: '100%',
                 margin: '18px 0 0',
@@ -1082,7 +1082,9 @@ export default function ScratchScreen() {
                 background: 'linear-gradient(135deg, #FFD700, #FF8C00)',
               }}
             >
-              {t('scratch.play_again')}
+              {freePlaysAvailable > 0
+                ? `${t('scratch.play_again')} (${freePlaysAvailable} 🎟️)`
+                : t('scratch.play_again')}
             </button>
           </div>
         </div>
