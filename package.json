@@ -12,8 +12,9 @@
     "preview": "vite preview",
     "server": "tsx watch server/index.ts",
     "server:start": "tsx server/index.ts",
-    "build:server": "tsc --project tsconfig.server.json",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --target=node20 --outfile=dist/server/index.js --external:@supabase/supabase-js --external:pg --external:bcrypt --external:sharp",
     "start:server": "node dist/server/index.js",
+    "start": "node dist/server/index.js",
     "dev:all": "concurrently -n web,api -c green,cyan \"npm run dev\" \"npm run server\""
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "@types/node": "^22.7.5",
     "@types/node-cron": "^3.0.11",
     "@supabase/supabase-js": "^2.105.4",
+    "esbuild": "^0.20.0",
     "typescript": "5.4.5",
     "argon2": "^0.44.0",
     "dotenv": "^16.4.5",
