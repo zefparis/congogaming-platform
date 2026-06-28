@@ -13,26 +13,38 @@ let _publicJwk: {
   kty: string; use: string; alg: string; kid: string; n: string; e: string;
 } | null = null;
 
+function generateEphemeral(log: FastifyInstance['log']): void {
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  _privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+  log.warn('[predictstreet] Using ephemeral RSA keypair — JWKS changes on restart');
+}
+
 function initKeys(log: FastifyInstance['log']): void {
   const envKey = process.env.PREDICTSTREET_RSA_PRIVATE_KEY;
 
   if (envKey && envKey.trim()) {
-    // Support both literal newlines and escaped \n from Railway secrets
-    _privateKeyPem = envKey.replace(/\\n/g, '\n');
+    // Support both literal newlines and escaped \n from env secrets
+    _privateKeyPem = envKey.replace(/\\n/g, '\n').trim();
     log.info('[predictstreet] Loaded RSA private key from PREDICTSTREET_RSA_PRIVATE_KEY');
   } else {
-    // Generate ephemeral RSA-2048 keypair — rotates on every restart.
-    // Set PREDICTSTREET_RSA_PRIVATE_KEY in Railway for a stable key.
-    const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-    _privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
-    log.warn('[predictstreet] No PREDICTSTREET_RSA_PRIVATE_KEY set — using ephemeral keypair (JWKS changes on restart)');
+    generateEphemeral(log);
   }
 
-  const jwk = crypto.createPublicKey(_privateKeyPem).export({ format: 'jwk' }) as {
-    kty: string; n: string; e: string;
-  };
-  _publicJwk = { kty: 'RSA', use: 'sig', alg: 'RS256', kid: KID, n: jwk.n, e: jwk.e };
-  log.info('[predictstreet] JWKS ready — kid=%s iss=%s aud=%s ttl=%ds', KID, ISS, AUD, TTL);
+  try {
+    const jwk = crypto.createPublicKey(_privateKeyPem).export({ format: 'jwk' }) as {
+      kty: string; n: string; e: string;
+    };
+    _publicJwk = { kty: 'RSA', use: 'sig', alg: 'RS256', kid: KID, n: jwk.n, e: jwk.e };
+    log.info('[predictstreet] JWKS ready — kid=%s iss=%s aud=%s ttl=%ds', KID, ISS, AUD, TTL);
+  } catch (err) {
+    log.error({ err }, '[predictstreet] Failed to parse PREDICTSTREET_RSA_PRIVATE_KEY — falling back to ephemeral keypair');
+    generateEphemeral(log);
+    const jwk = crypto.createPublicKey(_privateKeyPem).export({ format: 'jwk' }) as {
+      kty: string; n: string; e: string;
+    };
+    _publicJwk = { kty: 'RSA', use: 'sig', alg: 'RS256', kid: KID, n: jwk.n, e: jwk.e };
+    log.info('[predictstreet] JWKS ready (ephemeral) — kid=%s', KID);
+  }
 }
 
 /* ── RS256 JWT mint — pure Node.js crypto, no external deps ────────────── */
