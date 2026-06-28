@@ -511,7 +511,7 @@ export default function ScratchScreen() {
     }
 
     try {
-      const r = await api.scratchBuy(userId, usingFreePlay ? 0 : bet);
+      const r = await api.scratchBuy(userId, bet, usingFreePlay);
       const newBal = await refreshBalance(userId).catch(() => null);
       if (newBal != null) setBalance(newBal);
       setTicketId(r.ticket_id);

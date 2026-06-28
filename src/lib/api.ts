@@ -102,8 +102,8 @@ export const api = {
     req<{ tirage: null | { id: string; numeros: number[]; hash_pre: string; jackpot_paye: boolean; drawn_at: string }; pot_cdf: number }>('/api/flash/tirage/latest'),
   flashMesTickets: (_user_id?: string) =>
     req<{ tickets: Array<{ id: string; numeros: number[]; prix_cdf: number; gains_cdf: number; nb_bons: number; status: 'pending' | 'gagnant' | 'perdant' | 'jackpot_attente'; jackpot_en_attente: boolean; tirage_id: string | null; created_at: string }> }>('/api/flash/mes-tickets'),
-  scratchBuy: (_user_id: string, bet_amount_cdf: number) =>
-    req<{ ticket_id: string; grid_hidden: true; bet_amount_cdf: number; grid: string[] }>('/api/scratch/buy', { method: 'POST', body: JSON.stringify({ bet_amount_cdf }) }),
+  scratchBuy: (_user_id: string, bet_amount_cdf: number, is_free_play = false) =>
+    req<{ ticket_id: string; grid_hidden: true; bet_amount_cdf: number; grid: string[] }>('/api/scratch/buy', { method: 'POST', body: JSON.stringify({ bet_amount_cdf, is_free_play }) }),
   scratchClaim: (_user_id: string, ticket_id: string) =>
     req<{ win_amount_cdf: number; new_balance: number; grid: string[] }>('/api/scratch/claim', { method: 'POST', body: JSON.stringify({ ticket_id }) }),
   kycScan: (_user_id: string, selfie_b64: string) =>
