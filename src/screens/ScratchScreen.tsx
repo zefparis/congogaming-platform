@@ -48,6 +48,7 @@ const cellRect = (i: number) => {
 };
 
 const FREE_PLAYS_KEY = 'cg_free_plays_pending';
+const FREE_PLAY_COMPLETED_KEY = 'cg_free_play_completed';
 
 export default function ScratchScreen() {
   const { t } = useTranslation();
@@ -61,11 +62,11 @@ export default function ScratchScreen() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ win: number; bet: number } | null>(null);
 
-  // Free Play Unlock gate — show once per page-load if not already completed
+  // Free Play Unlock gate — one-time cognitive test, never repeated
   const [showFreePlay, setShowFreePlay] = useState<boolean>(() => {
-    // Skip if user already has pending free plays from a previous visit
+    const completed = localStorage.getItem(FREE_PLAY_COMPLETED_KEY);
     const pending = parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
-    return pending === 0;
+    return !completed && pending === 0;
   });
   const [freePlaysAvailable, setFreePlaysAvailable] = useState<number>(() => {
     return parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
@@ -534,6 +535,7 @@ export default function ScratchScreen() {
   const canBuy = (balance >= bet || freePlaysAvailable > 0) && !busy && !ticketId;
 
   const handleFreePlayComplete = (awarded: number) => {
+    localStorage.setItem(FREE_PLAY_COMPLETED_KEY, 'true');
     const total = freePlaysAvailable + awarded;
     localStorage.setItem(FREE_PLAYS_KEY, String(total));
     setFreePlaysAvailable(total);
@@ -541,11 +543,8 @@ export default function ScratchScreen() {
   };
 
   const handleFreePlaySkip = () => {
+    localStorage.setItem(FREE_PLAY_COMPLETED_KEY, 'true');
     setShowFreePlay(false);
-  };
-
-  const reopenFreePlay = () => {
-    setShowFreePlay(true);
   };
 
   return (
@@ -641,10 +640,11 @@ export default function ScratchScreen() {
         </div>
       </div>
 
-      {/* Free Plays badge — tappable to re-open the FreePlayUnlock modal */}
+      {/* Free Plays badge — tap to immediately use a free play */}
       {freePlaysAvailable > 0 && (
         <button
-          onClick={reopenFreePlay}
+          onClick={canBuy ? buy : undefined}
+          disabled={!canBuy}
           style={{
             margin: '10px 14px 0',
             padding: '10px 14px',
@@ -655,18 +655,19 @@ export default function ScratchScreen() {
             alignItems: 'center',
             gap: 8,
             width: 'calc(100% - 28px)',
-            cursor: 'pointer',
+            cursor: canBuy ? 'pointer' : 'default',
             touchAction: 'manipulation',
             minHeight: 48,
             WebkitTapHighlightColor: 'transparent',
+            opacity: canBuy ? 1 : 0.6,
           }}
-          aria-label="Ouvrir les Free Plays"
+          aria-label="Utiliser un Free Play"
         >
           <span style={{ fontSize: 20 }}>🎟️</span>
           <span style={{ color: '#FFD700', fontWeight: 800, fontSize: 14, flex: 1, textAlign: 'left' }}>
             {freePlaysAvailable} Free Play{freePlaysAvailable > 1 ? 's' : ''} disponible{freePlaysAvailable > 1 ? 's' : ''}
           </span>
-          <span style={{ color: '#FFD700', fontSize: 18, opacity: 0.7 }}>▶</span>
+          <span style={{ color: '#FFD700', fontSize: 13, opacity: 0.8 }}>Jouer →</span>
         </button>
       )}
 
