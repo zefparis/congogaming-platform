@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { env } from '../env.js';
 
 const url = env.SUPABASE_URL;
@@ -10,6 +11,7 @@ if (!url || !key) {
 
 export const supabaseAdmin = createClient(url || 'http://localhost', key || 'anon', {
   auth: { persistSession: false, autoRefreshToken: false },
+  realtime: { transport: ws },
 });
 
 /**
