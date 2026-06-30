@@ -116,7 +116,9 @@ export default function KycScreen() {
     setStage('loading');
     setError(null);
     try {
-      const res = await api.kycScan(session.id, photoB64);
+      // Strip the "data:image/...;base64," prefix — the server expects raw base64
+      const rawB64 = photoB64.includes(',') ? photoB64.split(',')[1]! : photoB64;
+      const res = await api.kycScan(session.id, rawB64);
       setResult({
         verdict: res.verdict,
         estimated_age: res.estimated_age,
