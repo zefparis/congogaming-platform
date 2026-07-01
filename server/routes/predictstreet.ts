@@ -162,14 +162,14 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
         kyc_status:              'not_started',
       };
 
-      // Check if user exists and is active in Congo Gaming
+      // Check if user exists and is not blocked in Congo Gaming
       const { data: userRow } = await supabaseAdmin
         .from('users')
-        .select('id, status')
+        .select('id, blocked, kyc_status')
         .eq('id', provider_user_id)
         .maybeSingle();
 
-      const eligible = userRow != null && (userRow.status == null || userRow.status === 'active');
+      const eligible = userRow != null && userRow.blocked === false;
 
       const { data } = await supabaseAdmin
         .from('user_limits')
@@ -188,7 +188,7 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
         trade_consumed:      usdStr(Number(row.trade_consumed_cdf       ?? DEFAULTS.trade_consumed_cdf)),
         withdrawal_limit:    usdStr(Number(row.withdrawal_limit_cdf     ?? DEFAULTS.withdrawal_limit_cdf)),
         withdrawal_consumed: usdStr(Number(row.withdrawal_consumed_cdf  ?? DEFAULTS.withdrawal_consumed_cdf)),
-        kyc_status:          row.kyc_status ?? DEFAULTS.kyc_status,
+        kyc_status:          userRow?.kyc_status ?? 'not_started',
         updated_at:          new Date().toISOString(),
         currency:            'USD',
       });
