@@ -1,5 +1,14 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { requireAdmin } from './admin.js';
+
+const FreePlaysAdminCreditSchema = z.object({
+  user_id: z.string().uuid(),
+  plays: z.number().int().positive(),
+  expires_days: z.number().int().positive().default(7),
+  source: z.string().min(1).max(64).default('admin'),
+});
 
 const FREE_PLAYS_PER_TEST = 5;
 
@@ -15,17 +24,15 @@ export default async function freePlaysRoutes(app: FastifyInstance) {
           .from('free_plays')
           .select('plays_remaining')
           .eq('user_id', user_id)
-          .gt('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .gt('expires_at', new Date().toISOString());
 
         if (error) {
           req.log.error({ err: error }, '[free-plays/balance]');
           return reply.code(500).send({ error: error.message });
         }
 
-        return reply.send({ plays_remaining: data?.plays_remaining ?? 0 });
+        const total = (data || []).reduce((sum, row) => sum + (row.plays_remaining ?? 0), 0);
+        return reply.send({ plays_remaining: total });
       } catch (e: any) {
         req.log.error({ err: e }, '[free-plays/balance]');
         return reply.code(500).send({ error: e.message ?? 'server_error' });
@@ -80,6 +87,47 @@ export default async function freePlaysRoutes(app: FastifyInstance) {
         return reply.code(201).send({ plays_remaining: inserted.plays_remaining, credited: true });
       } catch (e: any) {
         req.log.error({ err: e }, '[free-plays/credit]');
+        return reply.code(500).send({ error: e.message ?? 'server_error' });
+      }
+    },
+  );
+
+  // POST /api/admin/free-plays/credit — admin-only credit of free plays to a user.
+  app.post(
+    '/api/admin/free-plays/credit',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      try {
+        const parsed = FreePlaysAdminCreditSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
+        }
+        const { user_id, plays, expires_days, source } = parsed.data;
+        const expires_at = new Date(Date.now() + expires_days * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabaseAdmin
+          .from('free_plays')
+          .insert({
+            user_id,
+            plays_remaining: plays,
+            source,
+            expires_at,
+          })
+          .select('id, plays_remaining, expires_at')
+          .single();
+
+        if (error) {
+          req.log.error({ err: error }, '[admin/free-plays/credit] insert');
+          return reply.code(500).send({ error: error.message });
+        }
+
+        return reply.code(201).send({
+          id: data.id,
+          plays_remaining: data.plays_remaining,
+          expires_at: data.expires_at,
+        });
+      } catch (e: any) {
+        req.log.error({ err: e }, '[admin/free-plays/credit]');
         return reply.code(500).send({ error: e.message ?? 'server_error' });
       }
     },

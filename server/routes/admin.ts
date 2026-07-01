@@ -1699,3 +1699,5 @@ export default async function adminRoutes(app: FastifyInstance) {
   );
 
 }
+
+export { requireAdmin, requireSuperAdmin };
