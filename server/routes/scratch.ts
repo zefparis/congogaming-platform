@@ -42,24 +42,51 @@ export default async function scratchRoutes(app: FastifyInstance) {
         const isFreePlay = parsed.success ? parsed.data.is_free_play : false;
         if (!ALLOWED_BETS.has(bet)) return reply.code(400).send({ error: 'invalid_bet' });
 
+        const { grid, win } = generateGrid(bet);
+
+        if (isFreePlay) {
+          const { data, error } = await supabaseAdmin.rpc('scratch_buy_free_atomic', {
+            p_user_id: user_id,
+            p_bet_amount_cdf: bet,
+            p_grid: grid,
+            p_win_amount_cdf: win,
+          });
+          if (error) {
+            if (error.message.includes('no_free_plays')) {
+              return reply.code(409).send({ code: 'NO_FREE_PLAYS', error: 'NO_FREE_PLAYS' });
+            }
+            req.log.error({ err: error }, '[scratch/buy] free play atomic failed');
+            return reply.code(500).send({ error: error.message || 'free_play_failed' });
+          }
+          const row = Array.isArray(data) ? data[0] : data;
+          const ticket_id = row?.ticket_id;
+          if (!ticket_id) {
+            return reply.code(500).send({ error: 'free_play_ticket_missing' });
+          }
+          return reply.send({
+            ticket_id,
+            grid_hidden: true,
+            bet_amount_cdf: bet,
+            grid, // symbols only — payout not exposed
+            is_free_play: true,
+          });
+        }
+
         const order_id = randomUUID();
         const debitKey = `scratch:buy:${user_id}:${order_id}`;
         const refundKey = `scratch:buy:${user_id}:${order_id}:refund`;
 
-        if (!isFreePlay) {
-          await recordLedgerEntry({
-            user_id,
-            direction: 'debit',
-            amount: Number(bet),
-            currency: 'CDF',
-            reason: 'scratch_buy',
-            reference_type: 'scratch_ticket',
-            reference_id: order_id,
-            idempotency_key: debitKey,
-          });
-        }
+        await recordLedgerEntry({
+          user_id,
+          direction: 'debit',
+          amount: Number(bet),
+          currency: 'CDF',
+          reason: 'scratch_buy',
+          reference_type: 'scratch_ticket',
+          reference_id: order_id,
+          idempotency_key: debitKey,
+        });
 
-        const { grid, win } = generateGrid(bet);
         const { data: ticket, error: insErr } = await supabaseAdmin
           .from('scratch_tickets')
           .insert({
@@ -72,22 +99,19 @@ export default async function scratchRoutes(app: FastifyInstance) {
           .select('id')
           .single();
         if (insErr || !ticket) {
-          // Best-effort refund only if we actually debited CDF.
-          if (!isFreePlay) {
-            try {
-              await recordLedgerEntry({
-                user_id,
-                direction: 'credit',
-                amount: Number(bet),
-                currency: 'CDF',
-                reason: 'scratch_buy_refund',
-                reference_type: 'scratch_ticket',
-                reference_id: order_id,
-                idempotency_key: refundKey,
-              });
-            } catch {
-              /* ignore refund failure */
-            }
+          try {
+            await recordLedgerEntry({
+              user_id,
+              direction: 'credit',
+              amount: Number(bet),
+              currency: 'CDF',
+              reason: 'scratch_buy_refund',
+              reference_type: 'scratch_ticket',
+              reference_id: order_id,
+              idempotency_key: refundKey,
+            });
+          } catch {
+            /* ignore refund failure */
           }
           return reply.code(500).send({ error: insErr?.message || 'ticket_insert_failed' });
         }
@@ -138,13 +162,15 @@ export default async function scratchRoutes(app: FastifyInstance) {
         const row = Array.isArray(data) ? data[0] : data;
         const win = Number(row?.win_amount_cdf ?? 0);
         const new_balance = Number(row?.new_balance ?? 0);
+        const is_free_play = Boolean(row?.is_free_play);
 
-        if (win > 0) await recordAgentWinCommission(user_id, ticket_id, 'scratch', win);
+        if (win > 0 && !is_free_play) await recordAgentWinCommission(user_id, ticket_id, 'scratch', win);
 
         return reply.send({
           win_amount_cdf: Number(win),
           new_balance: Number(new_balance),
           grid: row?.grid,
+          is_free_play,
         });
       } catch (e: any) {
         req.log.error({ err: e }, '[scratch/claim]');
