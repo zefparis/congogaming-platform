@@ -162,6 +162,15 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
         kyc_status:              'not_started',
       };
 
+      // Check if user exists and is active in Congo Gaming
+      const { data: userRow } = await supabaseAdmin
+        .from('users')
+        .select('id, status')
+        .eq('id', provider_user_id)
+        .maybeSingle();
+
+      const eligible = userRow != null && (userRow.status == null || userRow.status === 'active');
+
       const { data } = await supabaseAdmin
         .from('user_limits')
         .select('deposit_limit_cdf,deposit_consumed_cdf,trade_limit_cdf,trade_consumed_cdf,withdrawal_limit_cdf,withdrawal_consumed_cdf,kyc_status')
@@ -169,17 +178,18 @@ export default async function predictstreetRoutes(app: FastifyInstance) {
         .maybeSingle();
 
       const row = data ?? DEFAULTS;
-      const usd = (cdf: number) => Math.round((cdf / 2600) * 100) / 100;
+      const usdStr = (cdf: number) => String(Math.round((cdf / 2600) * 100) / 100);
 
       return reply.send({
-        deposit_limit:       usd(Number(row.deposit_limit_cdf       ?? DEFAULTS.deposit_limit_cdf)),
-        deposit_consumed:    usd(Number(row.deposit_consumed_cdf     ?? DEFAULTS.deposit_consumed_cdf)),
-        trade_limit:         usd(Number(row.trade_limit_cdf          ?? DEFAULTS.trade_limit_cdf)),
-        trade_consumed:      usd(Number(row.trade_consumed_cdf       ?? DEFAULTS.trade_consumed_cdf)),
-        withdrawal_limit:    usd(Number(row.withdrawal_limit_cdf     ?? DEFAULTS.withdrawal_limit_cdf)),
-        withdrawal_consumed: usd(Number(row.withdrawal_consumed_cdf  ?? DEFAULTS.withdrawal_consumed_cdf)),
-        eligible:            (row.kyc_status ?? DEFAULTS.kyc_status) === 'verified',
+        eligible,
+        deposit_limit:       usdStr(Number(row.deposit_limit_cdf       ?? DEFAULTS.deposit_limit_cdf)),
+        deposit_consumed:    usdStr(Number(row.deposit_consumed_cdf     ?? DEFAULTS.deposit_consumed_cdf)),
+        trade_limit:         usdStr(Number(row.trade_limit_cdf          ?? DEFAULTS.trade_limit_cdf)),
+        trade_consumed:      usdStr(Number(row.trade_consumed_cdf       ?? DEFAULTS.trade_consumed_cdf)),
+        withdrawal_limit:    usdStr(Number(row.withdrawal_limit_cdf     ?? DEFAULTS.withdrawal_limit_cdf)),
+        withdrawal_consumed: usdStr(Number(row.withdrawal_consumed_cdf  ?? DEFAULTS.withdrawal_consumed_cdf)),
         kyc_status:          row.kyc_status ?? DEFAULTS.kyc_status,
+        updated_at:          new Date().toISOString(),
         currency:            'USD',
       });
     },
