@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
-import { teamName, type RawMatch } from './predictionsShared';
+import { teamName, FLAGS, type RawMatch } from './predictionsShared';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
@@ -22,6 +22,16 @@ function formatDate(d: string): string {
     return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(d));
   } catch {
     return d;
+  }
+}
+
+function isToday(dateStr: string): boolean {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    return d.toDateString() === now.toDateString();
+  } catch {
+    return false;
   }
 }
 
@@ -54,6 +64,9 @@ export default function PredictionsScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const hasLiveMatch = matches.some(m => isToday(m.date) && !isPlayed(m));
+  const pendingCount = matches.filter(m => !isPlayed(m)).length;
+
   return (
     <div className="min-h-screen pb-24" style={{ background: '#0a0a0f' }}>
 
@@ -72,8 +85,14 @@ export default function PredictionsScreen() {
             'radial-gradient(circle at 85% 30%, rgba(255,215,0,0.15) 0%, transparent 50%)',
           pointerEvents: 'none',
         }} />
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'radial-gradient(circle, rgba(255,215,0,0.07) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+          pointerEvents: 'none',
+        }} />
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{
               background: 'linear-gradient(135deg,#CE1126 0%,#8B0000 100%)',
               color: '#fff', fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
@@ -85,6 +104,18 @@ export default function PredictionsScreen() {
               padding: '3px 9px', borderRadius: 4,
               border: '1px solid rgba(255,215,0,0.28)',
             }}>Congo Gaming</span>
+            {hasLiveMatch && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: 'rgba(74,222,128,0.1)', color: '#4ade80',
+                fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
+                padding: '3px 9px', borderRadius: 4, textTransform: 'uppercase',
+                border: '1px solid rgba(74,222,128,0.3)',
+              }}>
+                <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', flexShrink: 0 }} />
+                EN DIRECT
+              </span>
+            )}
           </div>
           <div style={{ fontFamily: 'Bebas Neue', fontSize: 42, color: '#fff', lineHeight: 1, letterSpacing: 1 }}>
             PRONOSTIQUEZ
@@ -95,6 +126,11 @@ export default function PredictionsScreen() {
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
             Misez vos points CDF sur les matchs de la Coupe du Monde
           </div>
+          {pendingCount > 0 && (
+            <div style={{ marginTop: 10, fontSize: 11, color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: 0.5 }}>
+              ⚡ {pendingCount} match{pendingCount > 1 ? 's' : ''} restant{pendingCount > 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       </div>
 
@@ -139,73 +175,74 @@ export default function PredictionsScreen() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.04 }}
                   style={{
+                    position: 'relative', overflow: 'hidden',
                     borderRadius: 16,
-                    background: played
-                      ? 'rgba(255,255,255,0.03)'
-                      : 'linear-gradient(140deg, rgba(206,17,38,0.08) 0%, rgba(20,0,40,0.85) 60%, rgba(255,215,0,0.06) 100%)',
-                    border: played
-                      ? '1px solid rgba(255,255,255,0.07)'
-                      : '1px solid rgba(255,215,0,0.2)',
-                    padding: '14px 16px',
+                    background: 'linear-gradient(135deg, #1a1040 0%, #0f0a2e 100%)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    padding: '16px',
                   }}
                 >
-                  {/* Badge + date */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase',
-                      color: played ? 'rgba(255,255,255,0.3)' : '#FFD700',
-                    }}>
+                  {/* DRC highlight stripe */}
+                  {(home === 'DR Congo' || away === 'DR Congo') && (
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+                      background: 'linear-gradient(90deg, #FFD700 0%, #CE1126 50%, #FFD700 100%)',
+                    }} />
+                  )}
+
+                  {/* Round badge + date */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: 'rgba(255,215,0,0.7)' }}>
                       {m.group ?? m.round ?? 'WC 2026'}
                     </span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
                       {formatDate(m.date)}{m.time ? ` · ${m.time}` : ''}
                     </span>
                   </div>
 
-                  {/* Teams + score */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: '#fff', letterSpacing: 1 }}>
-                        {home}
-                      </div>
+                  {/* Teams row */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[home] ?? '🏳️'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{home}</div>
                     </div>
-                    <div style={{ padding: '0 12px', textAlign: 'center' }}>
+
+                    <div style={{ padding: '0 12px', textAlign: 'center', minWidth: 80 }}>
                       {played && score ? (
-                        <div style={{ fontFamily: 'Bebas Neue', fontSize: 22, color: '#FFD700', letterSpacing: 2 }}>
-                          {score[0]} – {score[1]}
-                        </div>
+                        <>
+                          <div style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700', letterSpacing: 2 }}>
+                            {score[0]} – {score[1]}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2, fontWeight: 700 }}>Terminé</div>
+                        </>
                       ) : (
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>VS</div>
+                        <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: 'rgba(255,255,255,0.25)', letterSpacing: 2 }}>VS</div>
                       )}
                     </div>
-                    <div style={{ flex: 1, textAlign: 'right' }}>
-                      <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: '#fff', letterSpacing: 1 }}>
-                        {away}
-                      </div>
+
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[away] ?? '🏳️'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{away}</div>
                     </div>
                   </div>
 
                   {/* CTA */}
-                  {!played ? (
+                  {!played && (
                     <motion.button
                       type="button"
-                      whileTap={{ scale: 0.97 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => { setSelectedMatch(m); setModalKey(k => k + 1); }}
                       style={{
-                        width: '100%',
-                        background: 'linear-gradient(135deg,#FFE27A 0%,#D9A400 100%)',
+                        marginTop: 16, width: '100%',
+                        background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
                         color: '#0a0500', fontFamily: 'Bebas Neue',
-                        fontSize: 15, letterSpacing: 2,
-                        padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                        fontSize: 15, letterSpacing: 3,
+                        padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
                         boxShadow: '0 4px 16px rgba(217,164,0,0.35)',
                       }}
                     >
-                      PRONOSTIQUER
+                      ⚡ PRONOSTIQUER
                     </motion.button>
-                  ) : (
-                    <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: 1 }}>
-                      TERMINÉ
-                    </div>
                   )}
                 </motion.div>
               );
