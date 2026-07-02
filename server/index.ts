@@ -26,6 +26,7 @@ import okapiColorRoutes from './routes/okapi-color.js';
 import cgltRoutes from './routes/cglt.js';
 import farmingRoutes from './routes/farming.js';
 import predictstreetRoutes from './routes/predictstreet.js';
+import predictionsRoutes from './routes/predictions.js';
 import { engine } from './lib/okapi-engine.js';
 import { startCrons } from './cron.js';
 import { env } from './env.js';
@@ -114,6 +115,7 @@ async function main() {
   await app.register(cgltRoutes);
   await app.register(farmingRoutes);
   await app.register(predictstreetRoutes);
+  await app.register(predictionsRoutes);
 
   const port = env.PORT;
   const host = env.HOST;
