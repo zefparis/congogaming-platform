@@ -20,9 +20,7 @@ interface MatchRaw {
 
 let matchCache: { data: unknown[]; fetchedAt: number } | null = null;
 
-const ESPN_LIVE_URL =
-  'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
-const LIVE_CACHE_TTL_MS = 60 * 1000;
+const LIVE_CACHE_TTL = 60_000;
 
 type LiveMatch = {
   id: string;
@@ -35,7 +33,64 @@ type LiveMatch = {
   date: string;
 };
 
-let liveCache: { data: LiveMatch[]; fetchedAt: number } | null = null;
+let liveCache: { data: LiveMatch[]; ts: number } | null = null;
+
+async function fetchLiveMatches(): Promise<LiveMatch[]> {
+  // PRIMARY: worldcup26.ir
+  try {
+    const res = await fetch('https://worldcup26.ir/get/games', {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const data = await res.json() as { games?: unknown[] };
+      const games = data.games ?? data ?? [];
+      return (games as Record<string, unknown>[]).map((g) => ({
+        id:     String(g.id ?? g._id ?? Math.random()),
+        team1:  String(g.home_team ?? g.team1 ?? ''),
+        team2:  String(g.away_team ?? g.team2 ?? ''),
+        score1: Number(g.home_score ?? g.score1 ?? 0),
+        score2: Number(g.away_score ?? g.score2 ?? 0),
+        status: (String(g.status ?? '').includes('progress') ? 'in_progress'
+              : String(g.status ?? '').includes('final') || String(g.status ?? '').includes('completed') ? 'final'
+              : 'scheduled') as LiveMatch['status'],
+        clock:  String(g.time ?? g.clock ?? g.minute ?? ''),
+        date:   String(g.date ?? g.match_date ?? ''),
+      }));
+    }
+  } catch { /* fall through to ESPN */ }
+
+  // FALLBACK: ESPN
+  try {
+    const res = await fetch(
+      'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (res.ok) {
+      const data = await res.json() as { events?: unknown[] };
+      return ((data.events ?? []) as Record<string, unknown>[]).map((e: Record<string, unknown>) => {
+        const comps = (e.competitions as Record<string, unknown>[])?.[0];
+        const competitors = (comps?.competitors as Record<string, unknown>[]) ?? [];
+        const home = competitors.find((c: Record<string, unknown>) => c.homeAway === 'home') ?? {};
+        const away = competitors.find((c: Record<string, unknown>) => c.homeAway === 'away') ?? {};
+        const status = (comps?.status as Record<string, unknown>)?.type as Record<string, unknown>;
+        return {
+          id:     String(e.id ?? ''),
+          team1:  String((home.team as Record<string, unknown>)?.displayName ?? ''),
+          team2:  String((away.team as Record<string, unknown>)?.displayName ?? ''),
+          score1: parseInt(String(home.score ?? '0'), 10),
+          score2: parseInt(String(away.score ?? '0'), 10),
+          status: (status?.name === 'STATUS_IN_PROGRESS' ? 'in_progress'
+                : status?.name === 'STATUS_FINAL' ? 'final'
+                : 'scheduled') as LiveMatch['status'],
+          clock:  String((comps?.status as Record<string, unknown>)?.displayClock ?? ''),
+          date:   String(e.date ?? ''),
+        };
+      });
+    }
+  } catch { /* nothing */ }
+
+  return [];
+}
 
 export default async function predictionsRoutes(app: FastifyInstance) {
   // POST /api/predictions
@@ -206,58 +261,14 @@ export default async function predictionsRoutes(app: FastifyInstance) {
   });
 
   // GET /api/matches/live
-  app.get('/api/matches/live', async (_req, reply) => {
+  app.get('/api/matches/live', async (_request, reply) => {
     const now = Date.now();
-    if (liveCache && now - liveCache.fetchedAt < LIVE_CACHE_TTL_MS) {
-      return reply.send({ matches: liveCache.data });
+    if (liveCache && now - liveCache.ts < LIVE_CACHE_TTL) {
+      return reply.send({ matches: liveCache.data, cached: true });
     }
-
-    try {
-      const res = await fetch(ESPN_LIVE_URL);
-      if (!res.ok) throw new Error(`ESPN returned ${res.status}`);
-      const json = (await res.json()) as { events?: unknown[] };
-
-      const events = Array.isArray(json.events) ? json.events : [];
-
-      const matches: LiveMatch[] = events.map((event: unknown) => {
-        const e = event as Record<string, unknown>;
-        const competition = (Array.isArray((e.competitions as unknown[])) ? (e.competitions as unknown[])[0] : {}) as Record<string, unknown>;
-        const competitors = Array.isArray(competition.competitors) ? (competition.competitors as unknown[]) : [];
-
-        const home = (competitors.find((c) => (c as Record<string, unknown>).homeAway === 'home') ?? competitors[0] ?? {}) as Record<string, unknown>;
-        const away = (competitors.find((c) => (c as Record<string, unknown>).homeAway === 'away') ?? competitors[1] ?? {}) as Record<string, unknown>;
-
-        const homeTeam = ((home.team as Record<string, unknown>) ?? {}).displayName as string ?? '';
-        const awayTeam = ((away.team as Record<string, unknown>) ?? {}).displayName as string ?? '';
-
-        const statusObj = (e.status as Record<string, unknown>) ?? {};
-        const statusType = (statusObj.type as Record<string, unknown>) ?? {};
-        const statusName = (statusType.name as string) ?? '';
-
-        let status: LiveMatch['status'] = 'scheduled';
-        if (statusName === 'STATUS_IN_PROGRESS') status = 'in_progress';
-        else if (statusName === 'STATUS_FINAL') status = 'final';
-
-        const clock = (statusObj.displayClock as string) ?? '';
-
-        return {
-          id: String(e.id ?? ''),
-          team1: homeTeam,
-          team2: awayTeam,
-          score1: parseInt(String(home.score ?? '0'), 10) || 0,
-          score2: parseInt(String(away.score ?? '0'), 10) || 0,
-          status,
-          clock,
-          date: String(e.date ?? ''),
-        };
-      });
-
-      liveCache = { data: matches, fetchedAt: now };
-      return reply.send({ matches });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
-    }
+    const matches = await fetchLiveMatches();
+    liveCache = { data: matches, ts: now };
+    return reply.send({ matches, cached: false });
   });
 
   // POST /api/predictions/resolve (admin only)
