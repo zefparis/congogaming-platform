@@ -1,7 +1,11 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, User, Zap, Mountain } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getSession } from '../lib/auth';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
 type NavItem = {
   to: string;
@@ -23,10 +27,24 @@ const items: NavItem[] = [
 
 export default function BottomNav() {
   const { t } = useTranslation();
+  const [predCount, setPredCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.id) return;
+    fetch(`${API_BASE}/api/predictions?user_id=${session.id}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.predictions) setPredCount(d.predictions.length); })
+      .catch(() => {});
+  }, []);
+
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-bg/95 backdrop-blur border-t border-zinc-900 z-30">
       <ul className="grid grid-cols-6 pb-[env(safe-area-inset-bottom)]">
-        {items.map(({ to, icon: Icon, emoji, label, labelText, badge }) => (
+        {items.map(({ to, icon: Icon, emoji, label, labelText, badge }) => {
+          const dynBadge = to === '/compte' && predCount != null && predCount > 0
+            ? String(predCount) : null;
+          return (
           <li key={to} style={{ position: 'relative' }}>
             {badge && (
               <span
@@ -51,6 +69,17 @@ export default function BottomNav() {
                 {badge}
               </span>
             )}
+            {dynBadge && (
+              <span style={{
+                position: 'absolute', top: 6, right: 8,
+                background: '#00C850', color: '#fff',
+                fontSize: 8, fontWeight: 900,
+                minWidth: 14, height: 14, borderRadius: 7,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 1, pointerEvents: 'none',
+                boxShadow: '0 0 6px rgba(0,200,80,0.5)',
+              }}>{dynBadge}</span>
+            )}
             <NavLink
               to={to}
               end={to === '/'}
@@ -68,7 +97,8 @@ export default function BottomNav() {
               <span className="text-[10px] font-semibold uppercase tracking-wide">{labelText ?? t(label)}</span>
             </NavLink>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </nav>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -16,6 +16,24 @@ type Props = {
   onSuccess: () => void;
 };
 
+const BEBAS_M = "FWC26-CondensedBlack, 'Bebas Neue', Impact, sans-serif";
+
+const CONFETTI = Array.from({ length: 20 }, (_, i) => ({
+  x: Math.round(Math.sin((i / 20) * 2 * Math.PI) * (70 + (i % 5) * 24)),
+  y: Math.round(-Math.abs(Math.cos((i / 20) * 2 * Math.PI)) * (70 + (i % 5) * 24) * 0.9) - 10,
+  color: ['#FFD700','#00C850','#ffffff','#CE1126','#F0B428','#4ade80','#FFE27A'][i % 7],
+  rot: 360 + i * 24,
+}));
+
+const SUCCESS_KF = [
+  '@keyframes flashGreen{0%{opacity:0.5}100%{opacity:0}}',
+  '@keyframes checkIn{0%{transform:scale(0);opacity:0}60%{transform:scale(1.2);opacity:1}100%{transform:scale(1);opacity:1}}',
+  '@keyframes fadeUpM{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}',
+  ...CONFETTI.map((p, i) =>
+    `@keyframes cf${i}{0%{transform:translate(0,0)rotate(0deg)scale(1);opacity:1}100%{transform:translate(${p.x}px,${p.y}px)rotate(${p.rot}deg)scale(0.2);opacity:0}}`
+  ),
+].join('\n');
+
 const scoreBtn: CSSProperties = {
   width: 30, height: 30, borderRadius: 8, border: 'none', cursor: 'pointer',
   background: 'rgba(255,255,255,0.08)', color: '#fff',
@@ -31,6 +49,15 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
   const [points, setPoints] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState<{ wagered: number; gain: number } | null>(null);
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
+
+  useEffect(() => {
+    if (!showSuccess) return;
+    const t = setTimeout(() => onSuccessRef.current(), 2000);
+    return () => clearTimeout(t);
+  }, [showSuccess]);
 
   const session = getSession();
   const balance = session?.balance_cdf ?? 0;
@@ -76,7 +103,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
         setError(msg);
         return;
       }
-      onSuccess();
+      setShowSuccess({ wagered: points, gain: estimatedGain });
     } catch {
       setError('Erreur réseau. Réessayez.');
     } finally {
@@ -305,6 +332,60 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
           </motion.button>
         </motion.div>
       </motion.div>
+
+      {/* ── SUCCESS OVERLAY ── */}
+      {showSuccess && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,8,0,0.94)',
+          }}
+        >
+          <style>{SUCCESS_KF}</style>
+
+          {/* Green flash */}
+          <div style={{
+            position: 'absolute', inset: 0, background: 'rgba(0,200,80,0.28)',
+            animation: 'flashGreen 0.4s ease-out forwards', pointerEvents: 'none',
+          }} />
+
+          {/* Confetti burst */}
+          {CONFETTI.map((p, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: '50%', top: '40%',
+              width: i % 3 === 0 ? 6 : 8, height: i % 3 === 0 ? 14 : 8,
+              marginLeft: -4, marginTop: -4,
+              borderRadius: i % 2 === 0 ? 2 : '50%',
+              background: p.color,
+              animation: `cf${i} 1.4s ease-out ${0.05 + i * 0.04}s both`,
+            }} />
+          ))}
+
+          {/* Content */}
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 24px' }}>
+            <div style={{
+              fontSize: 80, lineHeight: 1, marginBottom: 20, display: 'inline-block',
+              animation: 'checkIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both',
+            }}>✅</div>
+            <div style={{
+              fontFamily: BEBAS_M, fontSize: 34, color: '#fff', letterSpacing: 3,
+              marginBottom: 10, animation: 'fadeUpM 0.4s ease-out 0.4s both',
+            }}>PARI ENREGISTRÉ !</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', animation: 'fadeUpM 0.4s ease-out 0.55s both' }}>
+              +{showSuccess.wagered.toLocaleString('fr-FR')} CDF misés
+            </div>
+            <div style={{
+              fontSize: 15, color: '#00C850', fontWeight: 700, marginTop: 6,
+              animation: 'fadeUpM 0.4s ease-out 0.65s both',
+              textShadow: '0 0 16px rgba(0,200,80,0.6)',
+            }}>
+              Gain potentiel: +{showSuccess.gain.toLocaleString('fr-FR')} CDF ✨
+            </div>
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }
