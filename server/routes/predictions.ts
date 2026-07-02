@@ -177,19 +177,25 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       if (!res.ok) throw new Error(`Upstream returned ${res.status}`);
       const json = (await res.json()) as OpenfootballJson;
 
-      const today = new Date().toISOString().split('T')[0];
-      const upcoming: unknown[] = [];
+      const allMatches: unknown[] = [];
 
       for (const round of json.rounds ?? []) {
         for (const match of round.matches ?? []) {
-          if (match.date >= today) {
-            upcoming.push({ ...match, round_name: round.name ?? null });
-          }
+          allMatches.push({ ...match, round_name: round.name ?? null });
         }
       }
 
-      matchCache = { data: upcoming, fetchedAt: now };
-      return reply.send({ matches: upcoming });
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      const relevantMatches = (allMatches as MatchRaw[]).filter(
+        (m) => new Date(m.date) >= threeDaysAgo,
+      );
+
+      const result = relevantMatches.length > 0 ? relevantMatches : allMatches.slice(-10);
+
+      matchCache = { data: result, fetchedAt: now };
+      return reply.send({ matches: result });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
