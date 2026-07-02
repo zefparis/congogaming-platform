@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, User, Zap, Mountain, Trophy } from 'lucide-react';
+import { Home, User, Zap, Mountain } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,8 +17,7 @@ const items: NavItem[] = [
   { to: '/flash', icon: Zap, label: 'nav.flash' },
   { to: '/scratch', emoji: '🎫', label: 'nav.scratch' },
   { to: '/climb', icon: Mountain, label: 'nav.climb' },
-  { to: '/jouer', emoji: '⚽', label: 'nav.predictions', badge: 'NOUVEAU' },
-  { to: '/predictions', icon: Trophy, label: 'nav.pronostics', labelText: 'PRONOS' },
+  { to: '/predictions', emoji: '⚽', label: 'nav.predictions', badge: 'NOUVEAU' },
   { to: '/compte', icon: User, label: 'nav.account' },
 ];
 
@@ -26,7 +25,7 @@ export default function BottomNav() {
   const { t } = useTranslation();
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-bg/95 backdrop-blur border-t border-zinc-900 z-30">
-      <ul className="grid grid-cols-7 pb-[env(safe-area-inset-bottom)]">
+      <ul className="grid grid-cols-6 pb-[env(safe-area-inset-bottom)]">
         {items.map(({ to, icon: Icon, emoji, label, labelText, badge }) => (
           <li key={to} style={{ position: 'relative' }}>
             {badge && (
