@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
@@ -79,6 +80,7 @@ function isToday(dateStr: string): boolean {
 }
 
 export default function PredictionsScreen() {
+  const nav = useNavigate();
   const [matches, setMatches] = useState<RawMatch[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,6 +176,21 @@ export default function PredictionsScreen() {
               ⚡ {pendingCount} match{pendingCount > 1 ? 's' : ''} restant{pendingCount > 1 ? 's' : ''}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => nav('/mes-paris')}
+            style={{
+              marginTop: 14,
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(255,215,0,0.1)', color: '#FFD700',
+              fontSize: 11, fontWeight: 800, letterSpacing: 1.5,
+              padding: '5px 12px', borderRadius: 20,
+              border: '1px solid rgba(255,215,0,0.28)',
+              cursor: 'pointer',
+            }}
+          >
+            📋 MES PARIS →
+          </button>
         </div>
       </div>
 
@@ -348,7 +365,7 @@ export default function PredictionsScreen() {
           key={modalKey}
           match={selectedMatch}
           onClose={() => setSelectedMatch(null)}
-          onSuccess={() => { setSelectedMatch(null); loadData(); }}
+          onSuccess={() => { setSelectedMatch(null); nav('/mes-paris'); }}
         />
       )}
     </div>
