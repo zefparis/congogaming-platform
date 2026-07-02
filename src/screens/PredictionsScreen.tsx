@@ -6,6 +6,49 @@ import { teamName, FLAGS, type RawMatch } from './predictionsShared';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
+const CODE_TO_NAME: Record<string, string> = {
+  'FR': 'France',   'FRA': 'France',
+  'PT': 'Portugal', 'POR': 'Portugal',
+  'ES': 'Spain',    'ESP': 'Spain',
+  'EN': 'England',  'ENG': 'England',
+  'BR': 'Brazil',   'BRA': 'Brazil',
+  'AR': 'Argentina','ARG': 'Argentina',
+  'DE': 'Germany',  'GER': 'Germany',
+  'NL': 'Netherlands','NED': 'Netherlands',
+  'BE': 'Belgium',  'BEL': 'Belgium',
+  'HR': 'Croatia',  'CRO': 'Croatia',
+  'MA': 'Morocco',  'MAR': 'Morocco',
+  'US': 'USA',      'USA': 'USA',
+  'MX': 'Mexico',   'MEX': 'Mexico',
+  'JP': 'Japan',    'JPN': 'Japan',
+  'SN': 'Senegal',  'SEN': 'Senegal',
+  'CD': 'DR Congo', 'COD': 'DR Congo',
+  'ZA': 'South Africa','RSA': 'South Africa',
+  'DZ': 'Algeria',  'ALG': 'Algeria',
+  'CH': 'Switzerland','SUI': 'Switzerland',
+  'AT': 'Austria',  'AUT': 'Austria',
+  'SE': 'Sweden',   'SWE': 'Sweden',
+  'NO': 'Norway',   'NOR': 'Norway',
+  'CA': 'Canada',   'CAN': 'Canada',
+  'AU': 'Australia','AUS': 'Australia',
+  'CO': 'Colombia', 'COL': 'Colombia',
+  'EC': 'Ecuador',  'ECU': 'Ecuador',
+  'UY': 'Uruguay',  'URU': 'Uruguay',
+  'KR': 'South Korea','KOR': 'South Korea',
+  'SA': 'Saudi Arabia','KSA': 'Saudi Arabia',
+  'IR': 'Iran',     'IRN': 'Iran',
+  'CI': 'Ivory Coast','CIV': 'Ivory Coast',
+  'CV': 'Cape Verde','CPV': 'Cape Verde',
+  'United States': 'USA',
+  'IR Iran': 'Iran','Korea Republic': 'South Korea',
+  'Côte d\'Ivoire': 'Ivory Coast','Cote d\'Ivoire': 'Ivory Coast',
+  'DR Congo': 'DR Congo','Congo DR': 'DR Congo',
+};
+
+function resolveTeamName(raw: string): string {
+  return CODE_TO_NAME[raw] ?? raw;
+}
+
 type LeaderboardEntry = {
   user_id: string;
   total_points_won: number;
@@ -166,8 +209,8 @@ export default function PredictionsScreen() {
             {matches.map((m, i) => {
               const played = isPlayed(m);
               const score = m.score?.ft;
-              const home = teamName(m.team1);
-              const away = teamName(m.team2);
+              const home = resolveTeamName(teamName(m.team1));
+              const away = resolveTeamName(teamName(m.team2));
               return (
                 <motion.div
                   key={`${m.date}-${i}`}
@@ -178,8 +221,9 @@ export default function PredictionsScreen() {
                     position: 'relative', overflow: 'hidden',
                     borderRadius: 16,
                     background: 'linear-gradient(135deg, #1a1040 0%, #0f0a2e 100%)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    border: `1px solid ${(home === 'DR Congo' || away === 'DR Congo') ? '#FFD700' : 'rgba(255,255,255,0.1)'}`,
                     padding: '16px',
+                    opacity: played ? 0.6 : 1,
                   }}
                 >
                   {/* DRC highlight stripe */}
