@@ -100,7 +100,7 @@ export default function SplashScreen() {
               whiteSpace: 'nowrap',
             }}
           >
-            🏆 FIFA WC 2026™
+            🏆 COUPE DU MONDE 2026
           </span>
         </header>
 
@@ -176,7 +176,7 @@ export default function SplashScreen() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                🏆 Official FIFA WC 2026™
+                🏆 COUPE DU MONDE 2026
               </span>
             </div>
           </section>
@@ -235,7 +235,7 @@ export default function SplashScreen() {
             padding: '13px 20px 11px',
           }}
         >
-          <img src="/assets/adi-logo.svg" alt="Congo Gaming" width={28} height={28} style={{ opacity: 0.9 }} />
+          <img src="/images/okapi.jpg" alt="Congo Gaming" className="w-10 h-10 rounded-full object-cover" />
 
           <div>
             <div
@@ -450,7 +450,7 @@ export default function SplashScreen() {
             lineHeight: 1.85,
           }}
         >
-          Congo Gaming · FIFA WC 2026™
+          Congo Gaming · Coupe du Monde 2026
           <br />
           Agré MJS N°047/2016 · DRC Officiel
         </footer>
