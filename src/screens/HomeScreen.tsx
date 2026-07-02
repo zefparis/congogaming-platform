@@ -332,110 +332,56 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* FIFA WC 2026 — ADI PredictStreet branding */}
+      {/* FIFA WC 2026 — Predictions */}
       <div style={{ padding: '0 14px 12px' }}>
-        <div
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 16,
-            background: 'linear-gradient(135deg, #010820 0%, #013CFF 100%)',
-            border: '1px solid rgba(1,60,255,0.35)',
-            padding: '22px 16px 20px',
-          }}
-        >
-          {/* Electric orange glow right, blue glow bottom-left */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'radial-gradient(circle at 92% 44%, rgba(255,113,10,0.35) 0%, transparent 52%),' +
-                'radial-gradient(circle at 4% 92%, rgba(1,60,255,0.18) 0%, transparent 50%)',
-              pointerEvents: 'none',
-            }}
-          />
-          {/* Subtle diagonal stripe — orange tint */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: '38%',
-              background:
-                'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(255,113,10,0.045) 6px, rgba(255,113,10,0.045) 7px)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            {/* Official pill badge */}
-            <span
-              style={{
-                display: 'inline-block',
-                background: 'linear-gradient(135deg, #FF710A, #c95500)',
-                color: '#fff',
-                fontSize: 8,
-                fontWeight: 800,
-                letterSpacing: 1.2,
-                padding: '3px 9px',
-                borderRadius: 20,
-                marginBottom: 12,
-                textTransform: 'uppercase' as const,
-              }}
-            >
-              🏆 OFFICIEL FIFA WORLD CUP 2026™
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a0a40] to-[#0f0a2e] border border-yellow-400/30 p-5">
+          {/* Top badge */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold bg-yellow-400 text-black px-2 py-0.5 rounded-full uppercase">
+              🏆 FIFA WC 2026™
             </span>
+            <span className="text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full uppercase">
+              ● EN DIRECT
+            </span>
+          </div>
 
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 36, color: 'white', lineHeight: 1 }}>
-              PREDICT AT THE SPEED
-            </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 36, color: '#FF710A', lineHeight: 1, marginBottom: 16 }}>
-              OF PLAY
-            </div>
+          {/* Title */}
+          <h2 className="text-2xl font-black text-white uppercase leading-tight mb-1">
+            PRONOSTIQUEZ
+            <span className="text-yellow-400"> &amp; GAGNEZ</span>
+          </h2>
+          <p className="text-sm text-white/60 mb-4">
+            Misez des points CDF sur les matchs restants
+          </p>
 
-            <motion.button
-              whileHover={{ filter: 'brightness(1.1)' }}
-              whileTap={{ scale: 0.98, filter: 'brightness(1.1)' }}
-              onClick={() => {
-                // PredictStreet (FIFA WC26) requires a verified identity.
-                // We persist the intended destination so KycScreen can
-                // bounce the user back here once the scan succeeds.
-                const s = getSession();
-                if (!s) {
-                  nav('/login');
-                  return;
-                }
-                if (s.kyc_status === 'approved' || s.kyc_status === 'verify_age') {
-                  nav('/jouer');
-                } else {
-                  try {
-                    localStorage.setItem('kyc_redirect', '/jouer');
-                  } catch {
-                    /* storage unavailable */
-                  }
-                  nav('/kyc');
-                }
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #013CFF 0%, #FF710A 100%)',
-                color: '#fff',
-                fontFamily: 'Bebas Neue',
-                fontSize: 16,
-                letterSpacing: 3,
-                padding: '12px 24px',
-                borderRadius: 12,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 20px rgba(1,60,255,0.42)',
-                display: 'block',
-              }}
-            >
-              JOUER MAINTENANT
-            </motion.button>
+          {/* Stats row */}
+          <div className="flex gap-3 mb-4">
+            <div className="bg-white/5 rounded-lg px-3 py-1.5 text-center">
+              <div className="text-lg font-black text-yellow-400">22</div>
+              <div className="text-[10px] text-white/40 uppercase">Matchs</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-3 py-1.5 text-center">
+              <div className="text-lg font-black text-yellow-400">×5</div>
+              <div className="text-[10px] text-white/40 uppercase">Max gain</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-3 py-1.5 text-center">
+              <div className="text-lg font-black text-yellow-400">CDF</div>
+              <div className="text-[10px] text-white/40 uppercase">Paiement</div>
+            </div>
+          </div>
+
+          {/* CTA Button */}
+          <button
+            type="button"
+            onClick={() => nav('/predictions')}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-black text-sm uppercase tracking-widest hover:from-yellow-300 active:scale-95 transition-all"
+          >
+            ⚡ JOUER MAINTENANT
+          </button>
+
+          {/* Congo Gaming badge */}
+          <div className="absolute top-4 right-4 text-xs text-white/20 font-bold">
+            CONGO GAMING
           </div>
         </div>
       </div>
