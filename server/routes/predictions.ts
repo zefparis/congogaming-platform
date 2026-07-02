@@ -17,14 +17,6 @@ interface MatchRaw {
   [key: string]: unknown;
 }
 
-interface RoundRaw {
-  name?: string;
-  matches?: MatchRaw[];
-}
-
-interface OpenfootballJson {
-  rounds?: RoundRaw[];
-}
 
 let matchCache: { data: unknown[]; fetchedAt: number } | null = null;
 
@@ -175,20 +167,14 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     try {
       const res = await fetch(OPENFOOTBALL_URL);
       if (!res.ok) throw new Error(`Upstream returned ${res.status}`);
-      const json = (await res.json()) as OpenfootballJson;
+      const json = (await res.json()) as { matches: MatchRaw[] };
 
-      const allMatches: unknown[] = [];
-
-      for (const round of json.rounds ?? []) {
-        for (const match of round.matches ?? []) {
-          allMatches.push({ ...match, round_name: round.name ?? null });
-        }
-      }
+      const allMatches = json.matches ?? [];
 
       const threeDaysAgo = new Date();
       threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-      const relevantMatches = (allMatches as MatchRaw[]).filter(
+      const relevantMatches = allMatches.filter(
         (m) => new Date(m.date) >= threeDaysAgo,
       );
 
