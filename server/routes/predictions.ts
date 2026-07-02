@@ -20,6 +20,23 @@ interface MatchRaw {
 
 let matchCache: { data: unknown[]; fetchedAt: number } | null = null;
 
+const ESPN_LIVE_URL =
+  'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+const LIVE_CACHE_TTL_MS = 60 * 1000;
+
+type LiveMatch = {
+  id: string;
+  team1: string;
+  team2: string;
+  score1: number;
+  score2: number;
+  status: 'in_progress' | 'final' | 'scheduled';
+  clock: string;
+  date: string;
+};
+
+let liveCache: { data: LiveMatch[]; fetchedAt: number } | null = null;
+
 export default async function predictionsRoutes(app: FastifyInstance) {
   // POST /api/predictions
   app.post<{
@@ -182,6 +199,61 @@ export default async function predictionsRoutes(app: FastifyInstance) {
 
       matchCache = { data: result, fetchedAt: now };
       return reply.send({ matches: result });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
+    }
+  });
+
+  // GET /api/matches/live
+  app.get('/api/matches/live', async (_req, reply) => {
+    const now = Date.now();
+    if (liveCache && now - liveCache.fetchedAt < LIVE_CACHE_TTL_MS) {
+      return reply.send({ matches: liveCache.data });
+    }
+
+    try {
+      const res = await fetch(ESPN_LIVE_URL);
+      if (!res.ok) throw new Error(`ESPN returned ${res.status}`);
+      const json = (await res.json()) as { events?: unknown[] };
+
+      const events = Array.isArray(json.events) ? json.events : [];
+
+      const matches: LiveMatch[] = events.map((event: unknown) => {
+        const e = event as Record<string, unknown>;
+        const competition = (Array.isArray((e.competitions as unknown[])) ? (e.competitions as unknown[])[0] : {}) as Record<string, unknown>;
+        const competitors = Array.isArray(competition.competitors) ? (competition.competitors as unknown[]) : [];
+
+        const home = (competitors.find((c) => (c as Record<string, unknown>).homeAway === 'home') ?? competitors[0] ?? {}) as Record<string, unknown>;
+        const away = (competitors.find((c) => (c as Record<string, unknown>).homeAway === 'away') ?? competitors[1] ?? {}) as Record<string, unknown>;
+
+        const homeTeam = ((home.team as Record<string, unknown>) ?? {}).displayName as string ?? '';
+        const awayTeam = ((away.team as Record<string, unknown>) ?? {}).displayName as string ?? '';
+
+        const statusObj = (e.status as Record<string, unknown>) ?? {};
+        const statusType = (statusObj.type as Record<string, unknown>) ?? {};
+        const statusName = (statusType.name as string) ?? '';
+
+        let status: LiveMatch['status'] = 'scheduled';
+        if (statusName === 'STATUS_IN_PROGRESS') status = 'in_progress';
+        else if (statusName === 'STATUS_FINAL') status = 'final';
+
+        const clock = (statusObj.displayClock as string) ?? '';
+
+        return {
+          id: String(e.id ?? ''),
+          team1: homeTeam,
+          team2: awayTeam,
+          score1: parseInt(String(home.score ?? '0'), 10) || 0,
+          score2: parseInt(String(away.score ?? '0'), 10) || 0,
+          status,
+          clock,
+          date: String(e.date ?? ''),
+        };
+      });
+
+      liveCache = { data: matches, fetchedAt: now };
+      return reply.send({ matches });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
