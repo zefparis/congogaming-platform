@@ -22,6 +22,7 @@ import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
 import PredictStreetTestScreen from './screens/PredictStreetTestScreen';
 import PredictionsScreen from './screens/PredictionsScreen';
+import MesParis from './screens/MesParis';
 import DebugPredictStreetScreen from './screens/DebugPredictStreetScreen';
 import BottomNav from './components/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
@@ -108,7 +109,7 @@ function KycRoute() {
 
 function AppRoutes() {
   const location = useLocation();
-  const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte', '/predictions'].includes(location.pathname);
+  const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte', '/predictions', '/mes-paris'].includes(location.pathname);
   // The farming progress bar is now a sticky mini-bar rendered inside each
   // game screen (under its header) — no floating overlay here.
   return (
@@ -141,6 +142,7 @@ function AppRoutes() {
           <Route path="/legal" element={<Protected><PageWrap><LegalScreen /></PageWrap></Protected>} />
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />
           <Route path="/predictions" element={<Protected><PageWrap><PredictionsScreen /></PageWrap></Protected>} />
+          <Route path="/mes-paris" element={<Protected><PageWrap><MesParis /></PageWrap></Protected>} />
           <Route path="/predictstreet-test" element={<PredictStreetTestScreen />} />
           <Route path="/debug/predictstreet" element={<Protected><PageWrap><DebugPredictStreetScreen /></PageWrap></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
