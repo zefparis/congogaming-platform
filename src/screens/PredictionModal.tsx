@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { getSession } from '../lib/auth';
-import { teamName, type RawMatch } from './predictionsShared';
+import { teamName, FLAGS, type RawMatch } from './predictionsShared';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
@@ -15,7 +16,7 @@ type Props = {
   onSuccess: () => void;
 };
 
-const scoreBtn: React.CSSProperties = {
+const scoreBtn: CSSProperties = {
   width: 30, height: 30, borderRadius: 8, border: 'none', cursor: 'pointer',
   background: 'rgba(255,255,255,0.08)', color: '#fff',
   fontSize: 18, fontWeight: 700,
@@ -123,6 +124,11 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
                 {match.date}{match.time ? ` · ${match.time}` : ''}
               </div>
+              {match.venue && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>
+                  📍 {match.venue}
+                </div>
+              )}
             </div>
             <button type="button" onClick={onClose} style={{
               background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
@@ -150,7 +156,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
                       ? 'linear-gradient(135deg,#FFE27A 0%,#D9A400 100%)'
                       : 'rgba(255,255,255,0.05)',
                     color: type === t ? '#0a0500' : 'rgba(255,255,255,0.6)',
-                    boxShadow: type === t ? '0 4px 16px rgba(217,164,0,0.35)' : 'none',
+                    boxShadow: type === t ? '0 4px 16px rgba(217,164,0,0.35), 0 0 20px rgba(234,179,8,0.3)' : 'none',
                   }}
                 >
                   <div style={{ fontFamily: 'Bebas Neue', fontSize: 14, letterSpacing: 1.5 }}>
@@ -172,26 +178,29 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 {([
-                  { value: 'home' as WinnerChoice, label: home },
-                  { value: 'draw' as WinnerChoice, label: 'NUL' },
-                  { value: 'away' as WinnerChoice, label: away },
-                ]).map(({ value, label }) => (
+                  { value: 'home' as WinnerChoice, label: home, flag: FLAGS[home] ?? '🏳️' },
+                  { value: 'draw' as WinnerChoice, label: 'NUL', flag: '🤝' },
+                  { value: 'away' as WinnerChoice, label: away, flag: FLAGS[away] ?? '🏳️' },
+                ]).map(({ value, label, flag }) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setWinner(value)}
                     style={{
                       padding: '10px 4px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                      fontFamily: 'Bebas Neue', fontSize: 13, letterSpacing: 1,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                      overflow: 'hidden',
                       background: winner === value
                         ? 'linear-gradient(135deg,#CE1126 0%,#8B0000 100%)'
                         : 'rgba(255,255,255,0.05)',
                       color: winner === value ? '#fff' : 'rgba(255,255,255,0.55)',
-                      boxShadow: winner === value ? '0 4px 12px rgba(206,17,38,0.4)' : 'none',
+                      boxShadow: winner === value
+                        ? '0 4px 12px rgba(206,17,38,0.4), 0 0 20px rgba(234,179,8,0.3)'
+                        : 'none',
                     }}
                   >
-                    {label}
+                    <span style={{ fontSize: 22 }}>{flag}</span>
+                    <span style={{ fontFamily: 'Bebas Neue', fontSize: 13, letterSpacing: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{label}</span>
                   </button>
                 ))}
               </div>
