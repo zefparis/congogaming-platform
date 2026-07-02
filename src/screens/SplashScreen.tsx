@@ -106,17 +106,16 @@ export default function SplashScreen() {
 
         {/* ── HERO ───────────────────────────────────────────── */}
         <main
+          className="flex flex-col md:flex-row md:items-start"
           style={{
             flex: 1,
-            display: 'flex',
-            alignItems: 'flex-start',
             padding: '8px 0 0 20px',
             overflow: 'hidden',
             minHeight: 260,
           }}
         >
           {/* Left content */}
-          <section style={{ width: '53%', flexShrink: 0, paddingTop: 8, ...fadeUp(0) }}>
+          <section className="w-full md:w-[53%] md:flex-shrink-0" style={{ paddingTop: 8, ...fadeUp(0) }}>
             <div
               style={{
                 fontFamily: BEBAS,
@@ -185,7 +184,8 @@ export default function SplashScreen() {
           {/* Match card preview */}
           <section
             aria-label="Aperçu match"
-            style={{ flex: 1, position: 'relative', ...fadeUp(0.16), display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingRight: 16, paddingTop: 4 }}
+            className="w-full md:flex-1 mt-4 md:mt-0"
+            style={{ ...fadeUp(0.16), display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingRight: 16, paddingTop: 4 }}
           >
             <div
               style={{
