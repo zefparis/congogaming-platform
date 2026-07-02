@@ -1,5 +1,16 @@
 export type RawTeam = string | { name?: string; code?: string };
 
+export type LiveMatch = {
+  id: string;
+  team1: string;
+  team2: string;
+  score1: number;
+  score2: number;
+  status: 'in_progress' | 'final' | 'scheduled';
+  clock: string;
+  date: string;
+};
+
 export type RawMatch = {
   num?: number;
   date: string;

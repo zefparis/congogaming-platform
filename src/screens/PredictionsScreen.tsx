@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
-import { teamName, FLAGS, type RawMatch } from './predictionsShared';
+import { teamName, FLAGS, type RawMatch, type LiveMatch } from './predictionsShared';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
@@ -69,6 +69,16 @@ function formatDate(d: string): string {
   }
 }
 
+function getLiveData(match: RawMatch, lives: LiveMatch[]): LiveMatch | null {
+  const t1 = teamName(match.team1).toLowerCase();
+  const t2 = teamName(match.team2).toLowerCase();
+  return lives.find(
+    (l) =>
+      (l.team1.toLowerCase().includes(t1) || t1.includes(l.team1.toLowerCase())) &&
+      (l.team2.toLowerCase().includes(t2) || t2.includes(l.team2.toLowerCase()))
+  ) ?? null;
+}
+
 function isToday(dateStr: string): boolean {
   try {
     const d = new Date(dateStr);
@@ -86,6 +96,7 @@ export default function PredictionsScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<RawMatch | null>(null);
   const [modalKey, setModalKey] = useState(0);
+  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -109,7 +120,20 @@ export default function PredictionsScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const hasLiveMatch = matches.some(m => isToday(m.date) && !isPlayed(m));
+  const fetchLive = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/matches/live`, { credentials: 'include' });
+      if (r.ok) { const j = await r.json(); setLiveMatches(j.matches ?? []); }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    fetchLive();
+    const interval = setInterval(fetchLive, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchLive]);
+
+  const hasLiveMatch = liveMatches.some(l => l.status === 'in_progress') || matches.some(m => isToday(m.date) && !isPlayed(m));
   const pendingCount = matches.filter(m => !isPlayed(m)).length;
 
   return (
@@ -228,8 +252,12 @@ export default function PredictionsScreen() {
               const score = m.score?.ft;
               const home = resolveTeamName(teamName(m.team1));
               const away = resolveTeamName(teamName(m.team2));
+              const liveData = getLiveData(m, liveMatches);
+              const isLive = liveData?.status === 'in_progress';
+              const isFinal = played || liveData?.status === 'final';
               return (
                 <motion.div
+                  layout
                   key={`${m.date}-${i}`}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -237,73 +265,117 @@ export default function PredictionsScreen() {
                   style={{
                     position: 'relative', overflow: 'hidden',
                     borderRadius: 16,
-                    background: 'linear-gradient(135deg, #1a1040 0%, #0f0a2e 100%)',
-                    border: `1px solid ${(home === 'DR Congo' || away === 'DR Congo') ? '#FFD700' : 'rgba(255,255,255,0.1)'}`,
+                    background: isLive
+                      ? 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, #0f0a2e 100%)'
+                      : 'linear-gradient(135deg, #1a1040 0%, #0f0a2e 100%)',
+                    border: isLive
+                      ? '1px solid rgba(239,68,68,0.5)'
+                      : `1px solid ${(home === 'DR Congo' || away === 'DR Congo') ? '#FFD700' : 'rgba(255,255,255,0.1)'}`,
                     padding: '16px',
-                    opacity: played ? 0.6 : 1,
+                    opacity: isFinal && !isLive ? 0.6 : 1,
+                    boxShadow: isLive ? '0 0 20px rgba(239,68,68,0.15)' : 'none',
                   }}
                 >
-                  {/* DRC highlight stripe */}
-                  {(home === 'DR Congo' || away === 'DR Congo') && (
+                  {/* DRC highlight stripe (scheduled only) */}
+                  {!isLive && (home === 'DR Congo' || away === 'DR Congo') && (
                     <div style={{
                       position: 'absolute', top: 0, left: 0, right: 0, height: 2,
                       background: 'linear-gradient(90deg, #FFD700 0%, #CE1126 50%, #FFD700 100%)',
                     }} />
                   )}
 
-                  {/* Round badge + date */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: 'rgba(255,215,0,0.7)' }}>
-                      {m.group ?? m.round ?? 'WC 2026'}
-                    </span>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-                      {formatDate(m.date)}{m.time ? ` · ${m.time}` : ''}
-                    </span>
-                  </div>
-
-                  {/* Teams row */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[home] ?? '🏳️'}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{home}</div>
-                    </div>
-
-                    <div style={{ padding: '0 12px', textAlign: 'center', minWidth: 80 }}>
-                      {played && score ? (
-                        <>
-                          <div style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700', letterSpacing: 2 }}>
-                            {score[0]} – {score[1]}
+                  {isLive ? (
+                    /* ── STATE 1: LIVE ── */
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block', flexShrink: 0 }} />
+                          <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 2 }}>EN DIRECT</span>
+                        </span>
+                        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontFamily: 'monospace' }}>
+                          {liveData!.clock ? `${liveData!.clock}'` : ''}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0' }}>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: 40, marginBottom: 4 }}>{FLAGS[home] ?? '🏳️'}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{home}</div>
+                        </div>
+                        <div style={{ textAlign: 'center', padding: '0 16px' }}>
+                          <div style={{ fontFamily: 'Bebas Neue', fontSize: 52, color: '#fff', letterSpacing: 2, lineHeight: 1 }}>
+                            {liveData!.score1} <span style={{ color: 'rgba(255,255,255,0.3)' }}>-</span> {liveData!.score2}
                           </div>
-                          <div style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2, fontWeight: 700 }}>Terminé</div>
-                        </>
-                      ) : (
-                        <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: 'rgba(255,255,255,0.25)', letterSpacing: 2 }}>VS</div>
+                        </div>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: 40, marginBottom: 4 }}>{FLAGS[away] ?? '🏳️'}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{away}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <button type="button" onClick={() => nav('/mes-paris')} style={{
+                          width: '100%', padding: '10px 0', borderRadius: 10,
+                          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                          color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 800,
+                          textTransform: 'uppercase', letterSpacing: 2, cursor: 'pointer',
+                        }}>👁️ VOIR MES PARIS</button>
+                      </div>
+                    </>
+                  ) : (
+                    /* ── STATE 2 (FINAL) / STATE 3 (SCHEDULED) ── */
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: 'rgba(255,215,0,0.7)' }}>
+                          {m.group ?? m.round ?? 'WC 2026'}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {isFinal && (
+                            <span style={{ fontSize: 9, fontWeight: 800, color: '#4ade80', letterSpacing: 1 }}>✅ TERMINÉ</span>
+                          )}
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                            {formatDate(m.date)}{m.time ? ` · ${m.time}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[home] ?? '🏳️'}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{home}</div>
+                        </div>
+                        <div style={{ padding: '0 12px', textAlign: 'center', minWidth: 80 }}>
+                          {isFinal ? (
+                            <>
+                              <div style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700', letterSpacing: 2 }}>
+                                {score ? `${score[0]} – ${score[1]}` : liveData ? `${liveData.score1} – ${liveData.score2}` : '– –'}
+                              </div>
+                              <div style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2, fontWeight: 700 }}>Terminé</div>
+                            </>
+                          ) : (
+                            <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: 'rgba(255,255,255,0.25)', letterSpacing: 2 }}>VS</div>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                          <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[away] ?? '🏳️'}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{away}</div>
+                        </div>
+                      </div>
+                      {!isFinal && (
+                        <motion.button
+                          type="button"
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => { setSelectedMatch(m); setModalKey(k => k + 1); }}
+                          style={{
+                            marginTop: 16, width: '100%',
+                            background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
+                            color: '#0a0500', fontFamily: 'Bebas Neue',
+                            fontSize: 15, letterSpacing: 3,
+                            padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                            boxShadow: '0 4px 16px rgba(217,164,0,0.35)',
+                          }}
+                        >
+                          ⚡ PRONOSTIQUER
+                        </motion.button>
                       )}
-                    </div>
-
-                    <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[away] ?? '🏳️'}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{away}</div>
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-                  {!played && (
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => { setSelectedMatch(m); setModalKey(k => k + 1); }}
-                      style={{
-                        marginTop: 16, width: '100%',
-                        background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
-                        color: '#0a0500', fontFamily: 'Bebas Neue',
-                        fontSize: 15, letterSpacing: 3,
-                        padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
-                        boxShadow: '0 4px 16px rgba(217,164,0,0.35)',
-                      }}
-                    >
-                      ⚡ PRONOSTIQUER
-                    </motion.button>
+                    </>
                   )}
                 </motion.div>
               );
