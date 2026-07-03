@@ -71,7 +71,7 @@ function Protected({ children }: { children: React.ReactNode }) {
  * with a `pending` KYC status to /kyc (preserving the intended
  * destination in localStorage so KycScreen can bounce them back here).
  */
-function PredictStreetRoute({ children }: { children: React.ReactNode }) {
+function PredictStreetRoute({ children, dest = '/jouer' }: { children: React.ReactNode; dest?: string }) {
   const session = getSession();
   if (!session) return <Navigate to="/splash" replace />;
   if (session.blocked || session.kyc_status === 'denied') {
@@ -80,7 +80,7 @@ function PredictStreetRoute({ children }: { children: React.ReactNode }) {
   }
   if (session.kyc_status !== 'approved' && session.kyc_status !== 'verify_age') {
     try {
-      localStorage.setItem('kyc_redirect', '/jouer');
+      localStorage.setItem('kyc_redirect', dest);
     } catch {
       /* storage unavailable — KycScreen will fall back to '/' */
     }
@@ -141,7 +141,16 @@ function AppRoutes() {
           <Route path="/okapi-color" element={<Protected><PageWrap><OkapiColorScreen /></PageWrap></Protected>} />
           <Route path="/legal" element={<Protected><PageWrap><LegalScreen /></PageWrap></Protected>} />
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />
-          <Route path="/predictions" element={<Protected><PageWrap><PredictionsScreen /></PageWrap></Protected>} />
+          <Route
+            path="/predictions"
+            element={
+              <Protected>
+                <PredictStreetRoute dest="/predictions">
+                  <PageWrap><PredictionsScreen /></PageWrap>
+                </PredictStreetRoute>
+              </Protected>
+            }
+          />
           <Route path="/mes-paris" element={<Protected><PageWrap><MesParis /></PageWrap></Protected>} />
           <Route path="/predictstreet-test" element={<PredictStreetTestScreen />} />
           <Route path="/debug/predictstreet" element={<Protected><PageWrap><DebugPredictStreetScreen /></PageWrap></Protected>} />
