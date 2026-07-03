@@ -189,8 +189,8 @@ function Drawer({
     }
   }
 
-  async function approveKyc() {
-    if (!confirm('Approuver la vérification KYC de ce joueur ?')) return;
+  async function approveKyc(confirmMsg?: string) {
+    if (!confirm(confirmMsg ?? 'Approuver la vérification KYC de ce joueur ?')) return;
     setBusy(true);
     setError(null);
     try {
@@ -206,8 +206,8 @@ function Drawer({
     }
   }
 
-  async function denyKyc() {
-    if (!confirm('Refuser la vérification KYC de ce joueur ?')) return;
+  async function denyKyc(confirmMsg?: string) {
+    if (!confirm(confirmMsg ?? 'Refuser la vérification KYC de ce joueur ?')) return;
     setBusy(true);
     setError(null);
     try {
@@ -512,58 +512,70 @@ function Drawer({
             </>
             )}
 
-            {isSuper && data.user.kyc_status === 'verify_age' && (
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: 16,
-                  background: 'rgba(255,165,0,0.1)',
-                  border: '1px solid rgba(255,165,0,0.3)',
-                  borderRadius: 12,
-                }}
-              >
-                <div style={{ color: '#FFD700', fontWeight: 700, marginBottom: 8 }}>
-                  ⚠️ Vérification manuelle requise
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 12 }}>
-                  Âge estimé : 19-25 ans. Confirmez l'identité de ce joueur.
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={approveKyc}
-                    disabled={busy}
-                    style={{
-                      flex: 1,
-                      padding: '10px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: '#00A86B',
-                      color: 'white',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      opacity: busy ? 0.5 : 1,
-                    }}
-                  >
-                    ✓ APPROUVER
-                  </button>
-                  <button
-                    onClick={denyKyc}
-                    disabled={busy}
-                    style={{
-                      flex: 1,
-                      padding: '10px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: '#CC0000',
-                      color: 'white',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      opacity: busy ? 0.5 : 1,
-                    }}
-                  >
-                    ✗ REFUSER
-                  </button>
-                </div>
+            {isSuper && (
+              <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <h4 className="mb-3 font-display tracking-wider text-gold">KYC — Action manuelle</h4>
+
+                {data.user.kyc_status === 'approved' && (
+                  <>
+                    <p className="mb-3 text-sm text-white/60">
+                      Ce joueur est actuellement approuvé. Révoquer l'approbation peut restreindre son accès à la plateforme.
+                    </p>
+                    <button
+                      onClick={() => denyKyc("Révoquer l'approbation KYC ? Cela peut restreindre l'accès de ce joueur à la plateforme.")}
+                      disabled={busy}
+                      className="w-full rounded-md border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Révoquer l'approbation
+                    </button>
+                  </>
+                )}
+
+                {data.user.kyc_status === 'denied' && (
+                  <>
+                    <p className="mb-3 text-sm text-amber-400/80">
+                      Ce joueur a été refusé par PlayGuard. Approuver manuellement override le verdict automatique.
+                    </p>
+                    <button
+                      onClick={() => approveKyc("Approuver manuellement ce joueur ? Cela override le verdict PlayGuard automatique.")}
+                      disabled={busy}
+                      className="w-full rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                    >
+                      ✓ Approuver quand même
+                    </button>
+                  </>
+                )}
+
+                {(data.user.kyc_status === 'verify_age' || data.user.kyc_status === 'pending') && (
+                  <>
+                    {data.user.kyc_status === 'verify_age' && (
+                      <p className="mb-3 text-sm text-amber-400/80">
+                        ⚠️ Vérification manuelle requise — Âge estimé : 19-25 ans. Confirmez l'identité de ce joueur.
+                      </p>
+                    )}
+                    {data.user.kyc_status === 'pending' && (
+                      <p className="mb-3 text-sm text-white/60">
+                        Ce joueur n'a pas encore soumis de vérification KYC.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveKyc()}
+                        disabled={busy}
+                        className="flex-1 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                      >
+                        ✓ Approuver
+                      </button>
+                      <button
+                        onClick={() => denyKyc()}
+                        disabled={busy}
+                        className="flex-1 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                      >
+                        ✗ Refuser
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

@@ -246,12 +246,137 @@ function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => voi
   );
 }
 
+function EditAgentModal({ agent, onUpdated, onClose }: { agent: Agent; onUpdated: (a: Agent) => void; onClose: () => void }) {
+  const [zone, setZone] = useState(agent.zone ?? '');
+  const [rate, setRate] = useState(String(Math.round(Number(agent.commission_rate) * 100)));
+  const [phone, setPhone] = useState(agent.phone ?? '');
+  const [operator, setOperator] = useState(agent.operator ?? '');
+  const [notes, setNotes] = useState(agent.notes ?? '');
+  const [status, setStatus] = useState<'active' | 'suspended'>(agent.status);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!phone.trim()) { setErr('Téléphone requis'); return; }
+    if (!operator)    { setErr('Opérateur requis'); return; }
+    try {
+      setLoading(true);
+      const updated = await adminApi.agentUpdate(agent.id, {
+        status,
+        zone:            zone.trim()  || undefined,
+        commission_rate: Number(rate) / 100,
+        phone:           phone.trim(),
+        operator,
+        notes:           notes.trim() || undefined,
+      });
+      onUpdated(updated);
+    } catch (e: any) {
+      setErr(e?.message || 'Erreur');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <form
+        className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
+        onSubmit={handleSubmit}
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="mb-4 text-lg font-semibold text-white">Modifier — {agent.display_name}</h3>
+        {err && <p className="mb-3 text-sm text-red-400">{err}</p>}
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Numéro de téléphone *</span>
+          <input
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="09XXXXXXXX"
+          />
+        </label>
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Opérateur *</span>
+          <select
+            value={operator}
+            onChange={e => setOperator(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-[#0f0f16] px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+          >
+            <option value="">— Choisir —</option>
+            {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Zone / Quartier</span>
+          <input
+            value={zone}
+            onChange={e => setZone(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="Gombe, Kinshasa"
+          />
+        </label>
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Notes</span>
+          <input
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="Carrefour Limete, en face du Total"
+          />
+        </label>
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">Commission (%)</span>
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={rate}
+            onChange={e => setRate(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+          />
+        </label>
+
+        <label className="mb-5 block">
+          <span className="mb-1 block text-xs text-white/50">Statut</span>
+          <select
+            value={status}
+            onChange={e => setStatus(e.target.value as 'active' | 'suspended')}
+            className="w-full rounded-lg border border-white/10 bg-[#0f0f16] px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+          >
+            <option value="active">Actif</option>
+            <option value="suspended">Suspendu</option>
+          </select>
+        </label>
+
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 rounded-lg bg-gold py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+          >
+            {loading ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+          <button type="button" onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 hover:bg-white/5">
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function AgentsTab() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [drawerAgentId, setDrawerAgentId] = useState<string | null>(null);
-  const [toggling, setToggling] = useState<string | null>(null);
+  const [editAgent, setEditAgent] = useState<Agent | null>(null);
 
   useEffect(() => {
     adminApi.agentsList()
@@ -259,18 +384,6 @@ export default function AgentsTab() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  async function toggleStatus(agent: Agent) {
-    const next = agent.status === 'active' ? 'suspended' : 'active';
-    try {
-      setToggling(agent.id);
-      const updated = await adminApi.agentUpdate(agent.id, { status: next });
-      setAgents(prev => prev.map(a => a.id === agent.id ? updated : a));
-    } catch {
-    } finally {
-      setToggling(null);
-    }
-  }
 
   if (loading) return <p className="text-sm text-white/40">Chargement…</p>;
 
@@ -367,15 +480,10 @@ export default function AgentsTab() {
                     ↓ QR
                   </a>
                   <button
-                    disabled={toggling === agent.id}
-                    onClick={() => toggleStatus(agent)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40 ${
-                      agent.status === 'active'
-                        ? 'border-red-800 text-red-400 hover:bg-red-900/20'
-                        : 'border-emerald-800 text-emerald-400 hover:bg-emerald-900/20'
-                    }`}
+                    onClick={() => setEditAgent(agent)}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
                   >
-                    {toggling === agent.id ? '…' : agent.status === 'active' ? 'Suspendre' : 'Activer'}
+                    ✎ Éditer
                   </button>
                 </div>
               </div>
@@ -388,6 +496,13 @@ export default function AgentsTab() {
         <CreateAgentModal
           onCreated={agent => { setAgents(prev => [agent, ...prev]); setShowCreate(false); }}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+      {editAgent && (
+        <EditAgentModal
+          agent={editAgent}
+          onUpdated={updated => { setAgents(prev => prev.map(a => a.id === updated.id ? updated : a)); setEditAgent(null); }}
+          onClose={() => setEditAgent(null)}
         />
       )}
       {drawerAgentId && (
