@@ -16,6 +16,7 @@ type Resolution = {
   match_id: string;
   actual_score_home: number;
   actual_score_away: number;
+  resolved_by: string | null;
   resolved_by_phone: string | null;
   resolved_at: string;
   predictions_resolved_count: number;
@@ -264,6 +265,9 @@ export default function PredictionsSubTab() {
   const [pending, setPending] = useState<PendingGroup[]>([]);
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [resolveMode, setResolveMode] = useState<'manual' | 'auto'>('manual');
+  const [modeLoading, setModeLoading] = useState(false);
+  const [showModeConfirm, setShowModeConfirm] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -281,11 +285,12 @@ export default function PredictionsSubTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [mRes, lRes, pData, rData] = await Promise.all([
+      const [mRes, lRes, pData, rData, modeData] = await Promise.all([
         fetch(`${API_BASE}/api/matches/upcoming`).then((r) => (r.ok ? r.json() : null)),
         fetch(`${API_BASE}/api/matches/live`).then((r) => (r.ok ? r.json() : null)),
         adminApi.predictionsPending().catch(() => ({ pending: [] })),
         adminApi.predictionsResolved().catch(() => ({ resolutions: [] })),
+        adminApi.getResolveMode().catch(() => ({ mode: 'manual' })),
       ]);
 
       if (mRes?.matches) {
@@ -298,6 +303,7 @@ export default function PredictionsSubTab() {
       if (lRes?.matches) setLiveMatches(lRes.matches);
       setPending(pData.pending);
       setResolutions(rData.resolutions);
+      setResolveMode(modeData.mode === 'auto' ? 'auto' : 'manual');
     } finally {
       setLoading(false);
     }
@@ -383,6 +389,36 @@ export default function PredictionsSubTab() {
     }
   }
 
+  async function handleToggleMode() {
+    if (resolveMode === 'manual') {
+      setShowModeConfirm(true);
+    } else {
+      // Turning OFF auto mode — no confirmation needed
+      setModeLoading(true);
+      try {
+        const r = await adminApi.setResolveMode('manual');
+        setResolveMode(r.mode);
+      } catch (e: any) {
+        console.error('Failed to set resolve mode:', e.message);
+      } finally {
+        setModeLoading(false);
+      }
+    }
+  }
+
+  async function confirmEnableAuto() {
+    setModeLoading(true);
+    try {
+      const r = await adminApi.setResolveMode('auto');
+      setResolveMode(r.mode);
+      setShowModeConfirm(false);
+    } catch (e: any) {
+      console.error('Failed to set resolve mode:', e.message);
+    } finally {
+      setModeLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {modal && (
@@ -394,6 +430,45 @@ export default function PredictionsSubTab() {
           onBack={handleBack}
           onConfirm={handleConfirm}
         />
+      )}
+
+      {showModeConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setShowModeConfirm(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f0f16] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-3 text-lg font-semibold text-white">Activer la résolution automatique ?</h3>
+            <div className="mb-5 space-y-2 text-sm text-white/60">
+              <p>En mode automatique, le système résoudra les matchs terminés toutes les 15 minutes sans intervention humaine :</p>
+              <ul className="ml-4 list-disc space-y-1 text-xs">
+                <li>Les scores finaux seront lus depuis OpenFootball et les caches live</li>
+                <li>Les gains seront crédités automatiquement aux joueurs gagnants</li>
+                <li>Les matchs sans score confirmé seront ignorés (circuit breaker) et resteront en résolution manuelle</li>
+              </ul>
+              <p className="text-amber-300">Cette action affecte directement les paiements. Assurez-vous que les sources de scores sont fiables.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowModeConfirm(false)}
+                disabled={modeLoading}
+                className="flex-1 rounded-lg border border-white/10 px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 disabled:opacity-40"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmEnableAuto}
+                disabled={modeLoading}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+              >
+                {modeLoading ? 'En cours…' : '✓ Activer le mode auto'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -412,13 +487,36 @@ export default function PredictionsSubTab() {
             </button>
           ))}
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="rounded border border-white/10 px-3 py-1 text-sm text-white/60 hover:bg-white/5 disabled:opacity-40"
-        >
-          {loading ? '…' : '↻ Rafraîchir'}
-        </button>
+        <div className="flex items-center gap-3">
+          {isSuper && (
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-1.5">
+              <span className="text-xs font-semibold text-white/70">Résolution auto:</span>
+              <button
+                onClick={handleToggleMode}
+                disabled={modeLoading}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  resolveMode === 'auto' ? 'bg-emerald-500' : 'bg-white/15'
+                } disabled:opacity-40`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    resolveMode === 'auto' ? 'translate-x-4' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs font-bold ${resolveMode === 'auto' ? 'text-emerald-400' : 'text-white/40'}`}>
+                {resolveMode === 'auto' ? 'ON' : 'OFF'}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="rounded border border-white/10 px-3 py-1 text-sm text-white/60 hover:bg-white/5 disabled:opacity-40"
+          >
+            {loading ? '…' : '↻ Rafraîchir'}
+          </button>
+        </div>
       </div>
 
       {!isSuper && (
@@ -553,7 +651,10 @@ export default function PredictionsSubTab() {
                           {fmtDateTime(r.resolved_at)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-xs text-white/50">
-                          {r.resolved_by_phone ?? '—'}
+                          {r.resolved_by === null
+                            ? <span className="text-emerald-400">Résolu automatiquement</span>
+                            : (r.resolved_by_phone ?? '—')
+                          }
                         </td>
                         <td className="px-3 py-2 text-right text-white/80">
                           {r.predictions_resolved_count}
