@@ -133,8 +133,9 @@ export default function OverviewTab() {
         />
         <Kpi
           icon={<Gamepad2 size={20} />}
-          label="Rounds Okapi aujourd'hui"
+          label="Rounds générés aujourd'hui"
           value={fmtInt(overview?.okapi_rounds_today ?? 0)}
+          hint="Parties générées par le moteur de jeu"
         />
       </div>
 
@@ -158,9 +159,11 @@ export default function OverviewTab() {
           accent="#fbbf24"
         />
         <Kpi
-          icon={<Gamepad2 size={20} />}
-          label="Rounds Okapi (jour)"
-          value={fmtInt(overview?.okapi_rounds_today ?? 0)}
+          icon={<ShieldCheck size={20} />}
+          label="KYC à vérifier"
+          value={fmtInt(overview?.kyc?.verify_age ?? 0)}
+          hint="Joueurs en attente de vérification manuelle"
+          accent={overview?.kyc?.verify_age ? '#fbbf24' : undefined}
         />
         <Kpi
           icon={<TrendingUp size={20} />}
