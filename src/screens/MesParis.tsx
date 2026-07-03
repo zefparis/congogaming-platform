@@ -21,6 +21,13 @@ type Prediction = {
   created_at: string;
 };
 
+type MatchInfo = {
+  num: number;
+  team1: string;
+  team2: string;
+  date: string;
+};
+
 const KNOWN_TEAMS = Object.keys(FLAGS)
   .map(t => ({ name: t, slug: t.toLowerCase().replace(/\s+/g, '-') }))
   .sort((a, b) => b.slug.length - a.slug.length);
@@ -124,6 +131,7 @@ export default function MesParis() {
   };
   const nav = useNavigate();
   const [preds, setPreds] = useState<Prediction[]>([]);
+  const [matches, setMatches] = useState<Record<string, MatchInfo>>({});
   const [loading, setLoading] = useState(true);
   const session = getSession();
 
@@ -136,7 +144,31 @@ export default function MesParis() {
     } finally { setLoading(false); }
   }, [session?.id]);
 
+  const loadMatches = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/matches/upcoming`, { credentials: 'include' });
+      if (r.ok) {
+        const j = await r.json();
+        const matchMap: Record<string, MatchInfo> = {};
+        for (const m of (j.matches ?? [])) {
+          if (m.num != null && m.team1 && m.team2) {
+            matchMap[String(m.num)] = {
+              num: m.num,
+              team1: m.team1,
+              team2: m.team2,
+              date: m.date,
+            };
+          }
+        }
+        setMatches(matchMap);
+      }
+    } catch {
+      // Silently fail - predictions will fall back to match number display
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadMatches(); }, [loadMatches]);
 
   const total = preds.length;
   const won   = preds.filter(p => p.status === 'won').length;
@@ -236,7 +268,10 @@ export default function MesParis() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {preds.map((pred, i) => {
               const cfg = CARD_S[pred.status] ?? CARD_S.pending;
-              const { home, away, date, title } = parseMatchInfo(pred.match_id);
+              const match = matches[pred.match_id];
+              const home = match?.team1 ?? '';
+              const away = match?.team2 ?? '';
+              const matchDate = match?.date ?? '';
               const mult    = pred.prediction_type === 'score_exact' ? 5 : 2;
               const potGain = pred.points_wagered * mult;
 
@@ -297,7 +332,7 @@ export default function MesParis() {
                       </div>
                     ) : (
                       <div style={{ fontFamily: BEBAS, fontSize: 18, color: '#fff', letterSpacing: 1, marginBottom: 12 }}>
-                        {title}
+                        Match #{pred.match_id}
                       </div>
                     )}
 
@@ -321,9 +356,9 @@ export default function MesParis() {
                     </div>
 
                     {/* Date */}
-                    {date && (
+                    {matchDate && (
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>
-                        {fmtDate(date)}
+                        {fmtDate(matchDate)}
                       </div>
                     )}
                   </div>

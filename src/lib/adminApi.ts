@@ -587,6 +587,34 @@ export const adminApi = {
   agentPay: (id: string) =>
     request<{ ok: boolean }>(`/api/admin/agents/${id}/pay`, { method: 'POST' }),
 
+  predictionsPending: () =>
+    request<{
+      pending: Array<{
+        match_id: string;
+        pending_count: number;
+        oldest_at: string;
+      }>;
+    }>('/api/admin/predictions/pending'),
+
+  predictionsResolved: () =>
+    request<{
+      resolutions: Array<{
+        match_id: string;
+        actual_score_home: number;
+        actual_score_away: number;
+        resolved_by_phone: string | null;
+        resolved_at: string;
+        predictions_resolved_count: number;
+        total_points_paid: number;
+      }>;
+    }>('/api/admin/predictions/resolved'),
+
+  resolveMatch: (body: { match_id: string; actual_score_home: number; actual_score_away: number }) =>
+    request<{ ok: boolean; resolved: number; won_count: number; lost_count: number; total_points_paid: number }>(
+      '/api/predictions/resolve',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
