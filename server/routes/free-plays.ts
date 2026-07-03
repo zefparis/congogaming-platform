@@ -48,7 +48,14 @@ export default async function freePlaysRoutes(app: FastifyInstance) {
     async (req, reply) => {
       try {
         const user_id = req.user.id;
-        const source = req.body?.source || 'cognitive_test';
+        const rawSource = req.body?.source;
+        // Allowlist: 'cognitive_test' is the only valid caller-supplied value.
+        // 'admin' credits go through /api/admin/free-plays/credit (its own schema).
+        const ALLOWED_SOURCES = ['cognitive_test'] as const;
+        if (rawSource !== undefined && !(ALLOWED_SOURCES as readonly string[]).includes(rawSource)) {
+          return reply.code(400).send({ error: 'INVALID_SOURCE', code: 'INVALID_SOURCE' });
+        }
+        const source = rawSource ?? 'cognitive_test';
 
         // Check for existing non-expired free_plays row
         const { data: existing, error: selErr } = await supabaseAdmin
