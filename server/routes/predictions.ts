@@ -200,12 +200,14 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     },
   );
 
-  // GET /api/predictions?user_id=xxx
-  app.get<{ Querystring: { user_id?: string } }>(
+  // GET /api/predictions — returns only the authenticated user's own predictions.
+  // NOTE: if admin tooling ever needs to query another user's predictions it must
+  // go through a dedicated requireAdmin route, not a query-param override here.
+  app.get(
     '/api/predictions',
+    { preHandler: app.requireAuth },
     async (req, reply) => {
-      const { user_id } = req.query;
-      if (!user_id) return reply.code(400).send({ error: 'MISSING_USER_ID' });
+      const user_id = req.user.id;
 
       const { data, error } = await supabaseAdmin
         .from('predictions')
