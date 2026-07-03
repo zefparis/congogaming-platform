@@ -189,6 +189,12 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         .single();
 
       if (error || !data) {
+        // DB-level unique constraint (unique_user_match_active_bet) is the
+        // authoritative guard; the SELECT above is just a fast-path optimisation.
+        if ((error as any)?.code === '23505') {
+          try { await adjustBalance(user_id, points_wagered); } catch { /* ignore */ }
+          return reply.code(409).send({ error: 'ALREADY_BET', message: 'Vous avez déjà parié sur ce match' });
+        }
         try {
           await adjustBalance(user_id, points_wagered);
         } catch { /* ignore refund failure */ }
