@@ -226,7 +226,7 @@ export default function SplashScreen() {
           }}
         />
 
-        {/* ── ADI CO-BRANDING ────────────────────────────────── */}
+        {/* ── CONGO GAMING BRANDING ────────────────────────────── */}
         <section
           style={{
             display: 'flex',
