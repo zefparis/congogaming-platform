@@ -139,14 +139,20 @@ export default async function predictionsRoutes(app: FastifyInstance) {
 
       const user_id = req.user.id;
 
-      // (b) Check match is not finished
+      // (b) Check match exists and is not finished.
+      // liveCache refreshes every 60 s; matchCache every 5 min — a cache miss
+      // in normal operation is rare. Fail-closed: unknown match_id is rejected
+      // to prevent predictions on stale or fabricated match IDs.
       const liveMatch = liveCache?.data.find((m) => m.id === match_id);
-      if (liveMatch?.status === 'final') {
-        return reply.code(400).send({ error: 'MATCH_FINISHED' });
-      }
       const upcomingMatch = (matchCache?.data as MatchRaw[])?.find(
         (m) => String(m.num ?? '') === match_id,
       );
+      if (!liveMatch && !upcomingMatch) {
+        return reply.code(400).send({ error: 'MATCH_NOT_FOUND', message: 'Match introuvable ou données indisponibles' });
+      }
+      if (liveMatch?.status === 'final') {
+        return reply.code(400).send({ error: 'MATCH_FINISHED' });
+      }
       if (upcomingMatch?.score != null) {
         return reply.code(400).send({ error: 'MATCH_FINISHED' });
       }
