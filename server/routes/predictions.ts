@@ -50,9 +50,11 @@ async function fetchLiveMatches(): Promise<LiveMatch[]> {
         score1: parseInt(String(g.home_score ?? '0'), 10),
         score2: parseInt(String(g.away_score ?? '0'), 10),
         status: String(g.finished).toUpperCase() === 'TRUE' ? 'final'
-              : String(g.time_elapsed) !== 'finished' && String(g.time_elapsed) !== ''
-                && String(g.time_elapsed) !== 'null' ? 'in_progress'
-              : 'scheduled',
+              : String(g.time_elapsed) === 'notstarted'
+                || String(g.time_elapsed) === ''
+                || String(g.time_elapsed) === 'null'
+                || g.time_elapsed === null ? 'scheduled'
+              : 'in_progress',
         clock:  String(g.time_elapsed ?? ''),
         date:   String(g.local_date ?? ''),
       })) as LiveMatch[];
