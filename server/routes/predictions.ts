@@ -259,18 +259,20 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     const userIds = top10.map(([id]) => id);
     const { data: users } = await supabaseAdmin
       .from('users')
-      .select('id, display_name, phone')
+      .select('id, display_name')
       .in('id', userIds);
 
     const userMap = new Map((users ?? []).map((u) => [u.id, u]));
 
     const leaderboard = top10.map(([user_id, total_points_won]) => {
       const u = userMap.get(user_id);
+      const displayName =
+        u?.display_name ||
+        `Joueur ${user_id.replace(/-/g, '').slice(-4).toUpperCase()}`;
       return {
         user_id,
         total_points_won,
-        display_name: u?.display_name ?? null,
-        phone: u?.phone ?? null,
+        display_name: displayName,
       };
     });
 
