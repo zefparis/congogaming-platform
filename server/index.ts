@@ -44,7 +44,9 @@ async function main() {
       'https://congogaming.com',
       'https://www.congogaming.com',
       'https://congogaming-platform-staging.vercel.app',
-      'http://localhost:5173',
+      // localhost is excluded from the fallback in production so that a missing
+      // ALLOWED_ORIGINS env var on Render cannot silently open CORS to local origins.
+      ...(isProduction ? [] : ['http://localhost:5173']),
     ],
     credentials: true,
   });
