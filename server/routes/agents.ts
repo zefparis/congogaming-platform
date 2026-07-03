@@ -10,7 +10,7 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
       const { qrCode } = req.params;
       const { data: agent, error } = await supabaseAdmin
         .from('agents')
-        .select('id, display_name, qr_code, zone, status, total_earned_cdf, phone, operator, min_payout_cdf, payout_requested_at, payout_requested_amount_cdf, created_at')
+        .select('id, display_name, zone, status, total_earned_cdf, commission_rate')
         .eq('qr_code', qrCode.toUpperCase())
         .eq('status', 'active')
         .single();
