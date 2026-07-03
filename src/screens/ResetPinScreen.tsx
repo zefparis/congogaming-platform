@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Lock, HeadphonesIcon } from 'lucide-react';
+import { Lock, Headphones } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { SelfieCaptureWidget } from '../components/SelfieCaptureWidget';
 import { AuthApiError, resetPinByPhone } from '../lib/auth';
@@ -159,7 +159,7 @@ export default function ResetPinScreen() {
               href="https://wa.me/243000000000"
               className="inline-flex items-center gap-2 text-sm text-orange-300 underline"
             >
-              <HeadphonesIcon size={15} />
+              <Headphones size={15} />
               {t('reset_pin.contact_support')}
             </a>
           </div>
