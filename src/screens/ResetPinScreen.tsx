@@ -10,10 +10,8 @@ import { AuthApiError, resetPinByPhone } from '../lib/auth';
 // WhatsApp support link — built from VITE_SUPPORT_PHONE (set in Vercel env vars).
 // Digits-only: the env var may be stored with or without the leading +.
 // If unset, supportHref is null and the link is replaced with plain text.
-const rawSupportPhone = import.meta.env.VITE_SUPPORT_PHONE;
-const supportHref = rawSupportPhone
-  ? `https://wa.me/${rawSupportPhone.replace(/\D/g, '')}`
-  : null;
+const rawSupportPhone = import.meta.env.VITE_SUPPORT_PHONE || '243997174834';
+const supportHref = `https://wa.me/${rawSupportPhone.replace(/\D/g, '')}`;
 
 // ─── ResetPinScreen ──────────────────────────────────────────────────────────
 //
@@ -163,22 +161,15 @@ export default function ResetPinScreen() {
           <div className="mb-4 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4">
             <div className="text-orange-300 font-display text-base mb-2">{t('reset_pin.error_not_enrolled_title')}</div>
             <div className="text-orange-200/80 text-sm mb-3">{t('reset_pin.error_not_enrolled')}</div>
-            {supportHref ? (
-              <a
-                href={supportHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-orange-300 underline"
-              >
-                <Headphones size={15} />
-                {t('reset_pin.contact_support')}
-              </a>
-            ) : (
-              <span className="inline-flex items-center gap-2 text-sm text-orange-300/60">
-                <Headphones size={15} />
-                {t('reset_pin.contact_support')}
-              </span>
-            )}
+            <a
+              href={supportHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-orange-300 underline"
+            >
+              <Headphones size={15} />
+              {t('reset_pin.contact_support')}
+            </a>
           </div>
         )}
 
