@@ -305,7 +305,16 @@
     "days": "Jours",
     "hours": "Heures",
     "min": "Min",
-    "sec": "Sec"
+    "sec": "Sec",
+    "title": "Pronostiquez",
+    "title2": "& Gagnez",
+    "subtitle": "La nouvelle expérience de prédiction sportive pour la CdM 2026.",
+    "badge": "🏆 Coupe du Monde 2026",
+    "cta_play": "⚡ JOUER MAINTENANT",
+    "cta_login": "Se connecter",
+    "promo_label": "PRONOS",
+    "discover": "Découvrez Congo Gaming",
+    "match_preview": "Misez en CDF · Gagnez en CDF"
   },
   "home": {
     "greeting": "Salut, {{name}} 👋",
