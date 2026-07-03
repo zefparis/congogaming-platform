@@ -139,14 +139,20 @@ export default async function predictionsRoutes(app: FastifyInstance) {
 
       const user_id = req.user.id;
 
-      // (b) Check match is not finished
+      // (b) Check match exists and is not finished.
+      // liveCache refreshes every 60 s; matchCache every 5 min — a cache miss
+      // in normal operation is rare. Fail-closed: unknown match_id is rejected
+      // to prevent predictions on stale or fabricated match IDs.
       const liveMatch = liveCache?.data.find((m) => m.id === match_id);
-      if (liveMatch?.status === 'final') {
-        return reply.code(400).send({ error: 'MATCH_FINISHED' });
-      }
       const upcomingMatch = (matchCache?.data as MatchRaw[])?.find(
         (m) => String(m.num ?? '') === match_id,
       );
+      if (!liveMatch && !upcomingMatch) {
+        return reply.code(400).send({ error: 'MATCH_NOT_FOUND', message: 'Match introuvable ou données indisponibles' });
+      }
+      if (liveMatch?.status === 'final') {
+        return reply.code(400).send({ error: 'MATCH_FINISHED' });
+      }
       if (upcomingMatch?.score != null) {
         return reply.code(400).send({ error: 'MATCH_FINISHED' });
       }
@@ -189,6 +195,12 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         .single();
 
       if (error || !data) {
+        // DB-level unique constraint (unique_user_match_active_bet) is the
+        // authoritative guard; the SELECT above is just a fast-path optimisation.
+        if ((error as any)?.code === '23505') {
+          try { await adjustBalance(user_id, points_wagered); } catch { /* ignore */ }
+          return reply.code(409).send({ error: 'ALREADY_BET', message: 'Vous avez déjà parié sur ce match' });
+        }
         try {
           await adjustBalance(user_id, points_wagered);
         } catch { /* ignore refund failure */ }
@@ -200,12 +212,14 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     },
   );
 
-  // GET /api/predictions?user_id=xxx
-  app.get<{ Querystring: { user_id?: string } }>(
+  // GET /api/predictions — returns only the authenticated user's own predictions.
+  // NOTE: if admin tooling ever needs to query another user's predictions it must
+  // go through a dedicated requireAdmin route, not a query-param override here.
+  app.get(
     '/api/predictions',
+    { preHandler: app.requireAuth },
     async (req, reply) => {
-      const { user_id } = req.query;
-      if (!user_id) return reply.code(400).send({ error: 'MISSING_USER_ID' });
+      const user_id = req.user.id;
 
       const { data, error } = await supabaseAdmin
         .from('predictions')

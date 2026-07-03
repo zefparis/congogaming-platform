@@ -1,24 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Camera, RotateCcw, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, AlertTriangle, Loader2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { clearSession, getSession, refreshKycStatus } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
+import { SelfieCaptureWidget } from '../components/SelfieCaptureWidget';
 
 // ─── PlayGuard KYC capture flow ─────────────────────────────────────────────
 //
-// 4 stages:
-//   1. capture  → live camera feed + "Prendre la photo" button
-//   2. preview  → still image + "Confirmer" / "Reprendre"
-//   3. loading  → POST to /api/kyc/scan (PlayGuard via server-side proxy)
-//   4. result   → APPROVED / DENIED / VERIFY_AGE branch
+// 3 stages:
+//   1. selfie   → SelfieCaptureWidget (camera feed → preview → confirm)
+//   2. loading  → POST to /api/kyc/scan (PlayGuard via server-side proxy)
+//   3. result   → APPROVED / DENIED / VERIFY_AGE branch
 //
 // DENIED is terminal: the user is logged out and cannot proceed regardless of
 // what they tap. VERIFY_AGE allows access but flags the account for manual
 // review (the admin dashboard surfaces this).
 
-type Stage = 'capture' | 'preview' | 'loading' | 'result';
+type Stage = 'selfie' | 'loading' | 'result';
 
 type KycVerdict = 'APPROVED' | 'DENIED' | 'VERIFY_AGE';
 
@@ -35,47 +36,9 @@ export default function KycScreen() {
   const nav = useNavigate();
   const session = getSession();
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const [stage, setStage] = useState<Stage>('capture');
-  const [photoB64, setPhotoB64] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>('selfie');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<KycResult | null>(null);
-
-  // ── Camera lifecycle ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (stage !== 'capture') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: 720, height: 720 },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
-      } catch (e: any) {
-        setError(
-          e?.name === 'NotAllowedError'
-            ? t('kyc.camera_denied')
-            : t('kyc.camera_error'),
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    };
-  }, [stage]);
 
   // Hard guard: if no session, kick back to splash. (App.tsx already does this
   // for protected routes, but /kyc is also reachable from the registration
@@ -86,40 +49,11 @@ export default function KycScreen() {
 
   if (!session) return null;
 
-  function capture() {
-    const video = videoRef.current;
-    if (!video || !video.videoWidth) return;
-    const canvas = document.createElement('canvas');
-    // Square crop centered on the video frame so the result matches the
-    // circular preview the operator sees.
-    const size = Math.min(video.videoWidth, video.videoHeight);
-    const sx = (video.videoWidth - size) / 2;
-    const sy = (video.videoHeight - size) / 2;
-    canvas.width = 720;
-    canvas.height = 720;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, sx, sy, size, size, 0, 0, 720, 720);
-    const b64 = canvas.toDataURL('image/jpeg', 0.9);
-    setPhotoB64(b64);
-    setStage('preview');
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }
-
-  function retake() {
-    setPhotoB64(null);
-    setError(null);
-    setStage('capture');
-  }
-
-  async function confirm() {
-    if (!photoB64 || !session) return;
+  async function handleSelfieConfirmed(rawB64: string) {
+    if (!session) return;
     setStage('loading');
     setError(null);
     try {
-      // Strip the "data:image/...;base64," prefix — the server expects raw base64
-      const rawB64 = photoB64.includes(',') ? photoB64.split(',')[1]! : photoB64;
       const res = await api.kycScan(session.id, rawB64);
       setResult({
         verdict: res.verdict,
@@ -134,7 +68,7 @@ export default function KycScreen() {
       setStage('result');
     } catch (e: any) {
       setError(e?.message || t('kyc.verify_failed'));
-      setStage('preview');
+      setStage('selfie');
     }
   }
 
@@ -189,21 +123,15 @@ export default function KycScreen() {
         {t('kyc.subtitle')}
       </p>
 
-      {stage === 'capture' && (
-        <CaptureStage
-          videoRef={videoRef}
-          onCapture={capture}
-          error={error}
-        />
-      )}
-
-      {stage === 'preview' && photoB64 && (
-        <PreviewStage
-          photoB64={photoB64}
-          onRetake={retake}
-          onConfirm={confirm}
-          error={error}
-        />
+      {stage === 'selfie' && (
+        <>
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 text-center">
+              {error}
+            </div>
+          )}
+          <SelfieCaptureWidget onCapture={handleSelfieConfirmed} />
+        </>
       )}
 
       {stage === 'loading' && <LoadingStage />}
@@ -221,110 +149,6 @@ export default function KycScreen() {
 }
 
 // ─── Stage components ───────────────────────────────────────────────────────
-
-function CaptureStage({
-  videoRef,
-  onCapture,
-  error,
-}: {
-  videoRef: React.RefObject<HTMLVideoElement>;
-  onCapture: () => void;
-  error: string | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <p className="text-center text-white text-base mb-4">
-        {t('kyc.look_straight')}
-      </p>
-      <div className="flex justify-center mb-6">
-        <div
-          className="relative rounded-full overflow-hidden border-4 border-gold"
-          style={{ width: 280, height: 280, background: '#111' }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-          />
-        </div>
-      </div>
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 text-center">
-          {error}
-        </div>
-      )}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={onCapture}
-        disabled={!!error}
-        className="h-14 rounded-2xl bg-gold text-black font-display text-xl tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
-      >
-        <Camera size={20} />
-        {t('kyc.take_photo')}
-      </motion.button>
-    </>
-  );
-}
-
-function PreviewStage({
-  photoB64,
-  onRetake,
-  onConfirm,
-  error,
-}: {
-  photoB64: string;
-  onRetake: () => void;
-  onConfirm: () => void;
-  error: string | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <p className="text-center text-white text-base mb-4">
-        {t('kyc.check_face')}
-      </p>
-      <div className="flex justify-center mb-6">
-        <div
-          className="relative rounded-full overflow-hidden border-4 border-gold"
-          style={{ width: 280, height: 280, background: '#111' }}
-        >
-          <img
-            src={photoB64}
-            alt="Aperçu"
-            className="w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }}
-          />
-        </div>
-      </div>
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 text-center">
-          {error}
-        </div>
-      )}
-      <div className="flex gap-3">
-        <button
-          onClick={onRetake}
-          className="flex-1 h-14 rounded-2xl border-2 border-zinc-700 bg-zinc-900 text-white font-display text-base tracking-wider flex items-center justify-center gap-2"
-        >
-          <RotateCcw size={18} />
-          {t('kyc.retake')}
-        </button>
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onConfirm}
-          className="flex-1 h-14 rounded-2xl bg-gold text-black font-display text-base tracking-wider flex items-center justify-center gap-2"
-        >
-          <Check size={18} />
-          {t('kyc.confirm')}
-        </motion.button>
-      </div>
-    </>
-  );
-}
 
 function LoadingStage() {
   const { t } = useTranslation();

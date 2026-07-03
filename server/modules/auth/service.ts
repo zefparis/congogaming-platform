@@ -258,6 +258,16 @@ export async function changePin(input: { userId: string; currentPin: string; new
   await resetPin(String(data.id), input.newPin);
 }
 
+export async function getUserByPhone(phone: string): Promise<{ id: string; phone: string } | null> {
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id, phone')
+    .eq('phone', phone)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? { id: String(data.id), phone: String(data.phone) } : null;
+}
+
 export async function getUserById(userId: string): Promise<AuthUser | null> {
   const { data, error } = await supabaseAdmin
     .from('users')
