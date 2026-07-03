@@ -8,6 +8,8 @@ import { isCongoLotoEnabled } from './lib/featureFlags.js';
 import { supabaseAdmin } from './lib/supabase.js';
 import { startReconciliationLoop } from './lib/unipesa-reconciliation.js';
 import { env } from './env.js';
+import { resolveMatchPredictions, fetchLiveMatches } from './routes/predictions.js';
+import { finalScore, isPlayed, teamName } from '../src/screens/predictionsShared.js';
 
 /**
  * Self-healing recovery for Loto Express (Flash) draws.
@@ -237,6 +239,143 @@ function scheduleNextFlashDraw() {
   }, ms).unref();
 }
 
+// =============================================================
+// Predictions auto-resolve — detection + resolution (every 15 min)
+// =============================================================
+
+const OPENFOOTBALL_URL =
+  'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+
+async function getResolveMode(): Promise<'manual' | 'auto'> {
+  const { data } = await supabaseAdmin
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'predictions_resolve_mode')
+    .maybeSingle();
+  return data?.value === 'auto' ? 'auto' : 'manual';
+}
+
+async function fetchOpenfootballMatches(): Promise<any[]> {
+  try {
+    const res = await fetch(OPENFOOTBALL_URL, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return [];
+    const json = await res.json() as { matches?: any[] };
+    return json.matches ?? [];
+  } catch { return []; }
+}
+
+async function detectAndResolvePredictions() {
+  const slotKey = `pred-resolve:${new Date().toISOString().slice(0, 16)}`;
+  const acquired = await acquireJobLock('predictions_resolve', slotKey);
+  if (!acquired) {
+    console.log('[PREDICTIONS RESOLVE] Slot already processed:', slotKey);
+    return;
+  }
+
+  const mode = await getResolveMode();
+  console.log(`[PREDICTIONS RESOLVE] Running detection (mode=${mode})`);
+
+  // 1. Get all pending predictions grouped by match_id
+  const { data: pendingPreds, error: pendErr } = await supabaseAdmin
+    .from('predictions')
+    .select('match_id')
+    .eq('status', 'pending');
+  if (pendErr) { console.error('[PREDICTIONS RESOLVE] Failed to fetch pending:', pendErr.message); return; }
+
+  if (!pendingPreds || pendingPreds.length === 0) {
+    console.log('[PREDICTIONS RESOLVE] No pending predictions');
+    return;
+  }
+
+  const pendingMatchIds = [...new Set(pendingPreds.map(p => String(p.match_id)))];
+
+  // 2. Filter out matches that already have a resolution row
+  const { data: alreadyResolved } = await supabaseAdmin
+    .from('match_resolutions')
+    .select('match_id')
+    .in('match_id', pendingMatchIds);
+  const resolvedSet = new Set((alreadyResolved ?? []).map(r => r.match_id));
+  const unresolvedMatchIds = pendingMatchIds.filter(id => !resolvedSet.has(id));
+
+  if (unresolvedMatchIds.length === 0) {
+    console.log('[PREDICTIONS RESOLVE] All pending matches already resolved');
+    return;
+  }
+
+  // 3. Fetch openfootball matches + live data to find final scores
+  const ofMatches = await fetchOpenfootballMatches();
+  const liveMatches = await fetchLiveMatches();
+
+  // Build a lookup: match_id (num as string) → RawMatch
+  const matchLookup = new Map<string, any>();
+  for (const m of ofMatches) {
+    if (m.num != null) matchLookup.set(String(m.num), m);
+  }
+
+  // 4. For each unresolved match, check if it's final and has a score
+  const readyToResolve: { matchId: string; scoreHome: number; scoreAway: number }[] = [];
+  let circuitBreakerCount = 0;
+
+  for (const matchId of unresolvedMatchIds) {
+    const rawMatch = matchLookup.get(matchId);
+    if (!rawMatch) continue;
+
+    // Check if match is played (has score in openfootball data)
+    const played = isPlayed(rawMatch);
+    const fs = finalScore(rawMatch);
+
+    // Also check live data for final status
+    const t1 = teamName(rawMatch.team1).toLowerCase();
+    const t2 = teamName(rawMatch.team2).toLowerCase();
+    const live = liveMatches.find(l =>
+      l.team1.toLowerCase() === t1 && l.team2.toLowerCase() === t2
+    );
+    const isLiveFinal = live?.status === 'final';
+
+    if (!played && !isLiveFinal) continue;
+
+    // Circuit breaker: match is final but no score available
+    if ((played || isLiveFinal) && !fs) {
+      circuitBreakerCount++;
+      console.warn(`[PREDICTIONS RESOLVE] Circuit breaker: match ${matchId} is final but has no score — skipping (manual required)`);
+      continue;
+    }
+
+    if (fs && fs.length >= 2) {
+      readyToResolve.push({ matchId, scoreHome: fs[0], scoreAway: fs[1] });
+    }
+  }
+
+  if (readyToResolve.length === 0) {
+    console.log(`[PREDICTIONS RESOLVE] No matches ready (circuit breaker: ${circuitBreakerCount}, unresolved: ${unresolvedMatchIds.length})`);
+    return;
+  }
+
+  console.log(`[PREDICTIONS RESOLVE] ${readyToResolve.length} match(es) ready, ${circuitBreakerCount} circuit breaker(s)`);
+
+  // 5. Resolve based on mode
+  if (mode === 'auto') {
+    for (const { matchId, scoreHome, scoreAway } of readyToResolve) {
+      try {
+        const result = await resolveMatchPredictions({
+          match_id: matchId,
+          actual_score_home: scoreHome,
+          actual_score_away: scoreAway,
+          resolved_by: null, // null = system/auto-resolved
+          log: { error: (obj, msg) => console.error('[PREDICTIONS RESOLVE]', msg, obj) },
+        });
+        console.log(`[PREDICTIONS RESOLVE] Auto-resolved match ${matchId}:`, result);
+      } catch (err: any) {
+        if (err.code === 'ALREADY_RESOLVED') continue;
+        console.error(`[PREDICTIONS RESOLVE] Failed to auto-resolve match ${matchId}:`, err.message);
+      }
+    }
+  } else {
+    // Manual mode: just log — admin UI already shows pending matches
+    console.log(`[PREDICTIONS RESOLVE] Manual mode — ${readyToResolve.length} match(es) ready for manual resolution`);
+  }
+}
+
 /**
  * Démarre tous les planificateurs serveur :
  * - Flash : tirage toutes les 30 minutes (:00 et :30)
@@ -317,5 +456,20 @@ export function startCrons() {
   // every ledger entry guarantee no double credit/debit even if a
   // late callback and a reconciliation tick race each other.
   startReconciliationLoop(60_000);
+
+  // Predictions auto-resolve — detection runs every 15 minutes.
+  // Checks openfootball + live cache for final matches with pending
+  // predictions. In 'manual' mode it only logs (admin UI surfaces them).
+  // In 'auto' mode it resolves directly via resolveMatchPredictions()
+  // with resolved_by=null (system). Circuit breaker: if a match is
+  // final but has no score data, it is skipped for manual handling.
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await detectAndResolvePredictions();
+    } catch (err) {
+      console.error('[PREDICTIONS RESOLVE CRON] Error:', err);
+    }
+  });
+  console.log('[PREDICTIONS RESOLVE CRON] Detection job scheduled — every 15 min');
 
 }

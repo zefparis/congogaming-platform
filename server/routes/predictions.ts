@@ -6,7 +6,7 @@ const OPENFOOTBALL_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-interface MatchRaw {
+export interface MatchRaw {
   num?: number;
   date: string;
   time?: string;
@@ -18,7 +18,7 @@ interface MatchRaw {
 }
 
 
-let matchCache: { data: unknown[]; fetchedAt: number } | null = null;
+export let matchCache: { data: unknown[]; fetchedAt: number } | null = null;
 
 const LIVE_CACHE_TTL = 60_000;
 
@@ -33,9 +33,9 @@ type LiveMatch = {
   date: string;
 };
 
-let liveCache: { data: LiveMatch[]; ts: number } | null = null;
+export let liveCache: { data: LiveMatch[]; ts: number } | null = null;
 
-async function fetchLiveMatches(): Promise<LiveMatch[]> {
+export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   // PRIMARY: worldcup26.ir
   try {
     const res = await fetch('https://worldcup26.ir/get/games', {
@@ -106,6 +106,125 @@ async function fetchLiveMatches(): Promise<LiveMatch[]> {
   } catch { /* nothing */ }
 
   return [];
+}
+
+// ── shared resolve logic ──────────────────────────────────────────────────────
+// Used by both the POST /api/predictions/resolve HTTP handler and the
+// auto-resolve cron job. No duplication.
+
+export type ResolveResult = {
+  ok: true;
+  resolved: number;
+  won_count: number;
+  lost_count: number;
+  total_points_paid: number;
+};
+
+export type ResolveOptions = {
+  match_id: string;
+  actual_score_home: number;
+  actual_score_away: number;
+  resolved_by: string | null;
+  log?: { error: (obj: Record<string, unknown>, msg: string) => void };
+};
+
+export async function resolveMatchPredictions(opts: ResolveOptions): Promise<ResolveResult> {
+  const { match_id, actual_score_home, actual_score_away, resolved_by, log } = opts;
+
+  const { data: preds, error: fetchErr } = await supabaseAdmin
+    .from('predictions')
+    .select('*')
+    .eq('match_id', match_id)
+    .eq('status', 'pending');
+
+  if (fetchErr) throw new Error(fetchErr.message);
+
+  const { data: existingRes, error: resCheckErr } = await supabaseAdmin
+    .from('match_resolutions')
+    .select('match_id')
+    .eq('match_id', match_id)
+    .maybeSingle();
+  if (resCheckErr) throw new Error(resCheckErr.message);
+  if (existingRes) {
+    const err = new Error('ALREADY_RESOLVED') as Error & { code: string };
+    err.code = 'ALREADY_RESOLVED';
+    throw err;
+  }
+
+  if (!preds || preds.length === 0) {
+    await supabaseAdmin.from('match_resolutions').insert({
+      match_id,
+      actual_score_home,
+      actual_score_away,
+      resolved_by,
+      predictions_resolved_count: 0,
+      total_points_paid: 0,
+    });
+    return { ok: true, resolved: 0, won_count: 0, lost_count: 0, total_points_paid: 0 };
+  }
+
+  let actual_winner: string | null = null;
+  if (actual_score_home > actual_score_away) actual_winner = 'home';
+  else if (actual_score_away > actual_score_home) actual_winner = 'away';
+  else actual_winner = 'draw';
+
+  let resolved = 0;
+  let won_count = 0;
+  let lost_count = 0;
+  let total_points_paid = 0;
+
+  for (const pred of preds) {
+    let won = false;
+    let multiplier = 0;
+
+    if (pred.prediction_type === 'winner') {
+      won = pred.predicted_winner === actual_winner;
+      multiplier = 2;
+    } else if (pred.prediction_type === 'score_exact') {
+      won =
+        pred.predicted_score_home === actual_score_home &&
+        pred.predicted_score_away === actual_score_away;
+      multiplier = 5;
+    }
+
+    const points_won = won ? (pred.points_wagered as number) * multiplier : 0;
+    const status = won ? 'won' : 'lost';
+    if (won) { won_count++; total_points_paid += points_won; } else { lost_count++; }
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('predictions')
+      .update({ status, points_won, updated_at: new Date().toISOString() })
+      .eq('id', pred.id);
+
+    if (updateErr) {
+      log?.error({ err: updateErr, pred_id: pred.id }, '[resolveMatchPredictions] update failed');
+      continue;
+    }
+
+    if (won && points_won > 0) {
+      try {
+        await adjustBalance(pred.user_id as string, points_won);
+      } catch (e) {
+        log?.error(
+          { err: e, pred_id: pred.id, user_id: pred.user_id },
+          '[resolveMatchPredictions] balance credit failed',
+        );
+      }
+    }
+
+    resolved++;
+  }
+
+  await supabaseAdmin.from('match_resolutions').insert({
+    match_id,
+    actual_score_home,
+    actual_score_away,
+    resolved_by,
+    predictions_resolved_count: resolved,
+    total_points_paid,
+  });
+
+  return { ok: true, resolved, won_count, lost_count, total_points_paid };
 }
 
 export default async function predictionsRoutes(app: FastifyInstance) {
@@ -358,87 +477,21 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'INVALID_SCORE' });
       }
 
-      const { data: preds, error: fetchErr } = await supabaseAdmin
-        .from('predictions')
-        .select('*')
-        .eq('match_id', match_id)
-        .eq('status', 'pending');
-
-      if (fetchErr) return reply.code(500).send({ error: fetchErr.message });
-
-      const { data: existingRes, error: resCheckErr } = await supabaseAdmin
-        .from('match_resolutions')
-        .select('match_id')
-        .eq('match_id', match_id)
-        .maybeSingle();
-      if (resCheckErr) return reply.code(500).send({ error: resCheckErr.message });
-      if (existingRes) return reply.code(409).send({ error: 'ALREADY_RESOLVED' });
-
-      if (!preds || preds.length === 0) return reply.send({ ok: true, resolved: 0, won_count: 0, lost_count: 0, total_points_paid: 0 });
-
-      let actual_winner: string | null = null;
-      if (actual_score_home > actual_score_away) actual_winner = 'home';
-      else if (actual_score_away > actual_score_home) actual_winner = 'away';
-      else actual_winner = 'draw';
-
-      let resolved = 0;
-      let won_count = 0;
-      let lost_count = 0;
-      let total_points_paid = 0;
-
-      for (const pred of preds) {
-        let won = false;
-        let multiplier = 0;
-
-        if (pred.prediction_type === 'winner') {
-          won = pred.predicted_winner === actual_winner;
-          multiplier = 2;
-        } else if (pred.prediction_type === 'score_exact') {
-          won =
-            pred.predicted_score_home === actual_score_home &&
-            pred.predicted_score_away === actual_score_away;
-          multiplier = 5;
-        }
-
-        const points_won = won ? (pred.points_wagered as number) * multiplier : 0;
-        const status = won ? 'won' : 'lost';
-        if (won) { won_count++; total_points_paid += points_won; } else { lost_count++; }
-
-        const { error: updateErr } = await supabaseAdmin
-          .from('predictions')
-          .update({ status, points_won, updated_at: new Date().toISOString() })
-          .eq('id', pred.id);
-
-        if (updateErr) {
-          req.log.error({ err: updateErr, pred_id: pred.id }, '[predictions/resolve] update failed');
-          continue;
-        }
-
-        if (won && points_won > 0) {
-          try {
-            await adjustBalance(pred.user_id as string, points_won);
-          } catch (e) {
-            req.log.error(
-              { err: e, pred_id: pred.id, user_id: pred.user_id },
-              '[predictions/resolve] balance credit failed',
-            );
-          }
-        }
-
-        resolved++;
-      }
-
       const resolvedBy = req.admin?.userId || null;
-      await supabaseAdmin.from('match_resolutions').insert({
-        match_id,
-        actual_score_home,
-        actual_score_away,
-        resolved_by: resolvedBy,
-        predictions_resolved_count: resolved,
-        total_points_paid,
-      });
-
-      return reply.send({ ok: true, resolved, won_count, lost_count, total_points_paid });
+      try {
+        const result = await resolveMatchPredictions({
+          match_id,
+          actual_score_home,
+          actual_score_away,
+          resolved_by: resolvedBy,
+          log: req.log,
+        });
+        return reply.send(result);
+      } catch (err: any) {
+        if (err.code === 'ALREADY_RESOLVED') return reply.code(409).send({ error: 'ALREADY_RESOLVED' });
+        req.log.error({ err }, '[predictions/resolve] failed');
+        return reply.code(500).send({ error: err.message || 'SERVER_ERROR' });
+      }
     },
   );
 
@@ -504,6 +557,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         match_id: r.match_id,
         actual_score_home: r.actual_score_home,
         actual_score_away: r.actual_score_away,
+        resolved_by: r.resolved_by,
         resolved_by_phone: r.resolved_by ? (phoneMap.get(r.resolved_by) ?? null) : null,
         resolved_at: r.resolved_at,
         predictions_resolved_count: r.predictions_resolved_count,
@@ -511,6 +565,48 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       }));
 
       return reply.send({ resolutions });
+    },
+  );
+
+  // GET /api/admin/predictions/resolve-mode (admin — read current mode)
+  app.get(
+    '/api/admin/predictions/resolve-mode',
+    { preHandler: requireAdmin as (req: FastifyRequest, reply: FastifyReply) => Promise<void> },
+    async (_req, reply) => {
+      const { data, error } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'predictions_resolve_mode')
+        .maybeSingle();
+      if (error) return reply.code(500).send({ error: error.message });
+      const mode = (data?.value === 'auto' ? 'auto' : 'manual') as 'manual' | 'auto';
+      return reply.send({ mode });
+    },
+  );
+
+  // POST /api/admin/predictions/resolve-mode (super_admin — toggle mode)
+  app.post<{
+    Body: { mode: 'manual' | 'auto' };
+  }>(
+    '/api/admin/predictions/resolve-mode',
+    { preHandler: [requireAdmin, requireSuperAdmin] as ((req: FastifyRequest, reply: FastifyReply) => Promise<void>)[] },
+    async (req, reply) => {
+      const { mode } = req.body ?? {};
+      if (mode !== 'manual' && mode !== 'auto') {
+        return reply.code(400).send({ error: 'INVALID_MODE' });
+      }
+
+      const resolvedBy = req.admin?.userId || null;
+      const { error } = await supabaseAdmin
+        .from('app_settings')
+        .upsert({
+          key: 'predictions_resolve_mode',
+          value: mode,
+          updated_by: resolvedBy,
+        }, { onConflict: 'key' });
+
+      if (error) return reply.code(500).send({ error: error.message });
+      return reply.send({ ok: true, mode });
     },
   );
 }

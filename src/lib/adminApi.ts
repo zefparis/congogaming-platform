@@ -602,6 +602,7 @@ export const adminApi = {
         match_id: string;
         actual_score_home: number;
         actual_score_away: number;
+        resolved_by: string | null;
         resolved_by_phone: string | null;
         resolved_at: string;
         predictions_resolved_count: number;
@@ -613,6 +614,15 @@ export const adminApi = {
     request<{ ok: boolean; resolved: number; won_count: number; lost_count: number; total_points_paid: number }>(
       '/api/predictions/resolve',
       { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getResolveMode: () =>
+    request<{ mode: 'manual' | 'auto' }>('/api/admin/predictions/resolve-mode'),
+
+  setResolveMode: (mode: 'manual' | 'auto') =>
+    request<{ ok: boolean; mode: 'manual' | 'auto' }>(
+      '/api/admin/predictions/resolve-mode',
+      { method: 'POST', body: JSON.stringify({ mode }) },
     ),
 
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
