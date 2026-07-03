@@ -1,13 +1,17 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { CongoPhoneSchema, LoginSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
-import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, loginUser, registerUser, resetPinByPhone, updateDisplayName } from './service.js';
-
+import { CongoPhoneSchema, LoginSchema, PinSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
+import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, getUserByPhone, loginUser, registerUser, resetPin, updateDisplayName } from './service.js';
+import { env } from '../../env.js';
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
+
+const PG_PROXY_URL = env.PG_PROXY_URL || 'https://playguard.vercel.app/api/proxy';
+const PG_PROXY_TIMEOUT_MS = 45_000;
 
 const ResetPinSchema = z.object({
   phone: CongoPhoneSchema,
-  newPin: z.string().regex(/^\d{6}$/, 'INVALID_PIN_FORMAT'),
+  selfie_b64: z.string().min(1, 'SELFIE_REQUIRED'),
+  newPin: PinSchema,
 });
 
 // Key auth limiters by the phone number in the body (identity) rather
@@ -97,26 +101,116 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/api/auth/reset-pin', {
-    config: { rateLimit: { max: 10, timeWindow: '15 minutes', keyGenerator: phoneKeyGenerator } },
+    config: { rateLimit: { max: 5, timeWindow: '24 hours', keyGenerator: phoneKeyGenerator } },
   }, async (req, reply) => {
     const parsed = ResetPinSchema.safeParse(req.body);
     if (!parsed.success) {
-      req.log.warn({ issues: parsed.error.issues, body: req.body }, 'reset-pin schema validation failed');
-      const isPhoneError = parsed.error.issues.some((i) => i.path[0] === 'phone');
-      if (isPhoneError) return reply.code(400).send({ error: 'INVALID_PHONE', code: 'INVALID_PHONE' });
-      return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
+      const firstPath = parsed.error.issues[0]?.path[0];
+      if (firstPath === 'newPin') return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
+      if (firstPath === 'selfie_b64') return reply.code(400).send({ error: 'SELFIE_REQUIRED', code: 'SELFIE_REQUIRED' });
+      return reply.code(400).send({ error: 'INVALID_PHONE', code: 'INVALID_PHONE' });
     }
+    const { phone, selfie_b64, newPin } = parsed.data;
+
+    // b. Look up user — generic error to prevent phone enumeration
+    let user: { id: string; phone: string } | null;
     try {
-      await resetPinByPhone({ phone: parsed.data.phone, newPin: parsed.data.newPin });
-      return reply.send({ ok: true });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg === 'INVALID_PIN_FORMAT') return reply.code(400).send({ error: 'INVALID_PIN_FORMAT', code: 'INVALID_PIN_FORMAT' });
-      if (msg === 'USER_NOT_FOUND') return reply.code(404).send({ error: 'USER_NOT_FOUND', code: 'USER_NOT_FOUND' });
-      if (msg === 'PIN_RESET_NOT_REQUIRED') return reply.code(409).send({ error: 'PIN_RESET_NOT_REQUIRED', code: 'PIN_RESET_NOT_REQUIRED' });
-      req.log.error({ err: msg }, 'reset-pin failed');
+      user = await getUserByPhone(phone);
+    } catch {
+      return reply.code(400).send({ error: 'INVALID_REQUEST', code: 'INVALID_REQUEST' });
+    }
+    if (!user) return reply.code(400).send({ error: 'INVALID_REQUEST', code: 'INVALID_REQUEST' });
+
+    // c. PlayGuard verify/check — wraps request with timeout consistent with KYC
+    const pgApiKey = env.PG_API_KEY;
+    const verifyUrl = `${PG_PROXY_URL}/playguard/verify/check`;
+    let pgRes: Response;
+    try {
+      pgRes = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': pgApiKey,
+          'x-playguard-key': pgApiKey,
+        },
+        body: JSON.stringify({ image: selfie_b64, externalId: user.id }),
+        signal: AbortSignal.timeout(PG_PROXY_TIMEOUT_MS),
+      });
+    } catch (e: any) {
+      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'UPSTREAM_TIMEOUT' }, 'reset-pin: PlayGuard verify/check unreachable');
+      return reply.code(502).send({
+        error: 'VERIFICATION_UNAVAILABLE',
+        code: 'VERIFICATION_UNAVAILABLE',
+        message: 'Service de vérification indisponible, réessayez dans quelques minutes ou contactez le support.',
+      });
+    }
+
+    // d. Non-OK upstream
+    if (!pgRes.ok) {
+      req.log.warn({ phone: `***${phone.slice(-4)}`, status: pgRes.status, outcome: 'UPSTREAM_ERROR' }, 'reset-pin: PlayGuard verify/check error');
+      return reply.code(502).send({
+        error: 'VERIFICATION_UNAVAILABLE',
+        code: 'VERIFICATION_UNAVAILABLE',
+        message: 'Service de vérification indisponible, réessayez dans quelques minutes ou contactez le support.',
+      });
+    }
+
+    const pgJson = (await pgRes.json().catch(() => null)) as {
+      success?: boolean;
+      enrolled?: boolean | null;
+      match?: boolean;
+    } | null;
+    if (!pgJson) {
+      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'MALFORMED_RESPONSE' }, 'reset-pin: malformed PlayGuard response');
+      return reply.code(502).send({
+        error: 'VERIFICATION_UNAVAILABLE',
+        code: 'VERIFICATION_UNAVAILABLE',
+        message: 'Service de vérification indisponible, réessayez dans quelques minutes ou contactez le support.',
+      });
+    }
+
+    const { enrolled, match } = pgJson;
+
+    // e. Authoritative enrolled/match mapping
+    if (enrolled === false) {
+      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'NOT_ENROLLED' }, 'reset-pin: user not enrolled');
+      return reply.code(403).send({
+        error: 'NOT_ENROLLED',
+        code: 'NOT_ENROLLED',
+        message: 'Vérification faciale non disponible pour ce compte. Contactez le support pour réinitialiser votre code.',
+      });
+    }
+
+    if (enrolled === true && match === false) {
+      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'FACE_MISMATCH' }, 'reset-pin: face mismatch');
+      return reply.code(403).send({
+        error: 'FACE_MISMATCH',
+        code: 'FACE_MISMATCH',
+        message: 'Vérification échouée. Réessayez avec plus de lumière et en cadrant bien votre visage. Après plusieurs tentatives, contactez le support.',
+      });
+    }
+
+    if (enrolled === null && match === false) {
+      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'DEGRADED_MISMATCH' }, 'reset-pin: degraded — enrolled unknown, no Rekognition match');
+      return reply.code(502).send({
+        error: 'VERIFICATION_UNAVAILABLE',
+        code: 'VERIFICATION_UNAVAILABLE',
+        message: 'Vérification temporairement indisponible, réessayez dans quelques minutes.',
+      });
+    }
+
+    // enrolled true+match true  → success
+    // enrolled null+match true  → Rekognition matched independently despite degraded registry; treat as success
+
+    // f. Reset PIN using the shared Argon2id helper
+    try {
+      await resetPin(user.id, newPin);
+    } catch (e: any) {
+      req.log.error({ err: e?.message, userId: user.id }, 'reset-pin: resetPin failed');
       return reply.code(500).send({ error: 'RESET_PIN_FAILED', code: 'RESET_PIN_FAILED' });
     }
+
+    return reply.send({ success: true });
   });
 
   app.post('/api/auth/logout', async (_req, reply) => {

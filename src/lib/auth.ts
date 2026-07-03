@@ -104,10 +104,10 @@ export async function loginUser(phone: string, pin: string): Promise<SessionUser
   return user;
 }
 
-export async function resetPinByPhone(phone: string, newPin: string): Promise<void> {
-  await authRequest<{ ok: boolean; message: string }>('/api/auth/reset-pin', {
+export async function resetPinByPhone(phone: string, selfie_b64: string, newPin: string): Promise<void> {
+  await authRequest<{ success: boolean }>('/api/auth/reset-pin', {
     method: 'POST',
-    body: JSON.stringify({ phone, newPin }),
+    body: JSON.stringify({ phone, selfie_b64, newPin }),
   });
 }
 
