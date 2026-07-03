@@ -2,12 +2,32 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { Lock, HeadphonesIcon } from 'lucide-react';
 import NumPad from '../components/NumPad';
+import { SelfieCaptureWidget } from '../components/SelfieCaptureWidget';
 import { AuthApiError, resetPinByPhone } from '../lib/auth';
-import { displayError } from '../lib/errors';
 
-type Step = 'new' | 'confirm' | 'done';
+// ─── ResetPinScreen ──────────────────────────────────────────────────────────
+//
+// Unauthenticated flow — the user has no valid session by definition.
+// Steps:
+//   1. selfie   → SelfieCaptureWidget (camera → preview → confirm)
+//   2. pin      → enter new 6-digit PIN
+//   3. confirm  → re-enter to confirm, then POST { phone, selfie_b64, newPin }
+//   4. done     → success
+//
+// PlayGuard error mapping:
+//   NOT_ENROLLED         → redirect to support contact (show message + button)
+//   FACE_MISMATCH        → retry selfie with lighting tip
+//   VERIFICATION_UNAVAILABLE → retry later
+
+type Step = 'selfie' | 'pin' | 'confirm' | 'done';
+
+type SelfieError =
+  | { kind: 'NOT_ENROLLED' }
+  | { kind: 'FACE_MISMATCH'; message: string }
+  | { kind: 'VERIFICATION_UNAVAILABLE'; message: string }
+  | { kind: 'generic'; message: string };
 
 export default function ResetPinScreen() {
   const nav = useNavigate();
@@ -15,69 +35,91 @@ export default function ResetPinScreen() {
   const location = useLocation();
   const phone = (location.state as { phone?: string } | null)?.phone || '';
 
-  const [step, setStep] = useState<Step>('new');
+  const [step, setStep] = useState<Step>('selfie');
+  const [selfieB64, setSelfieB64] = useState<string | null>(null);
+  const [selfieError, setSelfieError] = useState<SelfieError | null>(null);
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [err, setErr] = useState<string | null>(null);
+  const [pinErr, setPinErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Hard guard: without a phone we cannot call the API. Send back to login.
     if (!phone) nav('/login', { replace: true });
   }, [phone, nav]);
 
-  const activePin = step === 'new' ? newPin : confirmPin;
-  const setActivePin = step === 'new' ? setNewPin : setConfirmPin;
+  // ── Selfie step ─────────────────────────────────────────────────────────
+  function handleSelfieConfirmed(rawB64: string) {
+    setSelfieB64(rawB64);
+    setSelfieError(null);
+    setStep('pin');
+  }
+
+  // ── PIN steps ────────────────────────────────────────────────────────────
+  const activePin = step === 'pin' ? newPin : confirmPin;
+  const setActivePin = step === 'pin' ? setNewPin : setConfirmPin;
 
   const onDigit = (d: string) => {
-    setErr(null);
+    setPinErr(null);
     setActivePin((prev) => (prev.length < 6 ? prev + d : prev));
   };
   const onDelete = () => {
-    setErr(null);
+    setPinErr(null);
     setActivePin((prev) => prev.slice(0, -1));
   };
 
   const goConfirm = () => {
     if (newPin.length !== 6) return;
     setStep('confirm');
-    setErr(null);
+    setPinErr(null);
   };
 
   const submit = async () => {
-    if (loading) return;
+    if (loading || !selfieB64) return;
     if (confirmPin.length !== 6) return;
     if (newPin !== confirmPin) {
-      setErr(t('reset_pin.error_mismatch'));
+      setPinErr(t('reset_pin.error_mismatch'));
       setConfirmPin('');
       return;
     }
     try {
       setLoading(true);
-      await resetPinByPhone(phone, newPin);
+      await resetPinByPhone(phone, selfieB64, newPin);
       setStep('done');
     } catch (e) {
       if (e instanceof AuthApiError) {
-        if (e.code === 'PIN_RESET_NOT_REQUIRED') {
-          setErr(t('reset_pin.error_already_ok'));
-        } else if (e.code === 'USER_NOT_FOUND') {
-          setErr(t('reset_pin.error_not_found'));
+        if (e.code === 'NOT_ENROLLED') {
+          setSelfieError({ kind: 'NOT_ENROLLED' });
+          setStep('selfie');
+          setSelfieB64(null);
+        } else if (e.code === 'FACE_MISMATCH') {
+          setSelfieError({ kind: 'FACE_MISMATCH', message: t('reset_pin.error_face_mismatch') });
+          setStep('selfie');
+          setSelfieB64(null);
+        } else if (e.code === 'VERIFICATION_UNAVAILABLE') {
+          setSelfieError({ kind: 'VERIFICATION_UNAVAILABLE', message: t('reset_pin.error_unavailable') });
+          setStep('selfie');
+          setSelfieB64(null);
         } else if (e.code === 'INVALID_PIN_FORMAT') {
-          setErr(t('reset_pin.error_invalid'));
+          setPinErr(t('reset_pin.error_invalid'));
+          setStep('pin');
         } else {
-          setErr(displayError(t, e.code, e.message));
+          setSelfieError({ kind: 'generic', message: e.message || t('reset_pin.error_network') });
+          setStep('selfie');
+          setSelfieB64(null);
         }
       } else {
-        setErr(t('reset_pin.error_network'));
+        setSelfieError({ kind: 'generic', message: t('reset_pin.error_network') });
+        setStep('selfie');
+        setSelfieB64(null);
       }
       setConfirmPin('');
-      setStep('new');
       setNewPin('');
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Done ─────────────────────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <div className="min-h-screen flex flex-col p-6 pt-16 items-center text-center">
@@ -95,6 +137,46 @@ export default function ResetPinScreen() {
     );
   }
 
+  // ── Selfie step ──────────────────────────────────────────────────────────
+  if (step === 'selfie') {
+    return (
+      <div className="min-h-screen flex flex-col p-6 pt-10">
+        <div className="flex items-center gap-3 mb-4">
+          <img src="/images/okapi.PNG" alt="Congo Gaming" className="h-10 w-auto object-contain" />
+          <div className="text-zinc-500 text-xs uppercase tracking-widest">{t('reset_pin.page_label')}</div>
+        </div>
+
+        <div className="bg-amber-900/30 border border-amber-700/40 rounded-2xl p-4 mb-5">
+          <div className="text-amber-200 font-display text-lg mb-1">{t('reset_pin.selfie_title')}</div>
+          <div className="text-amber-100/80 text-sm">{t('reset_pin.selfie_body')}</div>
+        </div>
+
+        {selfieError?.kind === 'NOT_ENROLLED' && (
+          <div className="mb-4 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4">
+            <div className="text-orange-300 font-display text-base mb-2">{t('reset_pin.error_not_enrolled_title')}</div>
+            <div className="text-orange-200/80 text-sm mb-3">{t('reset_pin.error_not_enrolled')}</div>
+            <a
+              href="https://wa.me/243000000000"
+              className="inline-flex items-center gap-2 text-sm text-orange-300 underline"
+            >
+              <HeadphonesIcon size={15} />
+              {t('reset_pin.contact_support')}
+            </a>
+          </div>
+        )}
+
+        {selfieError && selfieError.kind !== 'NOT_ENROLLED' && (
+          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+            {selfieError.message}
+          </div>
+        )}
+
+        <SelfieCaptureWidget onCapture={handleSelfieConfirmed} />
+      </div>
+    );
+  }
+
+  // ── PIN / Confirm steps ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col p-6 pt-10">
       <div className="flex items-center gap-3 mb-4">
@@ -104,10 +186,10 @@ export default function ResetPinScreen() {
 
       <div className="bg-amber-900/30 border border-amber-700/40 rounded-2xl p-4 mb-5">
         <div className="text-amber-200 font-display text-lg mb-1">
-          {step === 'new' ? t('reset_pin.create_title') : t('reset_pin.confirm_title')}
+          {step === 'pin' ? t('reset_pin.create_title') : t('reset_pin.confirm_title')}
         </div>
         <div className="text-amber-100/80 text-sm whitespace-pre-line">
-          {step === 'new' ? t('reset_pin.create_body') : t('reset_pin.warning_confirm')}
+          {step === 'pin' ? t('reset_pin.create_body') : t('reset_pin.warning_confirm')}
         </div>
       </div>
 
@@ -115,7 +197,7 @@ export default function ResetPinScreen() {
         <Lock className="w-6 h-6 text-gold" />
         <div className="flex-1">
           <div className="text-xs text-zinc-500">
-            {step === 'new' ? t('reset_pin.field_new') : t('reset_pin.field_confirm')}
+            {step === 'pin' ? t('reset_pin.field_new') : t('reset_pin.field_confirm')}
           </div>
           <div className="flex gap-2 mt-2">
             {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -134,7 +216,7 @@ export default function ResetPinScreen() {
         </div>
       </div>
 
-      {/* Hidden numeric input for native mobile keyboards if user taps */}
+      {/* Hidden numeric input for native mobile keyboards */}
       <input
         type="tel"
         inputMode="numeric"
@@ -146,14 +228,14 @@ export default function ResetPinScreen() {
         aria-hidden="true"
       />
 
-      {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
+      {pinErr && <div className="mt-3 text-red-400 text-sm">{pinErr}</div>}
       {loading && <div className="mt-3 text-gold text-sm">{t('reset_pin.updating')}</div>}
 
       <div className="mt-5">
         <NumPad onDigit={onDigit} onDelete={onDelete} />
       </div>
 
-      {step === 'new' && newPin.length === 6 && (
+      {step === 'pin' && newPin.length === 6 && (
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={goConfirm}
@@ -177,15 +259,28 @@ export default function ResetPinScreen() {
       {step === 'confirm' && (
         <button
           onClick={() => {
-            setStep('new');
+            setStep('pin');
             setConfirmPin('');
-            setErr(null);
+            setPinErr(null);
           }}
           className="mt-4 text-zinc-400 text-sm"
         >
           {t('reset_pin.restart')}
         </button>
       )}
+
+      <button
+        onClick={() => {
+          setStep('selfie');
+          setSelfieB64(null);
+          setSelfieError(null);
+          setNewPin('');
+          setConfirmPin('');
+        }}
+        className="mt-3 text-zinc-500 text-xs"
+      >
+        ← {t('reset_pin.retake_selfie')}
+      </button>
     </div>
   );
 }
