@@ -189,6 +189,27 @@ export default async function kycRoutes(app: FastifyInstance) {
         return reply.code(500).send({ error: updateErr.message });
       }
 
+      // ── Auto-enroll approved users into the verify collection ───────────
+      // Fire-and-forget: failure is intentionally non-fatal. If enrollment
+      // fails, the user simply falls back to NOT_ENROLLED behavior at
+      // reset-pin time, which is handled gracefully on the client.
+      // Only on approved — VERIFY_AGE and DENIED must not be enrolled.
+      if (kycStatus === 'approved') {
+        const enrollUrl = `${PG_PROXY_URL}/playguard/verify/enroll`;
+        void fetch(enrollUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'x-playguard-key': apiKey,
+          },
+          body: JSON.stringify({ image: selfie, externalId: userId }),
+          signal: AbortSignal.timeout(PG_PROXY_TIMEOUT_MS),
+        }).catch((e: any) => {
+          req.log.warn({ err: e?.message, userId }, 'PlayGuard verify/enroll fire-and-forget failed — user will be NOT_ENROLLED');
+        });
+      }
+
       return reply.send({
         verdict: wireVerdict,
         kyc_status: kycStatus,
