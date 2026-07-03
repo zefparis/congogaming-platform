@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { supabaseAdmin, adjustBalance } from '../lib/supabase.js';
-import { requireAdmin } from './admin.js';
+import { requireAdmin, requireSuperAdmin } from './admin.js';
 
 const OPENFOOTBALL_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
@@ -344,7 +344,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     };
   }>(
     '/api/predictions/resolve',
-    { preHandler: requireAdmin as (req: FastifyRequest, reply: FastifyReply) => Promise<void> },
+    { preHandler: [requireAdmin, requireSuperAdmin] as ((req: FastifyRequest, reply: FastifyReply) => Promise<void>)[] },
     async (req, reply) => {
       const { match_id, actual_score_home, actual_score_away } = req.body ?? {};
 
@@ -365,7 +365,16 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         .eq('status', 'pending');
 
       if (fetchErr) return reply.code(500).send({ error: fetchErr.message });
-      if (!preds || preds.length === 0) return reply.send({ ok: true, resolved: 0 });
+
+      const { data: existingRes, error: resCheckErr } = await supabaseAdmin
+        .from('match_resolutions')
+        .select('match_id')
+        .eq('match_id', match_id)
+        .maybeSingle();
+      if (resCheckErr) return reply.code(500).send({ error: resCheckErr.message });
+      if (existingRes) return reply.code(409).send({ error: 'ALREADY_RESOLVED' });
+
+      if (!preds || preds.length === 0) return reply.send({ ok: true, resolved: 0, won_count: 0, lost_count: 0, total_points_paid: 0 });
 
       let actual_winner: string | null = null;
       if (actual_score_home > actual_score_away) actual_winner = 'home';
@@ -373,6 +382,9 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       else actual_winner = 'draw';
 
       let resolved = 0;
+      let won_count = 0;
+      let lost_count = 0;
+      let total_points_paid = 0;
 
       for (const pred of preds) {
         let won = false;
@@ -390,6 +402,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
 
         const points_won = won ? (pred.points_wagered as number) * multiplier : 0;
         const status = won ? 'won' : 'lost';
+        if (won) { won_count++; total_points_paid += points_won; } else { lost_count++; }
 
         const { error: updateErr } = await supabaseAdmin
           .from('predictions')
@@ -415,7 +428,89 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         resolved++;
       }
 
-      return reply.send({ ok: true, resolved });
+      const resolvedBy = req.admin?.userId || null;
+      await supabaseAdmin.from('match_resolutions').insert({
+        match_id,
+        actual_score_home,
+        actual_score_away,
+        resolved_by: resolvedBy,
+        predictions_resolved_count: resolved,
+        total_points_paid,
+      });
+
+      return reply.send({ ok: true, resolved, won_count, lost_count, total_points_paid });
+    },
+  );
+
+  // GET /api/admin/predictions/pending (admin — read-only listing)
+  app.get(
+    '/api/admin/predictions/pending',
+    { preHandler: requireAdmin as (req: FastifyRequest, reply: FastifyReply) => Promise<void> },
+    async (_req, reply) => {
+      const { data, error } = await supabaseAdmin
+        .from('predictions')
+        .select('match_id, created_at')
+        .eq('status', 'pending');
+      if (error) return reply.code(500).send({ error: error.message });
+
+      const grouped = new Map<string, { count: number; oldest: string }>();
+      for (const pred of data || []) {
+        const key = String(pred.match_id);
+        const existing = grouped.get(key);
+        if (!existing) {
+          grouped.set(key, { count: 1, oldest: String(pred.created_at) });
+        } else {
+          existing.count++;
+          if (String(pred.created_at) < existing.oldest) existing.oldest = String(pred.created_at);
+        }
+      }
+
+      const pending = Array.from(grouped.entries())
+        .map(([match_id, { count, oldest }]) => ({
+          match_id,
+          pending_count: count,
+          oldest_at: oldest,
+        }))
+        .sort((a, b) => a.oldest_at.localeCompare(b.oldest_at));
+
+      return reply.send({ pending });
+    },
+  );
+
+  // GET /api/admin/predictions/resolved (admin — history view)
+  app.get(
+    '/api/admin/predictions/resolved',
+    { preHandler: requireAdmin as (req: FastifyRequest, reply: FastifyReply) => Promise<void> },
+    async (_req, reply) => {
+      const { data: rows, error } = await supabaseAdmin
+        .from('match_resolutions')
+        .select('match_id, actual_score_home, actual_score_away, resolved_by, resolved_at, predictions_resolved_count, total_points_paid')
+        .order('resolved_at', { ascending: false });
+      if (error) return reply.code(500).send({ error: error.message });
+
+      const resolverIds = [...new Set(
+        (rows || []).map(r => r.resolved_by).filter(Boolean) as string[]
+      )];
+      const phoneMap = new Map<string, string>();
+      if (resolverIds.length > 0) {
+        const { data: users } = await supabaseAdmin
+          .from('users')
+          .select('id, phone')
+          .in('id', resolverIds);
+        for (const u of users || []) phoneMap.set(u.id, u.phone);
+      }
+
+      const resolutions = (rows || []).map(r => ({
+        match_id: r.match_id,
+        actual_score_home: r.actual_score_home,
+        actual_score_away: r.actual_score_away,
+        resolved_by_phone: r.resolved_by ? (phoneMap.get(r.resolved_by) ?? null) : null,
+        resolved_at: r.resolved_at,
+        predictions_resolved_count: r.predictions_resolved_count,
+        total_points_paid: Number(r.total_points_paid),
+      }));
+
+      return reply.send({ resolutions });
     },
   );
 }
