@@ -74,8 +74,7 @@ export default function KycScreen() {
 
   // After a successful (APPROVED or VERIFY_AGE) scan, bounce the user to
   // wherever they were trying to go before being intercepted by the KYC
-  // gate — typically /jouer (PredictStreet). We default to home if no
-  // intended destination was recorded.
+  // gate. We default to home if no intended destination was recorded.
   function consumeKycRedirect(): string {
     try {
       const dest = localStorage.getItem('kyc_redirect');

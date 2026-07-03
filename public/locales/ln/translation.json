@@ -488,8 +488,8 @@
     "UNKNOWN_ERROR": "Likambo ebimaki"
   },
   "kyc": {
-    "title": "Vérification esengami po na PredictStreet",
-    "subtitle": "Mabeti ya FIFA 2026 esengaka vérification ya bambula.",
+    "title": "Vérification ya bambula esengami",
+    "subtitle": "Vérification ya identité esengami po ba fonctionnalités moko.",
     "camera_denied": "Accès na caméra ebandisami te. Pesá accès na caméra na paramètres ya navigateur.",
     "camera_error": "Ekoki te kozwa caméra.",
     "verify_failed": "Vérification ekweaki. Sala lisusu.",

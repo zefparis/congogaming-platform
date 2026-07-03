@@ -185,7 +185,6 @@ export default function OverviewTab() {
                 KYC — Vérification d'âge PlayGuard
               </h3>
             </div>
-            <span className="text-xs text-white/40">Conformité PredictStreet</span>
           </div>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm text-white/80">
             <div>

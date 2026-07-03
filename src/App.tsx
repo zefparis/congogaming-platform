@@ -6,7 +6,6 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ResetPinScreen from './screens/ResetPinScreen';
 import HomeScreen from './screens/HomeScreen';
-import GameScreen from './screens/GameScreen';
 import DepositScreen from './screens/DepositScreen';
 import WithdrawScreen from './screens/WithdrawScreen';
 import AccountScreen from './screens/AccountScreen';
@@ -20,10 +19,8 @@ import LegalScreen from './screens/LegalScreen';
 import OkapiGame from './screens/okapi/OkapiGame';
 import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
-import PredictStreetTestScreen from './screens/PredictStreetTestScreen';
 import PredictionsScreen from './screens/PredictionsScreen';
 import MesParis from './screens/MesParis';
-import DebugPredictStreetScreen from './screens/DebugPredictStreetScreen';
 import BottomNav from './components/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
 import { LanguageToggle } from './components/LanguageToggle';
@@ -58,20 +55,14 @@ function Protected({ children }: { children: React.ReactNode }) {
     clearSession();
     return <Navigate to="/splash" replace />;
   }
-  // KYC is no longer a global gate. It's enforced ONLY on the PredictStreet
-  // sports-betting route (/jouer) via `PredictStreetRoute` below. All other
-  // games (Climb, Loto, Flash, Scratch) and account pages are reachable
-  // immediately after registration regardless of `kyc_status`.
   return <>{children}</>;
 }
 
 /**
- * Sports-betting (PredictStreet) gate. FIFA WC26 betting requires a
- * verified identity per the PredictStreet contract, so we redirect users
- * with a `pending` KYC status to /kyc (preserving the intended
- * destination in localStorage so KycScreen can bounce them back here).
+ * KYC-required route gate. Redirects users with pending KYC status to /kyc.
+ * Used for features that require verified identity (e.g., predictions).
  */
-function PredictStreetRoute({ children, dest = '/jouer' }: { children: React.ReactNode; dest?: string }) {
+function KycRequiredRoute({ children, dest = '/predictions' }: { children: React.ReactNode; dest?: string }) {
   const session = getSession();
   if (!session) return <Navigate to="/splash" replace />;
   if (session.blocked || session.kyc_status === 'denied') {
@@ -121,16 +112,6 @@ function AppRoutes() {
           <Route path="/register" element={<PageWrap><RegisterScreen /></PageWrap>} />
           <Route path="/reset-pin" element={<PageWrap><ResetPinScreen /></PageWrap>} />
           <Route path="/" element={<Protected><PageWrap><HomeScreen /></PageWrap></Protected>} />
-          <Route
-            path="/jouer"
-            element={
-              <Protected>
-                <PredictStreetRoute>
-                  <PageWrap><GameScreen /></PageWrap>
-                </PredictStreetRoute>
-              </Protected>
-            }
-          />
           <Route path="/depot" element={<Protected><PageWrap><DepositScreen /></PageWrap></Protected>} />
           <Route path="/retrait" element={<Protected><PageWrap><WithdrawScreen /></PageWrap></Protected>} />
           <Route path="/compte" element={<Protected><PageWrap><AccountScreen /></PageWrap></Protected>} />
@@ -145,15 +126,13 @@ function AppRoutes() {
             path="/predictions"
             element={
               <Protected>
-                <PredictStreetRoute dest="/predictions">
+                <KycRequiredRoute dest="/predictions">
                   <PageWrap><PredictionsScreen /></PageWrap>
-                </PredictStreetRoute>
+                </KycRequiredRoute>
               </Protected>
             }
           />
           <Route path="/mes-paris" element={<Protected><PageWrap><MesParis /></PageWrap></Protected>} />
-          <Route path="/predictstreet-test" element={<PredictStreetTestScreen />} />
-          <Route path="/debug/predictstreet" element={<Protected><PageWrap><DebugPredictStreetScreen /></PageWrap></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
