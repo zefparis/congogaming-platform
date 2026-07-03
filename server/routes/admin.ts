@@ -163,6 +163,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   // the token. There is no anonymous / legacy admin login.
   app.post<{ Body: { secret?: string; phone?: string } }>(
     '/api/admin/auth',
+    { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
     async (req, reply) => {
       const provided = String(req.body?.secret || '');
       const expected = process.env.LOTO_ADMIN_SECRET || '';
