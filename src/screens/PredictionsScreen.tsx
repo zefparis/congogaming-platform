@@ -187,7 +187,7 @@ export default function PredictionsScreen() {
               background: 'linear-gradient(135deg,#CE1126 0%,#8B0000 100%)',
               color: '#fff', fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
               padding: '3px 9px', borderRadius: 4, textTransform: 'uppercase',
-            }}>🏆 FIFA WC 2026</span>
+            }}>{t('predictions.fifa_badge')}</span>
             <span style={{
               background: 'rgba(255,215,0,0.1)', color: '#FFD700',
               fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
@@ -263,7 +263,7 @@ export default function PredictionsScreen() {
         {/* Matches section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontFamily: 'Bebas Neue', fontSize: 22, color: '#fff', letterSpacing: 2 }}>
-            ⚽ MATCHS
+            {t('predictions.matchs')}
           </div>
           <button type="button" onClick={loadData} style={{
             background: 'none', border: 'none', cursor: 'pointer',
@@ -275,7 +275,7 @@ export default function PredictionsScreen() {
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
-            Chargement…
+            {t('predictions.chargement')}
           </div>
         ) : matches.length === 0 ? (
           <div style={{
@@ -283,7 +283,7 @@ export default function PredictionsScreen() {
             border: '1px solid rgba(255,255,255,0.07)', padding: '32px 16px',
             textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13, marginBottom: 24,
           }}>
-            Aucun match disponible pour le moment
+            {t('predictions.aucun_match')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
@@ -434,11 +434,11 @@ export default function PredictionsScreen() {
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <Trophy size={18} style={{ color: '#FFD700' }} />
-            CLASSEMENT
+            {t('predictions.classement')}
           </div>
           {leaderboard.length === 0 ? (
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '12px 0' }}>
-              Aucun pronostic encore soumis
+              {t('predictions.aucun_pronostic')}
             </div>
           ) : leaderboard.map((entry, i) => {
             const name = entry.display_name

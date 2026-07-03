@@ -107,18 +107,18 @@ export default function RegisterScreen() {
       {agentRef && (
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/8 p-4">
           <div className="flex-1">
-            <p className="text-xs text-zinc-400 mb-2">Vous avez déjà un compte ?</p>
+            <p className="text-xs text-zinc-400 mb-2">{t('register.already_account')}</p>
             <button
               onClick={() => nav(`/login?ref=${agentRef}`)}
               className="w-full rounded-xl bg-zinc-800 border border-zinc-700 py-2 text-sm font-semibold text-gold"
             >
-              Se connecter
+              {t('register.sign_in')}
             </button>
           </div>
           <span className="text-zinc-600 text-xs px-1">ou</span>
           <div className="flex-1 text-center">
-            <p className="text-xs text-zinc-400 mb-2">Nouveau ?</p>
-            <p className="text-sm font-semibold text-white">Créer un compte</p>
+            <p className="text-xs text-zinc-400 mb-2">{t('register.new_user')}</p>
+            <p className="text-sm font-semibold text-white">{t('register.create_account')}</p>
           </div>
         </div>
       )}

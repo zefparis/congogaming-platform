@@ -209,7 +209,7 @@ export default function MesParis() {
       <div style={{ padding: '14px 14px 100px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
-            Chargement…
+            {t('predictions.chargement')}
           </div>
         ) : preds.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 16px' }}>

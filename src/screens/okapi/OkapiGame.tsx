@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 import { gameSocket } from '../../lib/okapi-socket'
@@ -30,6 +31,7 @@ const BG_MAP: Record<BgKey, string> = {
 
 export default function OkapiGame() {
   const nav = useNavigate()
+  const { t } = useTranslation()
   const session = getSession()
   const userId = session?.id ?? ''
   // Always start at 0; the real balance is fetched from the backend on mount.
@@ -527,16 +529,16 @@ export default function OkapiGame() {
     } catch (err: any) {
       // No optimistic update happened, so nothing to roll back. Surface error.
       const raw = String(err?.message || '')
-      let label = 'Mise refusée'
+      let label = t('okapi.bet_refused')
       // 409 = round not in WAITING phase. Lock the bet button until the next
       // WAITING socket event so the user can't spam the server.
       const isConflict =
         raw.includes('409') ||
         raw.includes('Betting closed') ||
         raw.includes('Game not running')
-      if (raw.includes('Insufficient')) label = 'Solde insuffisant'
-      else if (isConflict) label = 'Tour en cours, patientez'
-      else if (raw.includes('Invalid bet')) label = 'Montant invalide'
+      if (raw.includes('Insufficient')) label = t('okapi.balance_insufficient')
+      else if (isConflict) label = t('okapi.round_in_progress')
+      else if (raw.includes('Invalid bet')) label = t('okapi.invalid_bet')
       if (isConflict) setBetLocked(true)
       // eslint-disable-next-line no-console
       console.error('[okapi] placeBet failed:', raw)
@@ -568,7 +570,7 @@ export default function OkapiGame() {
     }
     // Check local balance before attempting bet
     if (balance < sess.cfg.amount) {
-      setAutoError('Solde insuffisant — session auto arrêtée')
+      setAutoError(t('okapi.auto_stopped'))
       autoStopRequestedRef.current = true
       // Stop the session immediately
       const sid = sess.id
@@ -603,12 +605,12 @@ export default function OkapiGame() {
       console.error('[okapi auto] placeBet failed:', raw)
       // Surface the actual cause to the UI so we know whether it's a
       // timing issue (409 Betting closed), balance, or something else.
-      let label = 'Mise refusée'
-      if (raw.includes('Insufficient')) label = 'Solde insuffisant'
+      let label = t('okapi.bet_refused')
+      if (raw.includes('Insufficient')) label = t('okapi.balance_insufficient')
       else if (raw.includes('409') || raw.includes('Betting closed'))
-        label = 'Pari en retard (409)'
-      else if (raw.includes('Invalid bet')) label = 'Montant invalide'
-      else if (raw.includes('Failed to fetch')) label = 'API injoignable'
+        label = t('okapi.late_bet')
+      else if (raw.includes('Invalid bet')) label = t('okapi.invalid_bet')
+      else if (raw.includes('Failed to fetch')) label = t('okapi.api_unreachable')
       setAutoError(`${label} — ${raw.slice(0, 80)}`)
       autoCurrentBetAmountRef.current = 0
       return false
@@ -697,7 +699,7 @@ export default function OkapiGame() {
       // Network blip: don't kill the loop, just log and continue.
       // eslint-disable-next-line no-console
       console.error('[okapi auto] progress failed:', err?.message)
-      setAutoError('Erreur réseau (continuera au prochain round)')
+      setAutoError(t('okapi.network_error'))
       // Keep local counters approximately in sync.
       setAutoRoundsPlayed((r) => r + 1)
       setAutoTotalPnl((p) => p + delta)
@@ -740,11 +742,11 @@ export default function OkapiGame() {
         // Surface the actual cause so the player sees why nothing happened
         // (typical causes: backend not redeployed -> 404, missing migration
         // -> 500 referencing okapi_auto_sessions, or RLS misconfig).
-        let label = 'Impossible de démarrer la session auto'
-        if (raw.includes('404')) label = 'Backend pas à jour (404) — redéploie l\'API'
-        else if (raw.includes('okapi_auto_sessions')) label = 'Migration Supabase manquante'
-        else if (raw.includes('500')) label = 'Erreur serveur (voir console)'
-        else if (raw.includes('Failed to fetch')) label = 'API injoignable'
+        let label = t('okapi.auto_start_error')
+        if (raw.includes('404')) label = t('okapi.backend_404')
+        else if (raw.includes('okapi_auto_sessions')) label = t('okapi.migration_missing')
+        else if (raw.includes('500')) label = t('okapi.server_error')
+        else if (raw.includes('Failed to fetch')) label = t('okapi.api_unreachable')
         setAutoError(label)
       }
     },

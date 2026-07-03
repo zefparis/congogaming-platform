@@ -679,9 +679,9 @@ export default function ScratchScreen() {
         >
           <span style={{ fontSize: 20 }}>🎟️</span>
           <span style={{ color: '#FFD700', fontWeight: 800, fontSize: 14, flex: 1, textAlign: 'left' }}>
-            {freePlaysAvailable} Free Play{freePlaysAvailable > 1 ? 's' : ''} disponible{freePlaysAvailable > 1 ? 's' : ''}
+            {freePlaysAvailable} {freePlaysAvailable > 1 ? t('scratch.free_play_plural') : t('scratch.free_play_singular')}
           </span>
-          <span style={{ color: '#FFD700', fontSize: 13, opacity: 0.8 }}>Jouer →</span>
+          <span style={{ color: '#FFD700', fontSize: 13, opacity: 0.8 }}>{t('scratch.play_btn')}</span>
         </button>
       )}
 

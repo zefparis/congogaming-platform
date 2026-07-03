@@ -64,7 +64,10 @@
     "bet_placed": "Stake: {{amount}} CDF",
     "no_luck": "Better luck next time...",
     "try_again": "Try again!",
-    "play_again": "PLAY AGAIN"
+    "play_again": "PLAY AGAIN",
+    "free_play_singular": "Free Play available",
+    "free_play_plural": "Free Plays available",
+    "play_btn": "Play →"
   },
   "okapi_color": {
     "header_title": "OKAPI COLOR",
@@ -258,7 +261,11 @@
     "back": "← Back",
     "error_phone": "Invalid DRC number (10 digits)",
     "error_adult": "You must be 18 years or older",
-    "error_blocked": "Account blocked."
+    "error_blocked": "Account blocked.",
+    "already_account": "Already have an account?",
+    "sign_in": "Sign in",
+    "new_user": "New here?",
+    "create_account": "Create an account"
   },
   "reset_pin": {
     "page_label": "Secret code",
@@ -376,7 +383,20 @@
     "voir_paris_match": "See my bets",
     "balance_insuffisante": "Insufficient balance",
     "pari_enregistre": "Bet placed!",
-    "kyc_required": "Verification required before betting"
+    "kyc_required": "Verification required before betting",
+    "fifa_badge": "🏆 FIFA WC 2026",
+    "matchs": "⚽ MATCHES",
+    "chargement": "Loading…",
+    "aucun_match": "No matches available at the moment",
+    "classement": "LEADERBOARD",
+    "aucun_pronostic": "No predictions submitted yet",
+    "donnees_invalides": "Invalid data",
+    "erreur_serveur": "Server error",
+    "erreur_reseau": "Network error. Please retry.",
+    "type_pronostic": "PREDICTION TYPE",
+    "score_final": "FINAL SCORE",
+    "cdf_mises": "CDF wagered",
+    "gain_potentiel": "Potential gain"
   },
   "loto": {
     "balance_display": "💰 Balance: {{amount}} CDF",
@@ -466,5 +486,43 @@
     "PROFILE_UPDATE_FAILED": "Profile update error",
     "AUTH_ERROR": "Authentication error",
     "UNKNOWN_ERROR": "An error occurred"
+  },
+  "kyc": {
+    "title": "Verification required for PredictStreet",
+    "subtitle": "FIFA 2026 sports betting requires age verification.",
+    "camera_denied": "Camera access denied. Please enable camera in your browser settings.",
+    "camera_error": "Unable to access camera.",
+    "verify_failed": "Verification failed. Please try again.",
+    "look_straight": "Look straight ahead",
+    "take_photo": "TAKE PHOTO",
+    "check_face": "Make sure your face is well framed",
+    "retake": "RETAKE",
+    "confirm": "CONFIRM",
+    "verifying": "VERIFYING…",
+    "biometric": "Secure biometric analysis",
+    "approved": "IDENTITY VERIFIED",
+    "welcome": "Welcome to Congo Gaming.",
+    "age_estimate": "Estimated age: {{age}} yrs",
+    "age_range": "Estimated age: {{low}}–{{high}} yrs",
+    "continue": "CONTINUE",
+    "denied": "ACCESS DENIED",
+    "denied_msg": "You must be 18 or older to use Congo Gaming.",
+    "understood": "UNDERSTOOD",
+    "age_uncertain": "AGE UNCERTAIN",
+    "age_uncertain_msg": "Your account will be manually reviewed by our team. You may continue while awaiting validation."
+  },
+  "okapi": {
+    "bet_refused": "Bet refused",
+    "balance_insufficient": "Insufficient balance",
+    "round_in_progress": "Round in progress, please wait",
+    "invalid_bet": "Invalid bet amount",
+    "auto_stopped": "Insufficient balance — auto session stopped",
+    "late_bet": "Late bet (409)",
+    "api_unreachable": "API unreachable",
+    "network_error": "Network error (will resume next round)",
+    "auto_start_error": "Unable to start auto session",
+    "backend_404": "Backend outdated (404) — redeploy API",
+    "migration_missing": "Supabase migration missing",
+    "server_error": "Server error (check console)"
   }
 }
