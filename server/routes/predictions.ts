@@ -130,6 +130,9 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       if (prediction_type === 'winner' && !predicted_winner) {
         return reply.code(400).send({ error: 'MISSING_PREDICTED_WINNER' });
       }
+      if (prediction_type === 'winner' && predicted_winner && predicted_winner.length > 100) {
+        return reply.code(400).send({ error: 'INVALID_PREDICTED_WINNER' });
+      }
       if (
         prediction_type === 'score_exact' &&
         (predicted_score_home === undefined || predicted_score_away === undefined)
@@ -256,18 +259,20 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     const userIds = top10.map(([id]) => id);
     const { data: users } = await supabaseAdmin
       .from('users')
-      .select('id, display_name, phone')
+      .select('id, display_name')
       .in('id', userIds);
 
     const userMap = new Map((users ?? []).map((u) => [u.id, u]));
 
     const leaderboard = top10.map(([user_id, total_points_won]) => {
       const u = userMap.get(user_id);
+      const displayName =
+        u?.display_name ||
+        `Joueur ${user_id.replace(/-/g, '').slice(-4).toUpperCase()}`;
       return {
         user_id,
         total_points_won,
-        display_name: u?.display_name ?? null,
-        phone: u?.phone ?? null,
+        display_name: displayName,
       };
     });
 
@@ -329,13 +334,14 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { match_id, actual_score_home, actual_score_away } = req.body ?? {};
 
-      if (
-        !match_id ||
-        typeof match_id !== 'string' ||
-        actual_score_home === undefined ||
-        actual_score_away === undefined
-      ) {
+      if (!match_id || typeof match_id !== 'string') {
         return reply.code(400).send({ error: 'INVALID_INPUT' });
+      }
+      if (
+        !Number.isInteger(actual_score_home) || actual_score_home < 0 ||
+        !Number.isInteger(actual_score_away) || actual_score_away < 0
+      ) {
+        return reply.code(400).send({ error: 'INVALID_SCORE' });
       }
 
       const { data: preds, error: fetchErr } = await supabaseAdmin
