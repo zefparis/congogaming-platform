@@ -332,13 +332,14 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { match_id, actual_score_home, actual_score_away } = req.body ?? {};
 
-      if (
-        !match_id ||
-        typeof match_id !== 'string' ||
-        actual_score_home === undefined ||
-        actual_score_away === undefined
-      ) {
+      if (!match_id || typeof match_id !== 'string') {
         return reply.code(400).send({ error: 'INVALID_INPUT' });
+      }
+      if (
+        !Number.isInteger(actual_score_home) || actual_score_home < 0 ||
+        !Number.isInteger(actual_score_away) || actual_score_away < 0
+      ) {
+        return reply.code(400).send({ error: 'INVALID_SCORE' });
       }
 
       const { data: preds, error: fetchErr } = await supabaseAdmin
