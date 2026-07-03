@@ -75,14 +75,28 @@ async function fetchLiveMatches(): Promise<LiveMatch[]> {
         const home = competitors.find((c: Record<string, unknown>) => c.homeAway === 'home') ?? {};
         const away = competitors.find((c: Record<string, unknown>) => c.homeAway === 'away') ?? {};
         const status = (comps?.status as Record<string, unknown>)?.type as Record<string, unknown>;
+        // ESPN status.type.name values observed:
+        // - STATUS_SCHEDULED
+        // - STATUS_IN_PROGRESS
+        // - STATUS_FULL_TIME (regulation 90 min finish)
+        // - STATUS_FINAL_AET (after extra time)
+        // - STATUS_FINAL_PEN (after penalties, if distinct from AET)
+        // - STATUS_FINAL (generic final, rarely seen in World Cup data)
+        const statusName = String(status?.name ?? '');
+        const isFinal = [
+          'STATUS_FINAL',
+          'STATUS_FULL_TIME',
+          'STATUS_FINAL_AET',
+          'STATUS_FINAL_PEN',
+        ].includes(statusName);
         return {
           id:     String(e.id ?? ''),
           team1:  String((home.team as Record<string, unknown>)?.displayName ?? ''),
           team2:  String((away.team as Record<string, unknown>)?.displayName ?? ''),
           score1: parseInt(String(home.score ?? '0'), 10),
           score2: parseInt(String(away.score ?? '0'), 10),
-          status: (status?.name === 'STATUS_IN_PROGRESS' ? 'in_progress'
-                : status?.name === 'STATUS_FINAL' ? 'final'
+          status: (statusName === 'STATUS_IN_PROGRESS' ? 'in_progress'
+                : isFinal ? 'final'
                 : 'scheduled') as LiveMatch['status'],
           clock:  String((comps?.status as Record<string, unknown>)?.displayClock ?? ''),
           date:   String(e.date ?? ''),
@@ -356,6 +370,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       let actual_winner: string | null = null;
       if (actual_score_home > actual_score_away) actual_winner = 'home';
       else if (actual_score_away > actual_score_home) actual_winner = 'away';
+      else actual_winner = 'draw';
 
       let resolved = 0;
 

@@ -17,7 +17,7 @@ export type RawMatch = {
   time?: string;
   team1?: RawTeam;
   team2?: RawTeam;
-  score?: { ft?: number[] } | null;
+  score?: { ft?: number[]; et?: number[]; p?: number[] } | null;
   round?: string;
   group?: string;
   venue?: string;
@@ -27,6 +27,33 @@ export function teamName(t: RawTeam | undefined): string {
   if (!t) return '?';
   if (typeof t === 'string') return t;
   return t.name ?? '?';
+}
+
+/**
+ * Returns the decisive score for a match in priority order:
+ * - p (penalties) if present
+ * - et (extra time) if present
+ * - ft (full time) if present
+ * - null if none present
+ */
+export function finalScore(m: RawMatch): number[] | null {
+  const s = m.score;
+  if (!s) return null;
+  if (s.p && s.p.length >= 2) return s.p;
+  if (s.et && s.et.length >= 2) return s.et;
+  if (s.ft && s.ft.length >= 2) return s.ft;
+  return null;
+}
+
+/**
+ * Returns whether a match has any recorded score (ft, et, or p).
+ */
+export function isPlayed(m: RawMatch): boolean {
+  const s = m.score;
+  if (!s) return false;
+  return !!(s.ft && s.ft.length >= 2) ||
+         !!(s.et && s.et.length >= 2) ||
+         !!(s.p && s.p.length >= 2);
 }
 
 export const FLAGS: Record<string, string> = {

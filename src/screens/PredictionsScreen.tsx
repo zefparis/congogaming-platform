@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
-import { teamName, FLAGS, type RawMatch, type LiveMatch } from './predictionsShared';
+import { teamName, FLAGS, type RawMatch, type LiveMatch, isPlayed, finalScore } from './predictionsShared';
 import { getSession } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 
@@ -58,10 +58,6 @@ type LeaderboardEntry = {
   display_name: string | null;
   phone: string | null;
 };
-
-function isPlayed(m: RawMatch): boolean {
-  return !!(m.score?.ft && m.score.ft.length >= 2);
-}
 
 function formatDate(d: string): string {
   try {
@@ -289,12 +285,23 @@ export default function PredictionsScreen() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
             {matches.map((m, i) => {
               const played = isPlayed(m);
-              const score = m.score?.ft;
+              const score = finalScore(m);
+              const ftScore = m.score?.ft;
+              const pScore = m.score?.p;
               const home = resolveTeamName(teamName(m.team1));
               const away = resolveTeamName(teamName(m.team2));
               const liveData = getLiveData(m, liveMatches);
               const isLive = liveData?.status === 'in_progress';
               const isFinal = played || liveData?.status === 'final';
+
+              // Format score display: ft score with penalty suffix if applicable
+              const scoreDisplay = played
+                ? ftScore && pScore
+                  ? `${ftScore[0]} – ${ftScore[1]} (pen. ${pScore[0]}–${pScore[1]})`
+                  : score
+                    ? `${score[0]} – ${score[1]}`
+                    : '– –'
+                : '– –';
               return (
                 <motion.div
                   layout
@@ -385,7 +392,7 @@ export default function PredictionsScreen() {
                           {isFinal ? (
                             <>
                               <div style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700', letterSpacing: 2 }}>
-                                {score ? `${score[0]} – ${score[1]}` : liveData ? `${liveData.score1} – ${liveData.score2}` : '– –'}
+                                {scoreDisplay}
                               </div>
                               <div style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2, fontWeight: 700 }}>{t('predictions.termine')}</div>
                             </>
