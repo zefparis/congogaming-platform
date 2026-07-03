@@ -124,8 +124,8 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       if (prediction_type !== 'winner' && prediction_type !== 'score_exact') {
         return reply.code(400).send({ error: 'INVALID_PREDICTION_TYPE' });
       }
-      if (!Number.isInteger(points_wagered) || points_wagered <= 0) {
-        return reply.code(400).send({ error: 'INVALID_POINTS_WAGERED' });
+      if (!Number.isInteger(points_wagered) || points_wagered < 100 || points_wagered > 10000) {
+        return reply.code(400).send({ error: 'INVALID_AMOUNT' });
       }
       if (prediction_type === 'winner' && !predicted_winner) {
         return reply.code(400).send({ error: 'MISSING_PREDICTED_WINNER' });
@@ -139,6 +139,35 @@ export default async function predictionsRoutes(app: FastifyInstance) {
 
       const user_id = req.user.id;
 
+      // (b) Check match is not finished
+      const liveMatch = liveCache?.data.find((m) => m.id === match_id);
+      if (liveMatch?.status === 'final') {
+        return reply.code(400).send({ error: 'MATCH_FINISHED' });
+      }
+      const upcomingMatch = (matchCache?.data as MatchRaw[])?.find(
+        (m) => String(m.num ?? '') === match_id,
+      );
+      if (upcomingMatch?.score != null) {
+        return reply.code(400).send({ error: 'MATCH_FINISHED' });
+      }
+
+      // (c) Check no duplicate bet
+      const { data: existingBet, error: dupErr } = await supabaseAdmin
+        .from('predictions')
+        .select('id')
+        .eq('user_id', user_id)
+        .eq('match_id', match_id)
+        .in('status', ['pending', 'won', 'lost'])
+        .maybeSingle();
+      if (dupErr) {
+        req.log.error({ err: dupErr }, '[predictions/create] duplicate check failed');
+        return reply.code(500).send({ error: 'SERVER_ERROR' });
+      }
+      if (existingBet) {
+        return reply.code(409).send({ error: 'ALREADY_BET', message: 'Vous avez déjà parié sur ce match' });
+      }
+
+      // (d) Check balance sufficient
       try {
         await adjustBalance(user_id, -points_wagered);
       } catch {
