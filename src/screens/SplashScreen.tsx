@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getSession } from '../lib/auth';
 
 /* ── Design tokens ─────────────────────────────────────────── */
@@ -16,6 +17,7 @@ const fadeUp = (delay = 0) => ({
 
 
 export default function SplashScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
 
   useEffect(() => {
