@@ -5,6 +5,7 @@ import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
 import { teamName, FLAGS, type RawMatch, type LiveMatch } from './predictionsShared';
 import { getSession } from '../lib/auth';
+import { useTranslation } from 'react-i18next';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
@@ -91,6 +92,7 @@ function isToday(dateStr: string): boolean {
 }
 
 export default function PredictionsScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [matches, setMatches] = useState<RawMatch[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -201,36 +203,36 @@ export default function PredictionsScreen() {
                 border: '1px solid rgba(74,222,128,0.3)',
               }}>
                 <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', flexShrink: 0 }} />
-                EN DIRECT
+                {t('predictions.en_direct').toUpperCase()}
               </span>
             )}
           </div>
           <div style={{ fontFamily: 'Bebas Neue', fontSize: 42, color: '#fff', lineHeight: 1, letterSpacing: 1 }}>
-            PRONOSTIQUEZ
+            {t('predictions.title').toUpperCase().split(' & ')[0]}
           </div>
           <div style={{ fontFamily: 'Bebas Neue', fontSize: 52, color: '#FFD700', lineHeight: 1, letterSpacing: 1, marginBottom: 8 }}>
-            &amp; GAGNEZ
+            {'& ' + (t('predictions.title').split(' & ')[1] ?? '').toUpperCase()}
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-            Misez vos points CDF sur les matchs de la Coupe du Monde
+            {t('predictions.subtitle')}
           </div>
           {pendingCount > 0 && (
             <div style={{ marginTop: 10, fontSize: 11, color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: 0.5 }}>
-              ⚡ {pendingCount} match{pendingCount > 1 ? 's' : ''} restant{pendingCount > 1 ? 's' : ''}
+              ⚡ {t('predictions.matches_left', { count: pendingCount })}
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>🎯 {userStats.placed}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>paris placés</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{t('predictions.paris_places')}</div>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>✅ {userStats.won}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>gagnés</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{t('predictions.paris_gagnes')}</div>
             </div>
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#FFD700', lineHeight: 1 }}>💰 {userStats.cdfWon}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>CDF gagnés</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{t('predictions.cdf_gagnes')}</div>
             </div>
           </div>
           <button
@@ -248,9 +250,9 @@ export default function PredictionsScreen() {
               gap: 2,
             }}
           >
-            📋 VOIR MES PARIS →
+            📋 {t('predictions.voir_mes_paris')}
             <span style={{ fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: 0.3, color: 'rgba(10,5,0,0.6)', marginTop: 1 }}>
-              Suivez vos pronostics en cours
+              {t('predictions.mes_paris_subtitle')}
             </span>
           </button>
         </div>
@@ -328,7 +330,7 @@ export default function PredictionsScreen() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block', flexShrink: 0 }} />
-                          <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 2 }}>EN DIRECT</span>
+                          <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 2 }}>{t('predictions.en_direct').toUpperCase()}</span>
                         </span>
                         <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontFamily: 'monospace' }}>
                           {liveData!.clock ? `${liveData!.clock}'` : ''}
@@ -355,7 +357,7 @@ export default function PredictionsScreen() {
                           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
                           color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 800,
                           textTransform: 'uppercase', letterSpacing: 2, cursor: 'pointer',
-                        }}>👁️ VOIR MES PARIS</button>
+                        }}>👁️ {t('predictions.voir_paris_match').toUpperCase()}</button>
                       </div>
                     </>
                   ) : (
@@ -367,7 +369,7 @@ export default function PredictionsScreen() {
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {isFinal && (
-                            <span style={{ fontSize: 9, fontWeight: 800, color: '#4ade80', letterSpacing: 1 }}>✅ TERMINÉ</span>
+                            <span style={{ fontSize: 9, fontWeight: 800, color: '#4ade80', letterSpacing: 1 }}>✅ {t('predictions.termine').toUpperCase()}</span>
                           )}
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
                             {formatDate(m.date)}{m.time ? ` · ${m.time}` : ''}
@@ -385,7 +387,7 @@ export default function PredictionsScreen() {
                               <div style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: '#FFD700', letterSpacing: 2 }}>
                                 {score ? `${score[0]} – ${score[1]}` : liveData ? `${liveData.score1} – ${liveData.score2}` : '– –'}
                               </div>
-                              <div style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2, fontWeight: 700 }}>Terminé</div>
+                              <div style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2, fontWeight: 700 }}>{t('predictions.termine')}</div>
                             </>
                           ) : (
                             <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: 'rgba(255,255,255,0.25)', letterSpacing: 2 }}>VS</div>
@@ -410,7 +412,7 @@ export default function PredictionsScreen() {
                             boxShadow: '0 4px 16px rgba(217,164,0,0.35)',
                           }}
                         >
-                          ⚡ PRONOSTIQUER
+                          ⚡ {t('predictions.pronostiquer').toUpperCase()}
                         </motion.button>
                       )}
                     </>

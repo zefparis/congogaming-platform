@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { getSession } from '../lib/auth';
+import { useTranslation } from 'react-i18next';
 import { FLAGS } from './predictionsShared';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
@@ -98,9 +99,6 @@ const CARD_S = {
   },
 } as const;
 
-const BADGE_LABEL: Record<string, string> = {
-  won: '✅ GAGNÉ', pending: '⏳ EN COURS', lost: '❌ PERDU', cancelled: '↩️ ANNULÉ',
-};
 
 const KF = `
 @keyframes goldPulseGlow {
@@ -117,6 +115,13 @@ const KF = `
 `;
 
 export default function MesParis() {
+  const { t } = useTranslation();
+  const BADGE_LABEL: Record<string, string> = {
+    won: `✅ ${t('predictions.gagne').toUpperCase()}`,
+    pending: `⏳ ${t('predictions.en_cours').toUpperCase()}`,
+    lost: `❌ ${t('predictions.perdu').toUpperCase()}`,
+    cancelled: `↩️ ${t('predictions.annule').toUpperCase()}`,
+  };
   const nav = useNavigate();
   const [preds, setPreds] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,9 +168,9 @@ export default function MesParis() {
             <ArrowLeft size={16} />
           </button>
           <div>
-            <div style={{ fontFamily: BEBAS, fontSize: 22, color: '#fff', letterSpacing: 2, lineHeight: 1 }}>MES PARIS</div>
+            <div style={{ fontFamily: BEBAS, fontSize: 22, color: '#fff', letterSpacing: 2, lineHeight: 1 }}>{t('predictions.mes_paris_title').toUpperCase()}</div>
             <div style={{ fontSize: 10, color: 'rgba(255,215,0,0.55)', letterSpacing: 0.5, marginTop: 1 }}>
-              Vos pronostics en temps réel
+              {t('predictions.mes_paris_subtitle')}
             </div>
           </div>
         </motion.div>
@@ -177,17 +182,17 @@ export default function MesParis() {
         style={{ padding: '14px 14px 0', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}
       >
         {([
-          { val: cTotal, label: 'PARIS',  sub: 'total',  color: '#FFD700' },
-          { val: cWon,   label: 'GAGNÉS', sub: '',       color: '#00C850' },
-          { val: cCdf,   label: 'CDF',    sub: 'gagnés', color: '#FFD700' },
-        ] as const).map(({ val, label, sub, color }) => (
+          { val: cTotal, label: t('predictions.paris_places'), sub: '', color: '#FFD700', small: false },
+          { val: cWon,   label: t('predictions.paris_gagnes'),  sub: '', color: '#00C850', small: false },
+          { val: cCdf,   label: t('predictions.cdf_gagnes'),   sub: '', color: '#FFD700', small: true },
+        ]).map(({ val, label, sub, color, small }) => (
           <div key={label} style={{
             background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14,
             padding: '12px 6px', textAlign: 'center',
           }}>
             <div style={{
-              fontFamily: BEBAS, fontSize: label === 'CDF' ? 18 : 28, color, lineHeight: 1, marginBottom: 3,
+              fontFamily: BEBAS, fontSize: small ? 18 : 28, color, lineHeight: 1, marginBottom: 3,
               textShadow: `0 0 18px ${color}66`,
             }}>
               {val.toLocaleString('fr-FR')}
@@ -212,10 +217,10 @@ export default function MesParis() {
               🏆
             </div>
             <div style={{ fontFamily: BEBAS, fontSize: 24, color: 'rgba(255,215,0,0.82)', letterSpacing: 2, marginBottom: 6, textShadow: '0 0 22px rgba(255,215,0,0.4)' }}>
-              Aucun pari pour le moment
+              {t('predictions.aucun_pari')}
             </div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 28 }}>
-              Les matchs restants vous attendent
+              {t('predictions.aucun_pari_sub')}
             </div>
             <button type="button" onClick={() => nav('/predictions')} style={{
               background: 'linear-gradient(90deg,#FFE27A,#D9A400,#FFE27A)', backgroundSize: '200% auto',
@@ -224,7 +229,7 @@ export default function MesParis() {
               padding: '14px 28px', borderRadius: 14, border: 'none', cursor: 'pointer',
               boxShadow: '0 4px 24px rgba(217,164,0,0.45)',
             }}>
-              ⚡ PARIER MAINTENANT
+              ⚡ {t('predictions.parier_maintenant').toUpperCase()}
             </button>
           </div>
         ) : (
@@ -302,9 +307,9 @@ export default function MesParis() {
                     {/* Stats grid: MON CHOIX / MISE / GAIN EST. */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
                       {[
-                        { l: 'MON CHOIX', v: choiceLabel(pred), color: '#fff' },
-                        { l: 'MISE', v: `${pred.points_wagered.toLocaleString('fr-FR')} CDF`, color: '#fff' },
-                        { l: 'GAIN EST.', v: `+${potGain.toLocaleString('fr-FR')} CDF`, color: pred.status === 'won' ? '#00C850' : '#FFD700' },
+                        { l: t('predictions.mon_choix').toUpperCase(), v: choiceLabel(pred), color: '#fff' },
+                        { l: t('predictions.mise').toUpperCase(), v: `${pred.points_wagered.toLocaleString('fr-FR')} CDF`, color: '#fff' },
+                        { l: t('predictions.gain_estime').toUpperCase(), v: `+${potGain.toLocaleString('fr-FR')} CDF`, color: pred.status === 'won' ? '#00C850' : '#FFD700' },
                       ].map(({ l, v, color }) => (
                         <div key={l}>
                           <div style={{ fontSize: 7, fontWeight: 800, letterSpacing: 1, color: 'rgba(255,255,255,0.32)', textTransform: 'uppercase', marginBottom: 3 }}>

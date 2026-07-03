@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { getSession } from '../lib/auth';
+import { useTranslation } from 'react-i18next';
 import { teamName, FLAGS, type RawMatch } from './predictionsShared';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
@@ -42,6 +43,7 @@ const scoreBtn: CSSProperties = {
 };
 
 export default function PredictionModal({ match, onClose, onSuccess }: Props) {
+  const { t } = useTranslation();
   const [type, setType] = useState<PredictionType>('winner');
   const [winner, setWinner] = useState<WinnerChoice | null>(null);
   const [scoreHome, setScoreHome] = useState(1);
@@ -97,7 +99,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
       const json = await res.json();
       if (!res.ok) {
         const msg =
-          json.error === 'INSUFFICIENT_BALANCE' ? 'Solde insuffisant'
+          json.error === 'INSUFFICIENT_BALANCE' ? t('predictions.balance_insuffisante')
           : json.error === 'INVALID_INPUT' ? 'Données invalides'
           : json.error ?? 'Erreur serveur';
         setError(msg);
@@ -171,26 +173,26 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
               TYPE DE PRONOSTIC
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {(['winner', 'score_exact'] as PredictionType[]).map(t => (
+              {(['winner', 'score_exact'] as PredictionType[]).map(pt => (
                 <button
-                  key={t}
+                  key={pt}
                   type="button"
-                  onClick={() => { setType(t); setError(null); }}
+                  onClick={() => { setType(pt); setError(null); }}
                   style={{
                     padding: '12px 8px', borderRadius: 12, border: 'none', cursor: 'pointer',
                     textAlign: 'center', transition: 'all 0.15s',
-                    background: type === t
+                    background: type === pt
                       ? 'linear-gradient(135deg,#FFE27A 0%,#D9A400 100%)'
                       : 'rgba(255,255,255,0.05)',
-                    color: type === t ? '#0a0500' : 'rgba(255,255,255,0.6)',
-                    boxShadow: type === t ? '0 4px 16px rgba(217,164,0,0.35), 0 0 20px rgba(234,179,8,0.3)' : 'none',
+                    color: type === pt ? '#0a0500' : 'rgba(255,255,255,0.6)',
+                    boxShadow: type === pt ? '0 4px 16px rgba(217,164,0,0.35), 0 0 20px rgba(234,179,8,0.3)' : 'none',
                   }}
                 >
                   <div style={{ fontFamily: 'Bebas Neue', fontSize: 14, letterSpacing: 1.5 }}>
-                    {t === 'winner' ? 'VAINQUEUR' : 'SCORE EXACT'}
+                    {pt === 'winner' ? t('predictions.vainqueur').toUpperCase() : t('predictions.score_exact').toUpperCase()}
                   </div>
                   <div style={{ fontSize: 10, fontWeight: 800, marginTop: 2, opacity: 0.8 }}>
-                    ×{t === 'winner' ? 2 : 5}
+                    ×{pt === 'winner' ? 2 : 5}
                   </div>
                 </button>
               ))}
@@ -201,12 +203,12 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
           {type === 'winner' && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
-                VAINQUEUR
+                {t('predictions.vainqueur').toUpperCase()}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 {([
                   { value: 'home' as WinnerChoice, label: home, flag: FLAGS[home] ?? '🏳️' },
-                  { value: 'draw' as WinnerChoice, label: 'NUL', flag: '🤝' },
+                  { value: 'draw' as WinnerChoice, label: t('predictions.nul').toUpperCase(), flag: '🤝' },
                   { value: 'away' as WinnerChoice, label: away, flag: FLAGS[away] ?? '🏳️' },
                 ]).map(({ value, label, flag }) => (
                   <button
@@ -266,7 +268,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                MISE
+                {t('predictions.mise').toUpperCase()}
               </div>
               <div style={{ fontFamily: 'Bebas Neue', fontSize: 18, color: '#FFD700' }}>
                 {points.toLocaleString('fr-FR')} CDF
@@ -283,7 +285,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
               <span>100 CDF</span>
-              <span>Solde: {balance.toLocaleString('fr-FR')} CDF</span>
+              <span>{t('predictions.solde')}: {balance.toLocaleString('fr-FR')} CDF</span>
             </div>
           </div>
 
@@ -293,7 +295,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
             border: '1px solid rgba(255,215,0,0.2)', padding: '12px 16px',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20,
           }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Gain estimé (×{multiplier})</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('predictions.gain_estime')} (×{multiplier})</div>
             <div style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: '#FFD700', letterSpacing: 1 }}>
               +{estimatedGain.toLocaleString('fr-FR')} CDF
             </div>
@@ -328,7 +330,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
               boxShadow: loading || balance < 100 ? 'none' : '0 6px 20px rgba(217,164,0,0.4)',
             }}
           >
-            {loading ? 'ENVOI…' : balance < 100 ? 'SOLDE INSUFFISANT' : 'CONFIRMER'}
+            {loading ? 'ENVOI…' : balance < 100 ? t('predictions.balance_insuffisante').toUpperCase() : t('predictions.confirmer').toUpperCase()}
           </motion.button>
         </motion.div>
       </motion.div>
@@ -372,7 +374,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
             <div style={{
               fontFamily: BEBAS_M, fontSize: 34, color: '#fff', letterSpacing: 3,
               marginBottom: 10, animation: 'fadeUpM 0.4s ease-out 0.4s both',
-            }}>PARI ENREGISTRÉ !</div>
+            }}>{t('predictions.pari_enregistre').toUpperCase()}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', animation: 'fadeUpM 0.4s ease-out 0.55s both' }}>
               +{showSuccess.wagered.toLocaleString('fr-FR')} CDF misés
             </div>
