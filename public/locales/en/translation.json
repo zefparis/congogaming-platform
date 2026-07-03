@@ -488,8 +488,8 @@
     "UNKNOWN_ERROR": "An error occurred"
   },
   "kyc": {
-    "title": "Verification required for PredictStreet",
-    "subtitle": "FIFA 2026 sports betting requires age verification.",
+    "title": "Age verification required",
+    "subtitle": "Identity verification is required for certain features.",
     "camera_denied": "Camera access denied. Please enable camera in your browser settings.",
     "camera_error": "Unable to access camera.",
     "verify_failed": "Verification failed. Please try again.",

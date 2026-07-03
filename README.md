@@ -28,7 +28,6 @@ Open http://localhost:5173 on a phone-sized window (≤ 430px wide).
 - **Loto Flash**: 5/20 quick lottery every 30 minutes. Pot accumulates until threshold.
 - **Scratch**: Instant win scratch cards with reveal animations.
 - **Okapi Climb**: Vertical climbing game with live feed, auto-bet, and real-time leaderboard.
-- **PredictStreet**: Sports betting (FIFA World Cup 2026) via iframe integration. Requires KYC approval.
 
 ### Key Features
 - **Wallet balance display**: Live balance shown in Flash and Loto screens, updates after each ticket.
@@ -59,7 +58,7 @@ PIN hashing uses SHA-256 of `congo_<pin>_gaming` on the client (4-digit PIN — 
 - **Register**: phone (10 digits, RDC formats) + 4-digit PIN + 18+ checkbox → row in `users`.
 - **Login**: phone + PIN → SHA-256 compared to `pin_hash`.
 - Session stored as `localStorage["congo_session"] = { id, phone, balance_cdf, kyc_status, blocked }`.
-- **KYC gating**: Only `/jouer` (PredictStreet) requires `kyc_status === 'approved'` or `'verify_age'`. Other games are accessible immediately after registration.
+- **KYC gating**: KYC is required for predictions. Other games are accessible immediately after registration.
 - **Account blocking**: Users with `blocked: true` or `kyc_status === 'denied'` are hard-blocked from all protected routes.
 
 Operator detection from phone prefix:
@@ -130,7 +129,6 @@ vercel
 #   VITE_SUPABASE_URL
 #   VITE_SUPABASE_ANON_KEY
 #   VITE_API_URL          (your Fastify public URL)
-#   VITE_GAME_IFRAME_URL  (https://adipredictstreet.com or your game)
 ```
 
 ### Backend → any Node host (Render, Fly.io, Railway, VPS)
@@ -176,7 +174,6 @@ congo-gaming/
 
 - The 4-digit PIN auth is intentionally simple for low-literacy users. Add **rate limiting** + **lockout** on the login endpoint for production.
 - The phone-based "anon" Supabase RLS policies are permissive on purpose (so the unauthenticated app can register/login). You can move auth fully behind a server endpoint and lock RLS down to `service_role` only.
-- The PredictStreet iframe URL is set via `VITE_GAME_IFRAME_URL` — change it to point at your game.
 - Bebas Neue + Barlow Condensed (italic + weights) are loaded from Google Fonts in `index.html`.
 - The container is capped at `max-w-app` (430px) — use a mobile viewport.
 - PlayGuard integration handles age verification and account blocking. Configure `PLAYGUARD_API_KEY` and `PLAYGUARD_VERIFICATION_ID` in server env vars.

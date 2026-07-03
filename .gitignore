@@ -9,3 +9,4 @@ dist
 .commit-msg.tmp
 token.json
 webhook-test.mjs
+*.pem

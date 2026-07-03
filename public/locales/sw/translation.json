@@ -488,8 +488,8 @@
     "UNKNOWN_ERROR": "Hitilafu imetokea"
   },
   "kyc": {
-    "title": "Uthibitishaji unahitajika kwa PredictStreet",
-    "subtitle": "Kubashiri michezo ya FIFA 2026 kunahitaji uthibitishaji wa umri.",
+    "title": "Uthibitishaji wa umri unahitajika",
+    "subtitle": "Uthibitishaji wa utambulisho unahitajika kwa baadhi ya vipengele.",
     "camera_denied": "Ruhusa ya kamera imekataliwa. Ruhusu kamera katika mipangilio ya kivinjari.",
     "camera_error": "Haiwezekani kufikia kamera.",
     "verify_failed": "Uthibitishaji umeshindwa. Jaribu tena.",

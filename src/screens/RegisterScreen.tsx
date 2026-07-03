@@ -50,10 +50,6 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
       const user = await registerUser(phone, pin, referralCode || null, agentRef);
-      // KYC is now scoped to PredictStreet (/jouer) only — see
-      // `PredictStreetRoute` in App.tsx. Fresh accounts go straight to
-      // home; the KYC scan is triggered the first time they tap the
-      // FIFA card.
       if (user.blocked || user.kyc_status === 'denied') {
         // Shouldn't happen on a fresh insert, but be safe.
         setErr(t('register.error_blocked'));

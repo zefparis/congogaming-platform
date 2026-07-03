@@ -71,9 +71,6 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await loginUser(phone, pin);
-      // KYC is scoped to /jouer (PredictStreet) only — see
-      // `PredictStreetRoute` in App.tsx. Always land returning users
-      // on home; the KYC scan is triggered on the FIFA card tap.
       nav('/', { replace: true });
     } catch (e: any) {
       // Highest priority: legacy PIN reset flow. Trigger from either the
