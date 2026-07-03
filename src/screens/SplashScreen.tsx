@@ -102,7 +102,7 @@ export default function SplashScreen() {
               whiteSpace: 'nowrap',
             }}
           >
-            🏆 COUPE DU MONDE 2026
+            {t('splash.badge')}
           </span>
         </header>
 
@@ -128,7 +128,7 @@ export default function SplashScreen() {
                 color: '#fff',
               }}
             >
-              PRONOSTIQUEZ
+              {t('splash.title')}
             </div>
 
             <div
@@ -142,7 +142,7 @@ export default function SplashScreen() {
                 marginBottom: 10,
               }}
             >
-              &amp; GAGNEZ
+              {t('splash.title2')}
             </div>
 
             <div
@@ -155,11 +155,7 @@ export default function SplashScreen() {
                 ...fadeUp(0.24)
               }}
             >
-              La nouvelle expérience
-              <br />
-              de prédiction sportive
-              <br />
-              pour la CdM 2026.
+              {t('splash.subtitle')}
             </div>
 
             <div style={{ marginTop: 17, ...fadeUp(0.34) }}>
@@ -178,7 +174,7 @@ export default function SplashScreen() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                🏆 COUPE DU MONDE 2026
+                {t('splash.badge')}
               </span>
             </div>
           </section>
@@ -213,7 +209,7 @@ export default function SplashScreen() {
                 <div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg, #FFD700, #D9A400)', borderRadius: 4 }} />
               </div>
               <div style={{ textAlign: 'center', fontSize: 8.5, color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: 0.5 }}>
-                Misez en CDF · Gagnez en CDF
+                {t('splash.match_preview')}
               </div>
             </div>
           </section>
@@ -261,7 +257,7 @@ export default function SplashScreen() {
                 letterSpacing: 1,
               }}
             >
-              PRONOS
+              {t('splash.promo_label')}
             </div>
           </div>
         </section>
@@ -292,7 +288,7 @@ export default function SplashScreen() {
               boxShadow: '0 5px 22px rgba(217,164,0,0.4)',
             }}
           >
-            ⚡ JOUER MAINTENANT
+            {t('splash.cta_play')}
           </button>
 
           <button
@@ -311,7 +307,7 @@ export default function SplashScreen() {
               cursor: 'pointer',
             }}
           >
-            Se connecter
+            {t('splash.cta_login')}
           </button>
         </section>
 
@@ -396,9 +392,7 @@ export default function SplashScreen() {
                   lineHeight: 1.25,
                 }}
               >
-                Découvrez
-                <br />
-                Congo Gaming
+                {t('splash.discover')}
               </div>
 
               <div

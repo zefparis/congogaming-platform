@@ -305,7 +305,16 @@
     "days": "Mikolo",
     "hours": "Ngonga",
     "min": "Min",
-    "sec": "Sec"
+    "sec": "Sec",
+    "title": "Bima liboso",
+    "title2": "& Keba",
+    "subtitle": "Experience ya sika ya kobima liboso na CdM 2026.",
+    "badge": "🏆 Coupe du Monde 2026",
+    "cta_play": "⚡ TALA SIKOYO",
+    "cta_login": "Kota",
+    "promo_label": "MABETI",
+    "discover": "Yeba Congo Gaming",
+    "match_preview": "Tia CDF · Zwa CDF"
   },
   "home": {
     "greeting": "Mbote, {{name}} 👋",

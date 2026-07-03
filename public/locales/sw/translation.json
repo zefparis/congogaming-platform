@@ -305,7 +305,16 @@
     "days": "Siku",
     "hours": "Masaa",
     "min": "Dak",
-    "sec": "Sek"
+    "sec": "Sek",
+    "title": "Tabiri",
+    "title2": "& Shinda",
+    "subtitle": "Uzoefu mpya wa kutabiri michezo kwa WC 2026.",
+    "badge": "🏆 Kombe la Dunia 2026",
+    "cta_play": "⚡ CHEZA SASA",
+    "cta_login": "Ingia",
+    "promo_label": "UBASHIRI",
+    "discover": "Gundua Congo Gaming",
+    "match_preview": "Weka CDF · Shinda CDF"
   },
   "home": {
     "greeting": "Habari, {{name}} 👋",

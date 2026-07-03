@@ -305,7 +305,16 @@
     "days": "Days",
     "hours": "Hours",
     "min": "Min",
-    "sec": "Sec"
+    "sec": "Sec",
+    "title": "Predict",
+    "title2": "& Win",
+    "subtitle": "The new sports prediction experience for WC 2026.",
+    "badge": "🏆 World Cup 2026",
+    "cta_play": "⚡ PLAY NOW",
+    "cta_login": "Sign in",
+    "promo_label": "PREDICTIONS",
+    "discover": "Discover Congo Gaming",
+    "match_preview": "Stake in CDF · Win in CDF"
   },
   "home": {
     "greeting": "Hi, {{name}} 👋",
