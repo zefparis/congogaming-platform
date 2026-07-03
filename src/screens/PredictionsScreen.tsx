@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
 import { teamName, FLAGS, type RawMatch, type LiveMatch } from './predictionsShared';
+import { getSession } from '../lib/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.congogaming.com';
 
@@ -97,6 +98,24 @@ export default function PredictionsScreen() {
   const [selectedMatch, setSelectedMatch] = useState<RawMatch | null>(null);
   const [modalKey, setModalKey] = useState(0);
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
+  const [userStats, setUserStats] = useState({ placed: 0, won: 0, cdfWon: 0 });
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session?.id) return;
+    fetch(`${API_BASE}/api/predictions?user_id=${session.id}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d?.predictions) return;
+        const preds = d.predictions as { points_won?: number | null }[];
+        setUserStats({
+          placed: preds.length,
+          won: preds.filter(p => p.points_won != null && p.points_won > 0).length,
+          cdfWon: preds.reduce((s, p) => s + (p.points_won ?? 0), 0),
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -200,20 +219,39 @@ export default function PredictionsScreen() {
               ⚡ {pendingCount} match{pendingCount > 1 ? 's' : ''} restant{pendingCount > 1 ? 's' : ''}
             </div>
           )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', lineHeight: 1 }}>🎯 {userStats.placed}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>paris placés</div>
+            </div>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>✅ {userStats.won}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>gagnés</div>
+            </div>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '10px 6px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#FFD700', lineHeight: 1 }}>💰 {userStats.cdfWon}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>CDF gagnés</div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => nav('/mes-paris')}
             style={{
-              marginTop: 14,
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(255,215,0,0.1)', color: '#FFD700',
-              fontSize: 11, fontWeight: 800, letterSpacing: 1.5,
-              padding: '5px 12px', borderRadius: 20,
-              border: '1px solid rgba(255,215,0,0.28)',
-              cursor: 'pointer',
+              marginTop: 12,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              width: '100%',
+              background: 'linear-gradient(135deg, #FFE27A 0%, #D9A400 100%)',
+              color: '#0a0500',
+              fontFamily: 'Bebas Neue', fontSize: 20, letterSpacing: 3,
+              padding: '14px 0', borderRadius: 14, border: 'none', cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(217,164,0,0.4)',
+              gap: 2,
             }}
           >
-            📋 MES PARIS →
+            📋 VOIR MES PARIS →
+            <span style={{ fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: 600, letterSpacing: 0.3, color: 'rgba(10,5,0,0.6)', marginTop: 1 }}>
+              Suivez vos pronostics en cours
+            </span>
           </button>
         </div>
       </div>
