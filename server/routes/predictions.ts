@@ -43,19 +43,19 @@ async function fetchLiveMatches(): Promise<LiveMatch[]> {
     });
     if (res.ok) {
       const data = await res.json() as { games?: unknown[] };
-      const games = data.games ?? data ?? [];
-      return (games as Record<string, unknown>[]).map((g) => ({
-        id:     String(g.id ?? g._id ?? Math.random()),
-        team1:  String(g.home_team ?? g.team1 ?? ''),
-        team2:  String(g.away_team ?? g.team2 ?? ''),
-        score1: Number(g.home_score ?? g.score1 ?? 0),
-        score2: Number(g.away_score ?? g.score2 ?? 0),
-        status: (String(g.status ?? '').includes('progress') ? 'in_progress'
-              : String(g.status ?? '').includes('final') || String(g.status ?? '').includes('completed') ? 'final'
-              : 'scheduled') as LiveMatch['status'],
-        clock:  String(g.time ?? g.clock ?? g.minute ?? ''),
-        date:   String(g.date ?? g.match_date ?? ''),
-      }));
+      return (data.games as Record<string, unknown>[]).map((g) => ({
+        id:     String(g.id ?? ''),
+        team1:  String(g.home_team_name_en ?? ''),
+        team2:  String(g.away_team_name_en ?? ''),
+        score1: parseInt(String(g.home_score ?? '0'), 10),
+        score2: parseInt(String(g.away_score ?? '0'), 10),
+        status: String(g.finished).toUpperCase() === 'TRUE' ? 'final'
+              : String(g.time_elapsed) !== 'finished' && String(g.time_elapsed) !== ''
+                && String(g.time_elapsed) !== 'null' ? 'in_progress'
+              : 'scheduled',
+        clock:  String(g.time_elapsed ?? ''),
+        date:   String(g.local_date ?? ''),
+      })) as LiveMatch[];
     }
   } catch { /* fall through to ESPN */ }
 
