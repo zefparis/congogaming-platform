@@ -166,7 +166,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const provided = String(req.body?.secret || '');
       const expected = process.env.LOTO_ADMIN_SECRET || '';
-      console.log('[ADMIN-AUTH] provided length:', provided.length, '| expected length:', expected.length, '| match:', provided === expected);
       if (!expected) return reply.code(500).send({ error: 'Admin not configured' });
       if (!provided || !constantTimeStringEqual(provided, expected)) {
         return reply.code(401).send({ error: 'Invalid secret' });
