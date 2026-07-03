@@ -130,6 +130,9 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       if (prediction_type === 'winner' && !predicted_winner) {
         return reply.code(400).send({ error: 'MISSING_PREDICTED_WINNER' });
       }
+      if (prediction_type === 'winner' && predicted_winner && predicted_winner.length > 100) {
+        return reply.code(400).send({ error: 'INVALID_PREDICTED_WINNER' });
+      }
       if (
         prediction_type === 'score_exact' &&
         (predicted_score_home === undefined || predicted_score_away === undefined)
