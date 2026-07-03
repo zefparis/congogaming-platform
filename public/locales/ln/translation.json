@@ -64,7 +64,10 @@
     "bet_placed": "Mise : {{amount}} CDF",
     "no_luck": "Sango malamu...",
     "try_again": "Meka lisusu !",
-    "play_again": "MEKA LISUSU"
+    "play_again": "MEKA LISUSU",
+    "free_play_singular": "Free Play ezali",
+    "free_play_plural": "Free Plays ezali",
+    "play_btn": "Tala →"
   },
   "okapi_color": {
     "header_title": "OKAPI COLOR",
@@ -258,7 +261,11 @@
     "back": "← Kozonga",
     "error_phone": "Nimero ya RDC ebongi te (manumero 10)",
     "error_adult": "Osengeli kozala na bambula 18 to koleka",
-    "error_blocked": "Compte ekangami."
+    "error_blocked": "Compte ekangami.",
+    "already_account": "Ozali na compte déjà?",
+    "sign_in": "Kota",
+    "new_user": "Ozali ya sika?",
+    "create_account": "Sala compte ya sika"
   },
   "reset_pin": {
     "page_label": "Code ya siri",
@@ -376,7 +383,20 @@
     "voir_paris_match": "Tala mabeti",
     "balance_insuffisante": "Mbongo ekoki te",
     "pari_enregistre": "Libeti etiei!",
-    "kyc_required": "Vérification esengeli liboso ya kobeta"
+    "kyc_required": "Vérification esengeli liboso ya kobeta",
+    "fifa_badge": "🏆 FIFA WC 2026",
+    "matchs": "⚽ MATCHS",
+    "chargement": "Kotanda…",
+    "aucun_match": "Matchs ezali te sikoyo",
+    "classement": "CLASSEMENT",
+    "aucun_pronostic": "Bima ezali te naino",
+    "donnees_invalides": "Données ezali mabe",
+    "erreur_serveur": "Erreur ya serveur",
+    "erreur_reseau": "Erreur ya réseau. Sala lisusu.",
+    "type_pronostic": "NDENGE YA PRONOSTIC",
+    "score_final": "SCORE YA SUKA",
+    "cdf_mises": "CDF ya libeti",
+    "gain_potentiel": "Gain ya possible"
   },
   "loto": {
     "balance_display": "💰 Mbongo : {{amount}} CDF",
@@ -466,5 +486,43 @@
     "PROFILE_UPDATE_FAILED": "Likambo ya kobongola profil",
     "AUTH_ERROR": "Likambo ya connexion",
     "UNKNOWN_ERROR": "Likambo ebimaki"
+  },
+  "kyc": {
+    "title": "Vérification esengami po na PredictStreet",
+    "subtitle": "Mabeti ya FIFA 2026 esengaka vérification ya bambula.",
+    "camera_denied": "Accès na caméra ebandisami te. Pesá accès na caméra na paramètres ya navigateur.",
+    "camera_error": "Ekoki te kozwa caméra.",
+    "verify_failed": "Vérification ekweaki. Sala lisusu.",
+    "look_straight": "Tala liboso penza",
+    "take_photo": "KAMBA PHOTO",
+    "check_face": "Talá ete elongi na yo ezali malamu",
+    "retake": "KAMBAKANISA",
+    "confirm": "CONFIRMER",
+    "verifying": "KOVÉRIFIER…",
+    "biometric": "Analyse biométrique ya sécurité",
+    "approved": "IDENTITÉ ÉVÉRIFIAMI",
+    "welcome": "Boyei malamu na Congo Gaming.",
+    "age_estimate": "Bambula estimées: {{age}} mbula",
+    "age_range": "Bambula estimées: {{low}}–{{high}} mbula",
+    "continue": "KANDA LIBOSO",
+    "denied": "ACCÈS EBANDISAMI TE",
+    "denied_msg": "Osengeli kozala na bambula 18 to koleka po na kozala na Congo Gaming.",
+    "understood": "NABOSANI",
+    "age_uncertain": "BAMBULA ESILI KOYEBANA TE",
+    "age_uncertain_msg": "Compte na yo ekozwama na maboko na biso. Okoki kanda liboso tii na vérification."
+  },
+  "okapi": {
+    "bet_refused": "Libeti ekatisami",
+    "balance_insufficient": "Mbongo ekokani te",
+    "round_in_progress": "Tour ezali, susu kaka",
+    "invalid_bet": "Montant ya libeti ezali mabe",
+    "auto_stopped": "Mbongo ekokani te — session auto esilaki",
+    "late_bet": "Libeti ya nsima (409)",
+    "api_unreachable": "API ezwami te",
+    "network_error": "Erreur ya réseau (ekokoba na round elandi)",
+    "auto_start_error": "Ekoki te kobanda session auto",
+    "backend_404": "Backend ezali ko (404) — deploy API lisusu",
+    "migration_missing": "Migration Supabase ezali te",
+    "server_error": "Erreur ya serveur (tala console)"
   }
 }

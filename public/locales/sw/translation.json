@@ -64,7 +64,10 @@
     "bet_placed": "Bet: {{amount}} CDF",
     "no_luck": "Bahati mbaya...",
     "try_again": "Jaribu tena!",
-    "play_again": "JARIBU TENA"
+    "play_again": "JARIBU TENA",
+    "free_play_singular": "Free Play inapatikana",
+    "free_play_plural": "Free Plays zinapatikana",
+    "play_btn": "Cheza →"
   },
   "okapi_color": {
     "header_title": "OKAPI COLOR",
@@ -258,7 +261,11 @@
     "back": "← Rudi",
     "error_phone": "Nambari ya DRC si sahihi (nambari 10)",
     "error_adult": "Lazima uwe na miaka 18 au zaidi",
-    "error_blocked": "Akaunti imefungwa."
+    "error_blocked": "Akaunti imefungwa.",
+    "already_account": "Je, una akaunti tayari?",
+    "sign_in": "Ingia",
+    "new_user": "Mpya hapa?",
+    "create_account": "Fungua akaunti"
   },
   "reset_pin": {
     "page_label": "Nambari ya siri",
@@ -376,7 +383,20 @@
     "voir_paris_match": "Ona mabao",
     "balance_insuffisante": "Salio haitoshi",
     "pari_enregistre": "Dau limewekwa!",
-    "kyc_required": "Uthibitisho unahitajika kabla ya kubashiri"
+    "kyc_required": "Uthibitisho unahitajika kabla ya kubashiri",
+    "fifa_badge": "🏆 FIFA WC 2026",
+    "matchs": "⚽ MECHI",
+    "chargement": "Inapakia…",
+    "aucun_match": "Hakuna mechi zinazopatikana kwa sasa",
+    "classement": "ORODHA",
+    "aucun_pronostic": "Hakuna ubashiri uliotumwa bado",
+    "donnees_invalides": "Data si sahihi",
+    "erreur_serveur": "Hitilafu ya seva",
+    "erreur_reseau": "Hitilafu ya mtandao. Jaribu tena.",
+    "type_pronostic": "AINA YA UBASHIRI",
+    "score_final": "MATOKEO YA MWISHO",
+    "cdf_mises": "CDF zilizowekwa",
+    "gain_potentiel": "Faida inayowezekana"
   },
   "loto": {
     "balance_display": "💰 Salio: {{amount}} CDF",
@@ -466,5 +486,43 @@
     "PROFILE_UPDATE_FAILED": "Hitilafu ya kusasisha wasifu",
     "AUTH_ERROR": "Hitilafu ya uthibitisho",
     "UNKNOWN_ERROR": "Hitilafu imetokea"
+  },
+  "kyc": {
+    "title": "Uthibitishaji unahitajika kwa PredictStreet",
+    "subtitle": "Kubashiri michezo ya FIFA 2026 kunahitaji uthibitishaji wa umri.",
+    "camera_denied": "Ruhusa ya kamera imekataliwa. Ruhusu kamera katika mipangilio ya kivinjari.",
+    "camera_error": "Haiwezekani kufikia kamera.",
+    "verify_failed": "Uthibitishaji umeshindwa. Jaribu tena.",
+    "look_straight": "Angalia moja kwa moja",
+    "take_photo": "PIGA PICHA",
+    "check_face": "Hakikisha uso wako unaonekana vizuri",
+    "retake": "PIGA TENA",
+    "confirm": "THIBITISHA",
+    "verifying": "INATHIBITISHA…",
+    "biometric": "Uchambuzi wa kibayometriki salama",
+    "approved": "UTAMBULISHO UMETHIBITISHWA",
+    "welcome": "Karibu Congo Gaming.",
+    "age_estimate": "Umri uliokadiriwa: miaka {{age}}",
+    "age_range": "Umri uliokadiriwa: miaka {{low}}–{{high}}",
+    "continue": "ENDELEA",
+    "denied": "UFIKIO UMEKATALIWA",
+    "denied_msg": "Lazima uwe na umri wa miaka 18 au zaidi kutumia Congo Gaming.",
+    "understood": "NIMEELEWA",
+    "age_uncertain": "UMRI SI WAZI",
+    "age_uncertain_msg": "Akaunti yako itakaguliwa na timu yetu. Unaweza kuendelea ukisubiri uthibitishaji."
+  },
+  "okapi": {
+    "bet_refused": "Dau limekataliwa",
+    "balance_insufficient": "Salio halitatoshi",
+    "round_in_progress": "Raundi inaendelea, subiri",
+    "invalid_bet": "Kiasi cha dau si sahihi",
+    "auto_stopped": "Salio halitatoshi — kipindi cha otomatiki kimesimama",
+    "late_bet": "Dau la kuchelewa (409)",
+    "api_unreachable": "API haifikiki",
+    "network_error": "Hitilafu ya mtandao (itaendelea raundi ijayo)",
+    "auto_start_error": "Haiwezekani kuanza kipindi cha otomatiki",
+    "backend_404": "Backend si ya kisasa (404) — tuma upya API",
+    "migration_missing": "Uhamishaji wa Supabase hauko",
+    "server_error": "Hitilafu ya seva (angalia console)"
   }
 }

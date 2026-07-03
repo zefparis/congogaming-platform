@@ -100,14 +100,14 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
       if (!res.ok) {
         const msg =
           json.error === 'INSUFFICIENT_BALANCE' ? t('predictions.balance_insuffisante')
-          : json.error === 'INVALID_INPUT' ? 'Données invalides'
-          : json.error ?? 'Erreur serveur';
+          : json.error === 'INVALID_INPUT' ? t('predictions.donnees_invalides')
+          : json.error ?? t('predictions.erreur_serveur');
         setError(msg);
         return;
       }
       setShowSuccess({ wagered: points, gain: estimatedGain });
     } catch {
-      setError('Erreur réseau. Réessayez.');
+      setError(t('predictions.erreur_reseau'));
     } finally {
       setLoading(false);
     }
@@ -170,7 +170,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
           {/* Type selector */}
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>
-              TYPE DE PRONOSTIC
+              {t('predictions.type_pronostic')}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {(['winner', 'score_exact'] as PredictionType[]).map(pt => (
@@ -240,7 +240,7 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
           {type === 'score_exact' && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>
-                SCORE FINAL
+                {t('predictions.score_final')}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center' }}>
                 <div style={{ textAlign: 'center' }}>
@@ -376,14 +376,14 @@ export default function PredictionModal({ match, onClose, onSuccess }: Props) {
               marginBottom: 10, animation: 'fadeUpM 0.4s ease-out 0.4s both',
             }}>{t('predictions.pari_enregistre').toUpperCase()}</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', animation: 'fadeUpM 0.4s ease-out 0.55s both' }}>
-              +{showSuccess.wagered.toLocaleString('fr-FR')} CDF misés
+              +{showSuccess.wagered.toLocaleString('fr-FR')} {t('predictions.cdf_mises')}
             </div>
             <div style={{
               fontSize: 15, color: '#00C850', fontWeight: 700, marginTop: 6,
               animation: 'fadeUpM 0.4s ease-out 0.65s both',
               textShadow: '0 0 16px rgba(0,200,80,0.6)',
             }}>
-              Gain potentiel: +{showSuccess.gain.toLocaleString('fr-FR')} CDF ✨
+              {t('predictions.gain_potentiel')}: +{showSuccess.gain.toLocaleString('fr-FR')} CDF ✨
             </div>
           </div>
         </motion.div>

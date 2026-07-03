@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Camera, RotateCcw, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { clearSession, getSession, refreshKycStatus } from '../lib/auth';
+import { useTranslation } from 'react-i18next';
 
 // ─── PlayGuard KYC capture flow ─────────────────────────────────────────────
 //
@@ -30,6 +31,7 @@ interface KycResult {
 }
 
 export default function KycScreen() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const session = getSession();
 
@@ -63,14 +65,14 @@ export default function KycScreen() {
       } catch (e: any) {
         setError(
           e?.name === 'NotAllowedError'
-            ? 'Accès à la caméra refusé. Autorisez la caméra dans les paramètres du navigateur.'
-            : 'Impossible d\'accéder à la caméra.',
+            ? t('kyc.camera_denied')
+            : t('kyc.camera_error'),
         );
       }
     })();
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
   }, [stage]);
@@ -101,7 +103,7 @@ export default function KycScreen() {
     const b64 = canvas.toDataURL('image/jpeg', 0.9);
     setPhotoB64(b64);
     setStage('preview');
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
   }
 
@@ -131,7 +133,7 @@ export default function KycScreen() {
       await refreshKycStatus(session.id);
       setStage('result');
     } catch (e: any) {
-      setError(e?.message || 'La vérification a échoué. Réessayez.');
+      setError(e?.message || t('kyc.verify_failed'));
       setStage('preview');
     }
   }
@@ -181,10 +183,10 @@ export default function KycScreen() {
         />
       </div>
       <h1 className="font-display text-3xl text-gold tracking-wide">
-        Vérification requise pour PredictStreet
+        {t('kyc.title')}
       </h1>
       <p className="text-zinc-400 text-sm mt-1 mb-6">
-        Les paris sportifs FIFA 2026 nécessitent une vérification d'identité.
+        {t('kyc.subtitle')}
       </p>
 
       {stage === 'capture' && (
@@ -229,10 +231,11 @@ function CaptureStage({
   onCapture: () => void;
   error: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <p className="text-center text-white text-base mb-4">
-        Regardez droit devant
+        {t('kyc.look_straight')}
       </p>
       <div className="flex justify-center mb-6">
         <div
@@ -261,7 +264,7 @@ function CaptureStage({
         className="h-14 rounded-2xl bg-gold text-black font-display text-xl tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Camera size={20} />
-        PRENDRE LA PHOTO
+        {t('kyc.take_photo')}
       </motion.button>
     </>
   );
@@ -278,10 +281,11 @@ function PreviewStage({
   onConfirm: () => void;
   error: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <p className="text-center text-white text-base mb-4">
-        Vérifiez que votre visage est bien cadré
+        {t('kyc.check_face')}
       </p>
       <div className="flex justify-center mb-6">
         <div
@@ -307,7 +311,7 @@ function PreviewStage({
           className="flex-1 h-14 rounded-2xl border-2 border-zinc-700 bg-zinc-900 text-white font-display text-base tracking-wider flex items-center justify-center gap-2"
         >
           <RotateCcw size={18} />
-          REPRENDRE
+          {t('kyc.retake')}
         </button>
         <motion.button
           whileTap={{ scale: 0.97 }}
@@ -315,7 +319,7 @@ function PreviewStage({
           className="flex-1 h-14 rounded-2xl bg-gold text-black font-display text-base tracking-wider flex items-center justify-center gap-2"
         >
           <Check size={18} />
-          CONFIRMER
+          {t('kyc.confirm')}
         </motion.button>
       </div>
     </>
@@ -323,15 +327,16 @@ function PreviewStage({
 }
 
 function LoadingStage() {
+  const { t } = useTranslation();
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6">
       <Loader2 className="text-gold animate-spin" size={64} />
       <div className="text-center">
         <div className="font-display text-2xl text-gold tracking-wider">
-          VÉRIFICATION EN COURS…
+          {t('kyc.verifying')}
         </div>
         <div className="mt-2 text-sm text-zinc-400">
-          Analyse biométrique sécurisée
+          {t('kyc.biometric')}
         </div>
       </div>
     </div>
@@ -349,6 +354,7 @@ function ResultStage({
   onDeniedAcknowledge: () => void;
   onVerifyAgeContinue: () => void;
 }) {
+  const { t } = useTranslation();
   if (result.verdict === 'APPROVED') {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-6">
@@ -357,13 +363,13 @@ function ResultStage({
         </div>
         <div className="text-center">
           <div className="font-display text-3xl text-emerald-400 tracking-wider">
-            IDENTITÉ VÉRIFIÉE
+            {t('kyc.approved')}
           </div>
           <div className="mt-2 text-sm text-zinc-400">
-            Bienvenue sur Congo Gaming.
+            {t('kyc.welcome')}
           </div>
           <div className="mt-1 text-xs text-zinc-500">
-            Âge estimé : {result.estimated_age} ans
+            {t('kyc.age_estimate', { age: result.estimated_age })}
           </div>
         </div>
         <motion.button
@@ -371,7 +377,7 @@ function ResultStage({
           onClick={onApprovedContinue}
           className="w-full h-14 rounded-2xl bg-gold text-black font-display text-xl tracking-wider"
         >
-          CONTINUER
+          {t('kyc.continue')}
         </motion.button>
       </div>
     );
@@ -385,13 +391,13 @@ function ResultStage({
         </div>
         <div className="text-center">
           <div className="font-display text-3xl text-red-400 tracking-wider">
-            ACCÈS REFUSÉ
+            {t('kyc.denied')}
           </div>
           <div className="mt-3 text-sm text-zinc-300 max-w-xs">
-            Vous devez avoir 18 ans ou plus pour utiliser Congo Gaming.
+            {t('kyc.denied_msg')}
           </div>
           <div className="mt-2 text-xs text-zinc-500">
-            Âge estimé : {result.age_low}–{result.age_high} ans
+            {t('kyc.age_range', { low: result.age_low, high: result.age_high })}
           </div>
         </div>
         <motion.button
@@ -399,7 +405,7 @@ function ResultStage({
           onClick={onDeniedAcknowledge}
           className="w-full h-14 rounded-2xl bg-red-500 text-white font-display text-xl tracking-wider"
         >
-          J'AI COMPRIS
+          {t('kyc.understood')}
         </motion.button>
       </div>
     );
@@ -413,14 +419,13 @@ function ResultStage({
       </div>
       <div className="text-center">
         <div className="font-display text-2xl text-amber-400 tracking-wider">
-          ÂGE INCERTAIN
+          {t('kyc.age_uncertain')}
         </div>
         <div className="mt-3 text-sm text-zinc-300 max-w-xs">
-          Votre compte sera vérifié manuellement par notre équipe. Vous pouvez
-          continuer en attendant la validation.
+          {t('kyc.age_uncertain_msg')}
         </div>
         <div className="mt-2 text-xs text-zinc-500">
-          Âge estimé : {result.age_low}–{result.age_high} ans
+          {t('kyc.age_range', { low: result.age_low, high: result.age_high })}
         </div>
       </div>
       <motion.button
@@ -428,7 +433,7 @@ function ResultStage({
         onClick={onVerifyAgeContinue}
         className="w-full h-14 rounded-2xl bg-amber-500 text-black font-display text-xl tracking-wider"
       >
-        CONTINUER
+        {t('kyc.continue')}
       </motion.button>
     </div>
   );
