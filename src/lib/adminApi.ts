@@ -7,20 +7,9 @@
 const BASE_URL =
   (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.congogaming.com';
 const BASE = BASE_URL;
-// eslint-disable-next-line no-console
-console.log('BASE_URL:', BASE_URL);
 const TOKEN_KEY = 'cg_admin_token';
 const SECRET_KEY = 'cg_admin_secret';
 const PHONE_KEY = 'cg_admin_phone';
-const FALLBACK_SECRET = 'cg_admin_loto_2026';
-// Toggle verbose Authorization logging by setting localStorage.cg_admin_debug = '1'.
-const DEBUG = (() => {
-  try {
-    return localStorage.getItem('cg_admin_debug') === '1';
-  } catch {
-    return false;
-  }
-})();
 
 export function getAdminToken(): string | null {
   try {
@@ -89,20 +78,14 @@ async function rawFetch(path: string, opts: RequestInit, token: string | null): 
     ...((opts.headers as Record<string, string>) || {}),
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (DEBUG) {
-    // eslint-disable-next-line no-console
-    console.log('[adminApi] →', path, {
-      authorization: headers['Authorization'] ?? '(none)',
-      tokenRaw: token,
-    });
-  }
   return fetch(`${BASE}${path}`, { ...opts, headers });
 }
 
 // Acquire a fresh token using the cached admin secret. Returns null if no
 // secret is available or re-auth fails.
 async function silentReauth(): Promise<string | null> {
-  const secret = getAdminSecret() || FALLBACK_SECRET;
+  const secret = getAdminSecret();
+  if (!secret) return null;
   try {
     const res = await fetch(`${BASE}/api/admin/auth`, {
       method: 'POST',
@@ -113,10 +96,6 @@ async function silentReauth(): Promise<string | null> {
     const data = (await res.json()) as { token?: string };
     if (data?.token) {
       setAdminToken(data.token);
-      if (DEBUG) {
-        // eslint-disable-next-line no-console
-        console.log('[adminApi] ↻ silent re-auth OK, new token stored');
-      }
       return data.token;
     }
     return null;
@@ -537,7 +516,8 @@ export const adminApi = {
     }),
 
   okapiColorForceDraw: () => {
-    const secret = getAdminSecret() || FALLBACK_SECRET;
+    const secret = getAdminSecret();
+    if (!secret) return Promise.reject(new AdminAuthError('No admin secret — re-authentication required'));
     return fetch(`${BASE}/api/okapi-color/draw`, {
       method: 'POST',
       headers: { 'x-admin-secret': secret },
@@ -549,7 +529,8 @@ export const adminApi = {
   },
 
   okapiColorPurgePending: () => {
-    const secret = getAdminSecret() || FALLBACK_SECRET;
+    const secret = getAdminSecret();
+    if (!secret) return Promise.reject(new AdminAuthError('No admin secret — re-authentication required'));
     return fetch(`${BASE}/api/okapi-color/purge-pending`, {
       method: 'POST',
       headers: { 'x-admin-secret': secret },
@@ -644,10 +625,6 @@ export async function approveKyc(
 ): Promise<{ ok: boolean; kyc_status: string }> {
   const token = localStorage.getItem(TOKEN_KEY) ?? '';
   const url = `${BASE_URL}/api/admin/users/${id}/kyc-approve`;
-  // eslint-disable-next-line no-console
-  console.log('KYC approve URL:', url);
-  // eslint-disable-next-line no-console
-  console.log('Token used:', token);
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -672,10 +649,6 @@ export async function denyKyc(
 ): Promise<{ ok: boolean; kyc_status: string; blocked: boolean }> {
   const token = localStorage.getItem(TOKEN_KEY) ?? '';
   const url = `${BASE_URL}/api/admin/users/${id}/kyc-deny`;
-  // eslint-disable-next-line no-console
-  console.log('KYC deny URL:', url);
-  // eslint-disable-next-line no-console
-  console.log('Token used:', token);
   const res = await fetch(url, {
     method: 'POST',
     headers: {
