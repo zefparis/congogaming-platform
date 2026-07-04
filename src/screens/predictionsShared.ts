@@ -32,6 +32,31 @@ export type RawMatch = {
   kickoffUtc?: string | null;
 };
 
+export type NormalizedMatch = {
+  id: string;
+  competitionId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamLogo?: string;
+  awayTeamLogo?: string;
+  kickoffUtc: string | null;
+  venue?: string;
+  round?: string;
+  status: 'scheduled' | 'live' | 'finished';
+  homeScore?: number;
+  awayScore?: number;
+  scorers?: { team: 'home' | 'away'; name: string; minute: string }[];
+};
+
+export type Competition = {
+  id: string;
+  display_name: string;
+  data_source: 'worldcup2026_legacy' | 'espn';
+  espn_slug: string | null;
+  active: boolean;
+  display_order: number;
+};
+
 export function teamName(t: RawTeam | undefined): string {
   if (!t) return '?';
   if (typeof t === 'string') return t;

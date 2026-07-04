@@ -1,6 +1,11 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { supabaseAdmin, adjustBalance } from '../lib/supabase.js';
 import { requireAdmin, requireSuperAdmin } from './admin.js';
+import {
+  fetchMatchesForCompetitionCached,
+  getActiveCompetitions,
+  getCompetitionById,
+} from '../lib/matchSources.js';
 
 const OPENFOOTBALL_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
@@ -200,6 +205,7 @@ export async function resolveMatchPredictions(opts: ResolveOptions): Promise<Res
       resolved_by,
       predictions_resolved_count: 0,
       total_points_paid: 0,
+      competition_id: preds?.[0]?.competition_id ?? 'worldcup2026',
     });
     return { ok: true, resolved: 0, won_count: 0, lost_count: 0, total_points_paid: 0 };
   }
@@ -263,6 +269,7 @@ export async function resolveMatchPredictions(opts: ResolveOptions): Promise<Res
     resolved_by,
     predictions_resolved_count: resolved,
     total_points_paid,
+    competition_id: (preds[0] as Record<string, unknown>)?.competition_id as string ?? 'worldcup2026',
   });
 
   return { ok: true, resolved, won_count, lost_count, total_points_paid };
@@ -278,6 +285,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       predicted_score_home?: number;
       predicted_score_away?: number;
       points_wagered: number;
+      competition_id?: string;
     };
   }>(
     '/api/predictions',
@@ -290,6 +298,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         predicted_score_home,
         predicted_score_away,
         points_wagered,
+        competition_id,
       } = req.body ?? {};
 
       if (!match_id || typeof match_id !== 'string') {
@@ -367,6 +376,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
           predicted_score_home: predicted_score_home ?? null,
           predicted_score_away: predicted_score_away ?? null,
           points_wagered,
+          competition_id: competition_id ?? 'worldcup2026',
         })
         .select('id')
         .single();
@@ -453,47 +463,96 @@ export default async function predictionsRoutes(app: FastifyInstance) {
     return reply.send({ leaderboard });
   });
 
-  // GET /api/matches/upcoming
-  app.get('/api/matches/upcoming', async (_req, reply) => {
-    const now = Date.now();
-    if (matchCache && now - matchCache.fetchedAt < CACHE_TTL_MS) {
-      return reply.send({ matches: matchCache.data });
-    }
-
-    try {
-      const res = await fetch(OPENFOOTBALL_URL);
-      if (!res.ok) throw new Error(`Upstream returned ${res.status}`);
-      const json = (await res.json()) as { matches: MatchRaw[] };
-
-      const allMatches = json.matches ?? [];
-
-      const threeDaysAgo = new Date();
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-
-      const relevantMatches = allMatches.filter(
-        (m) => new Date(m.date) >= threeDaysAgo,
-      );
-
-      const result = (relevantMatches.length > 0 ? relevantMatches : allMatches.slice(-10)).map(enrichMatch);
-
-      matchCache = { data: result, fetchedAt: now };
-      return reply.send({ matches: result });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
-    }
+  // GET /api/competitions — list active competitions for frontend tabs
+  app.get('/api/competitions', async (_req, reply) => {
+    const competitions = await getActiveCompetitions();
+    return reply.send({ competitions });
   });
 
-  // GET /api/matches/live
-  app.get('/api/matches/live', async (_request, reply) => {
-    const now = Date.now();
-    if (liveCache && now - liveCache.ts < LIVE_CACHE_TTL) {
-      return reply.send({ matches: liveCache.data, cached: true });
-    }
-    const matches = await fetchLiveMatches();
-    liveCache = { data: matches, ts: now };
-    return reply.send({ matches, cached: false });
-  });
+  // GET /api/matches/upcoming — accepts ?competition=xxx (default: worldcup2026)
+  app.get<{ Querystring: { competition?: string } }>(
+    '/api/matches/upcoming',
+    async (req, reply) => {
+      const competitionId = req.query.competition || 'worldcup2026';
+
+      // Legacy path for worldcup2026: keep existing openfootball logic intact
+      if (competitionId === 'worldcup2026') {
+        const now = Date.now();
+        if (matchCache && now - matchCache.fetchedAt < CACHE_TTL_MS) {
+          return reply.send({ matches: matchCache.data });
+        }
+
+        try {
+          const res = await fetch(OPENFOOTBALL_URL);
+          if (!res.ok) throw new Error(`Upstream returned ${res.status}`);
+          const json = (await res.json()) as { matches: MatchRaw[] };
+
+          const allMatches = json.matches ?? [];
+
+          const threeDaysAgo = new Date();
+          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+          const relevantMatches = allMatches.filter(
+            (m) => new Date(m.date) >= threeDaysAgo,
+          );
+
+          const result = (relevantMatches.length > 0 ? relevantMatches : allMatches.slice(-10)).map(enrichMatch);
+
+          matchCache = { data: result, fetchedAt: now };
+          return reply.send({ matches: result });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
+        }
+      }
+
+      // New path: ESPN-sourced competitions
+      try {
+        const comp = await getCompetitionById(competitionId);
+        if (!comp) {
+          return reply.code(404).send({ error: 'COMPETITION_NOT_FOUND' });
+        }
+        const matches = await fetchMatchesForCompetitionCached(competitionId);
+        return reply.send({ matches, competition: comp });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
+      }
+    },
+  );
+
+  // GET /api/matches/live — accepts ?competition=xxx (default: worldcup2026)
+  app.get<{ Querystring: { competition?: string } }>(
+    '/api/matches/live',
+    async (req, reply) => {
+      const competitionId = req.query.competition || 'worldcup2026';
+
+      // Legacy path for worldcup2026: keep existing live logic intact
+      if (competitionId === 'worldcup2026') {
+        const now = Date.now();
+        if (liveCache && now - liveCache.ts < LIVE_CACHE_TTL) {
+          return reply.send({ matches: liveCache.data, cached: true });
+        }
+        const matches = await fetchLiveMatches();
+        liveCache = { data: matches, ts: now };
+        return reply.send({ matches, cached: false });
+      }
+
+      // New path: ESPN-sourced competitions — return normalized matches with live/finished status
+      try {
+        const comp = await getCompetitionById(competitionId);
+        if (!comp) {
+          return reply.code(404).send({ error: 'COMPETITION_NOT_FOUND' });
+        }
+        const matches = await fetchMatchesForCompetitionCached(competitionId);
+        const liveOrRecent = matches.filter(m => m.status === 'live' || m.status === 'finished');
+        return reply.send({ matches: liveOrRecent, competition: comp });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return reply.code(502).send({ error: 'UPSTREAM_FETCH_FAILED', detail: msg });
+      }
+    },
+  );
 
   // POST /api/predictions/resolve (admin only)
   app.post<{
