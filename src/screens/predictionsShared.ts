@@ -9,6 +9,11 @@ export type LiveMatch = {
   status: 'in_progress' | 'final' | 'scheduled';
   clock: string;
   date: string;
+  scorers1?: string[];
+  scorers2?: string[];
+  stage?: string;
+  homePenaltyScore?: number;
+  awayPenaltyScore?: number;
 };
 
 export type RawMatch = {
@@ -17,10 +22,14 @@ export type RawMatch = {
   time?: string;
   team1?: RawTeam;
   team2?: RawTeam;
-  score?: { ft?: number[]; et?: number[]; p?: number[] } | null;
+  score?: { ft?: number[]; et?: number[]; p?: number[]; ht?: number[] } | null;
   round?: string;
   group?: string;
   venue?: string;
+  ground?: string;
+  goals1?: { name: string; minute: string; penalty?: boolean; owngoal?: boolean }[];
+  goals2?: { name: string; minute: string; penalty?: boolean; owngoal?: boolean }[];
+  kickoffUtc?: string | null;
 };
 
 export function teamName(t: RawTeam | undefined): string {
@@ -68,4 +77,31 @@ export const FLAGS: Record<string, string> = {
   'Colombia': '🇨🇴', 'Ecuador': '🇪🇨', 'Uruguay': '🇺🇾',
   'South Korea': '🇰🇷', 'Saudi Arabia': '🇸🇦', 'Iran': '🇮🇷',
   'Ivory Coast': '🇨🇮', 'Cape Verde': '🇨🇻',
+};
+
+export const TEAM_TO_ISO: Record<string, string> = {
+  // --- Already in FLAGS ---
+  'France': 'fr', 'Portugal': 'pt', 'Spain': 'es',
+  'England': 'gb-eng', 'Brazil': 'br', 'Argentina': 'ar',
+  'Germany': 'de', 'Netherlands': 'nl', 'Belgium': 'be',
+  'Croatia': 'hr', 'Morocco': 'ma', 'USA': 'us',
+  'United States': 'us', 'Mexico': 'mx', 'Japan': 'jp',
+  'Senegal': 'sn', 'DR Congo': 'cd', 'South Africa': 'za',
+  'Algeria': 'dz', 'Switzerland': 'ch', 'Austria': 'at',
+  'Sweden': 'se', 'Norway': 'no', 'Canada': 'ca',
+  'Australia': 'au', 'Colombia': 'co', 'Ecuador': 'ec',
+  'Uruguay': 'uy', 'South Korea': 'kr', 'Korea Republic': 'kr',
+  'Saudi Arabia': 'sa', 'Iran': 'ir', 'IR Iran': 'ir',
+  'Ivory Coast': 'ci', "Côte d'Ivoire": 'ci', "Cote d'Ivoire": 'ci',
+  'Cape Verde': 'cv',
+  // --- Previously missing (17 teams) ---
+  'Ghana': 'gh', 'Egypt': 'eg', 'Paraguay': 'py',
+  'Czech Republic': 'cz',
+  'Bosnia & Herzegovina': 'ba', 'Bosnia and Herzegovina': 'ba',
+  'Qatar': 'qa', 'Scotland': 'gb-sct', 'Haiti': 'ht',
+  'Turkey': 'tr', 'Curaçao': 'cw', 'Curacao': 'cw',
+  'Tunisia': 'tn', 'New Zealand': 'nz', 'Iraq': 'iq',
+  'Jordan': 'jo', 'Uzbekistan': 'uz', 'Panama': 'pa',
+  // --- Name variants from worldcup26.ir ---
+  'Democratic Republic of the Congo': 'cd', 'Congo DR': 'cd',
 };
