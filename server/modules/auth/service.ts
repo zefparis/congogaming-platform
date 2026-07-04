@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../../lib/supabase.js';
 import type { AuthUser } from './types.js';
 
 import { env } from '../../env.js';
+import { toUnipayPhone } from '../../lib/unipay-cglt.js';
 
 const MAX_LOGIN_FAILURES = env.AUTH_MAX_FAILURES;
 const LOCKOUT_MINUTES = env.AUTH_LOCKOUT_MINUTES;
@@ -127,6 +128,46 @@ export async function registerUser(input: { phone: string; pin: string; referral
     if (error.code === '23505') throw new Error('PHONE_ALREADY_REGISTERED');
     throw new Error(error.message);
   }
+
+  // Fire-and-forget: provision a UniPay wallet for this user.
+  // If unipay-api is down or returns an error, registration still succeeds.
+  // The lazy provisioning in unipay-api (findOrCreateWalletByPhone) will
+  // create the wallet on the first CGLT interaction if this call fails.
+  const unipayPhone = toUnipayPhone(input.phone);
+  const unipayUrl = env.UNIPAY_API_URL ?? 'https://unipay-api.onrender.com';
+  const gamingKey = env.GAMING_API_KEY;
+  if (unipayPhone && gamingKey) {
+    fetch(`${unipayUrl}/v1/wallet/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': gamingKey,
+      },
+      body: JSON.stringify({
+        phone: unipayPhone,
+        pin: input.pin,
+        full_name: undefined,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          // 409 = phone already registered on unipay side — that's fine
+          if (res.status !== 409) {
+            console.error(
+              `[auth] UniPay wallet provisioning failed for user ${data.id}: ${res.status} ${JSON.stringify(body)}`,
+            );
+          }
+        }
+      })
+      .catch((err) => {
+        console.error(
+          `[auth] UniPay wallet provisioning error for user ${data.id}:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      });
+  }
+
   return sanitizeUser(data);
 }
 

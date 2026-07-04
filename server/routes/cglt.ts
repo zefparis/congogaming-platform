@@ -84,10 +84,9 @@ const cgltRoutes: FastifyPluginAsync = async (app) => {
         '[cglt/balance] failed',
       );
       if (e instanceof CgltError) {
-        // A missing UniPay wallet (404) is normal for a brand-new player.
-        if (e.status === 404) return reply.send({ phone: null, cglt_balance: 0, equivalent_usdt: null });
-        // Don't leak an upstream 500 as our own 500: report it as a 502
-        // Bad Gateway so the cause (UniPay) is unambiguous.
+        // With lazy provisioning in unipay-api, a 404 should never happen —
+        // the wallet is created on-the-fly if missing. If we still get a 404,
+        // treat it as an upstream error rather than silently returning 0.
         const status = e.status >= 500 ? 502 : e.status;
         return reply.code(status).send({ error: e.code || 'cglt_upstream_error', upstream_status: e.status });
       }
