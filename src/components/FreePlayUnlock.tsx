@@ -37,6 +37,7 @@ type Phase = 'intro' | 'countdown' | 'game' | 'waiting' | 'results';
 interface Props {
   onComplete: (freePlays: number) => void;
   onSkip: () => void;
+  userId: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -97,17 +98,17 @@ function deviceType(): 'mobile' | 'desktop' {
   return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
 }
 
-const FREE_PLAYS_KEY = 'cg_free_plays_pending';
-const FREE_PLAY_COMPLETED_KEY = 'cg_free_play_completed';
+const getFreePlaysKey = (uid: string) => `cg_free_plays_pending_${uid || 'anonymous'}`;
+const getFreePlayCompletedKey = (uid: string) => `cg_free_play_completed_${uid || 'anonymous'}`;
 
-function setLocalFreePlays(n: number) {
-  localStorage.setItem(FREE_PLAYS_KEY, String(n));
-  localStorage.setItem(FREE_PLAY_COMPLETED_KEY, 'true');
+function setLocalFreePlays(n: number, uid: string) {
+  localStorage.setItem(getFreePlaysKey(uid), String(n));
+  localStorage.setItem(getFreePlayCompletedKey(uid), 'true');
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function FreePlayUnlock({ onComplete, onSkip }: Props) {
+export default function FreePlayUnlock({ onComplete, onSkip, userId }: Props) {
   const [phase, setPhase] = useState<Phase>('intro');
   const [countdown, setCountdown] = useState(3);
   const [currentRound, setCurrentRound] = useState(0);
@@ -277,10 +278,10 @@ export default function FreePlayUnlock({ onComplete, onSkip }: Props) {
     // Credit free plays server-side (idempotent), then sync localStorage
     try {
       const result = await api.freePlaysCredit('cognitive_test');
-      setLocalFreePlays(result.plays_remaining);
+      setLocalFreePlays(result.plays_remaining, userId);
     } catch {
       // Fallback: credit localStorage only so the UI still works offline
-      setLocalFreePlays(5);
+      setLocalFreePlays(5, userId);
     }
   }, []);
 
