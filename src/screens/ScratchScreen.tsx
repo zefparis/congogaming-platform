@@ -47,8 +47,8 @@ const cellRect = (i: number) => {
   };
 };
 
-const FREE_PLAYS_KEY = 'cg_free_plays_pending';
-const FREE_PLAY_COMPLETED_KEY = 'cg_free_play_completed';
+const getFreePlaysKey = (uid: string) => `cg_free_plays_pending_${uid || 'anonymous'}`;
+const getFreePlayCompletedKey = (uid: string) => `cg_free_play_completed_${uid || 'anonymous'}`;
 
 export default function ScratchScreen() {
   const { t } = useTranslation();
@@ -64,22 +64,27 @@ export default function ScratchScreen() {
 
   // Free Play Unlock gate — one-time cognitive test, never repeated
   const [showFreePlay, setShowFreePlay] = useState<boolean>(() => {
-    const completed = localStorage.getItem(FREE_PLAY_COMPLETED_KEY);
-    const pending = parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
+    const completed = localStorage.getItem(getFreePlayCompletedKey(userId));
+    const pending = parseInt(localStorage.getItem(getFreePlaysKey(userId)) || '0', 10);
     return !completed && pending === 0;
   });
   const [freePlaysAvailable, setFreePlaysAvailable] = useState<number>(() => {
-    return parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
+    return parseInt(localStorage.getItem(getFreePlaysKey(userId)) || '0', 10);
   });
   // Sync free plays count from server on mount (source of truth)
   useEffect(() => {
     if (!userId) return;
+    // Clean up legacy global keys (pre-user-scoping) to stop cross-account pollution
+    const legacyCompleted = localStorage.getItem('cg_free_play_completed');
+    if (legacyCompleted) localStorage.removeItem('cg_free_play_completed');
+    const legacyPending = localStorage.getItem('cg_free_plays_pending');
+    if (legacyPending) localStorage.removeItem('cg_free_plays_pending');
     api.freePlaysBalance().then((res) => {
       const serverCount = res.plays_remaining;
-      localStorage.setItem(FREE_PLAYS_KEY, String(serverCount));
+      localStorage.setItem(getFreePlaysKey(userId), String(serverCount));
       setFreePlaysAvailable(serverCount);
       // If server says 0 and test not yet completed, show the modal
-      if (serverCount === 0 && !localStorage.getItem(FREE_PLAY_COMPLETED_KEY)) {
+      if (serverCount === 0 && !localStorage.getItem(getFreePlayCompletedKey(userId))) {
         setShowFreePlay(true);
       }
     }).catch(() => { /* best-effort */ });
@@ -520,7 +525,7 @@ export default function ScratchScreen() {
     const usingFreePlay = freePlaysAvailable > 0;
     if (usingFreePlay) {
       const remaining = freePlaysAvailable - 1;
-      localStorage.setItem(FREE_PLAYS_KEY, String(remaining));
+      localStorage.setItem(getFreePlaysKey(userId), String(remaining));
       setFreePlaysAvailable(remaining);
     }
 
@@ -551,13 +556,13 @@ export default function ScratchScreen() {
   const handleFreePlayComplete = (_awarded: number) => {
     // FreePlayUnlock already credited server-side and set localStorage.
     // Read the authoritative count from localStorage (set by FreePlayUnlock).
-    const synced = parseInt(localStorage.getItem(FREE_PLAYS_KEY) || '0', 10);
+    const synced = parseInt(localStorage.getItem(getFreePlaysKey(userId)) || '0', 10);
     setFreePlaysAvailable(synced);
     setShowFreePlay(false);
   };
 
   const handleFreePlaySkip = () => {
-    localStorage.setItem(FREE_PLAY_COMPLETED_KEY, 'true');
+    localStorage.setItem(getFreePlayCompletedKey(userId), 'true');
     setShowFreePlay(false);
   };
 
@@ -565,6 +570,7 @@ export default function ScratchScreen() {
     <>
       {showFreePlay && (
         <FreePlayUnlock
+          userId={userId}
           onComplete={handleFreePlayComplete}
           onSkip={handleFreePlaySkip}
         />
