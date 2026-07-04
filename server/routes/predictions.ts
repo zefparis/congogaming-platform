@@ -12,8 +12,12 @@ export interface MatchRaw {
   time?: string;
   team1?: unknown;
   team2?: unknown;
-  score?: unknown;
+  score?: { ft?: number[]; ht?: number[]; et?: number[]; p?: number[] } | null;
   group?: string;
+  round?: string;
+  goals1?: { name: string; minute: string; penalty?: boolean; owngoal?: boolean }[];
+  goals2?: { name: string; minute: string; penalty?: boolean; owngoal?: boolean }[];
+  ground?: string;
   [key: string]: unknown;
 }
 
@@ -21,6 +25,21 @@ export interface MatchRaw {
 export let matchCache: { data: unknown[]; fetchedAt: number } | null = null;
 
 const LIVE_CACHE_TTL = 60_000;
+
+function parseMatchDateTime(date: string, time?: string): string | null {
+  if (!time) return null;
+  const match = time.match(/(\d{1,2}):(\d{2})\s*UTC([+-]\d+)/);
+  if (!match) return null;
+  const [, hh, mm, offset] = match;
+  const utcHour = parseInt(hh, 10) - parseInt(offset, 10);
+  const dt = new Date(`${date}T00:00:00Z`);
+  dt.setUTCHours(utcHour, parseInt(mm, 10), 0, 0);
+  return dt.toISOString();
+}
+
+function enrichMatch(m: MatchRaw): MatchRaw & { kickoffUtc?: string | null } {
+  return { ...m, kickoffUtc: parseMatchDateTime(m.date, m.time) };
+}
 
 type LiveMatch = {
   id: string;
@@ -31,9 +50,26 @@ type LiveMatch = {
   status: 'in_progress' | 'final' | 'scheduled';
   clock: string;
   date: string;
+  scorers1?: string[];
+  scorers2?: string[];
+  stage?: string;
+  homePenaltyScore?: number;
+  awayPenaltyScore?: number;
 };
 
 export let liveCache: { data: LiveMatch[]; ts: number } | null = null;
+
+function parseScorers(raw: string): string[] | undefined {
+  if (!raw || raw === 'null' || raw === 'undefined') return undefined;
+  try {
+    const cleaned = raw.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    const items = cleaned.match(/\{?"?([^"}]+?)"?\}/g);
+    if (!items) return undefined;
+    return items.map(s => s.replace(/[{}"]/g, '').trim()).filter(Boolean);
+  } catch {
+    return undefined;
+  }
+}
 
 export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   // PRIMARY: worldcup26.ir
@@ -57,6 +93,11 @@ export async function fetchLiveMatches(): Promise<LiveMatch[]> {
               : 'in_progress',
         clock:  String(g.time_elapsed ?? ''),
         date:   String(g.local_date ?? ''),
+        scorers1: parseScorers(String(g.home_scorers ?? '')),
+        scorers2: parseScorers(String(g.away_scorers ?? '')),
+        stage:   String(g.type ?? ''),
+        homePenaltyScore: g.home_penalty_score && g.home_penalty_score !== 'null' ? parseInt(String(g.home_penalty_score), 10) : undefined,
+        awayPenaltyScore: g.away_penalty_score && g.away_penalty_score !== 'null' ? parseInt(String(g.away_penalty_score), 10) : undefined,
       })) as LiveMatch[];
     }
   } catch { /* fall through to ESPN */ }
@@ -433,7 +474,7 @@ export default async function predictionsRoutes(app: FastifyInstance) {
         (m) => new Date(m.date) >= threeDaysAgo,
       );
 
-      const result = relevantMatches.length > 0 ? relevantMatches : allMatches.slice(-10);
+      const result = (relevantMatches.length > 0 ? relevantMatches : allMatches.slice(-10)).map(enrichMatch);
 
       matchCache = { data: result, fetchedAt: now };
       return reply.send({ matches: result });

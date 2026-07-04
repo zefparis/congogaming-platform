@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { RefreshCw, Trophy } from 'lucide-react';
 import PredictionModal from './PredictionModal';
-import { teamName, FLAGS, type RawMatch, type LiveMatch, isPlayed, finalScore } from './predictionsShared';
+import { teamName, type RawMatch, type LiveMatch, isPlayed, finalScore } from './predictionsShared';
+import { Flag } from '../components/Flag';
 import { getSession } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 
@@ -65,6 +66,53 @@ function formatDate(d: string): string {
   } catch {
     return d;
   }
+}
+
+function formatKickoff(kickoffUtc: string | null | undefined, fallbackDate: string, fallbackTime?: string): string {
+  if (kickoffUtc) {
+    try {
+      const date = new Date(kickoffUtc);
+      const dayMonth = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date);
+      const time = new Intl.DateTimeFormat('fr-FR', {
+        hour: '2-digit', minute: '2-digit',
+        timeZone: 'Africa/Kinshasa',
+      }).format(date);
+      return `${dayMonth} · ${time}`;
+    } catch {
+      // fall through to fallback
+    }
+  }
+  return `${formatDate(fallbackDate)}${fallbackTime ? ` · ${fallbackTime}` : ''}`;
+}
+
+function formatStage(m: RawMatch): string {
+  const group = m.group ?? '';
+  const round = m.round ?? '';
+  if (group && round) return `${round} — ${group}`;
+  return group || round || 'WC 2026';
+}
+
+function ScorersDisplay({ goals1, goals2, scorers1, scorers2 }: {
+  goals1?: { name: string; minute: string }[];
+  goals2?: { name: string; minute: string }[];
+  scorers1?: string[];
+  scorers2?: string[];
+}) {
+  const hasData = (goals1?.length || goals2?.length || scorers1?.length || scorers2?.length);
+  if (!hasData) return null;
+  const formatOpenfootball = (goals?: { name: string; minute: string }[]) =>
+    goals?.map(g => `${g.name} ${g.minute}'`).join(', ') || '';
+  const formatLive = (scorers?: string[]) =>
+    scorers?.join(', ') || '';
+  const homeScorers = formatOpenfootball(goals1) || formatLive(scorers1);
+  const awayScorers = formatOpenfootball(goals2) || formatLive(scorers2);
+  if (!homeScorers && !awayScorers) return null;
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 12, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+      <div style={{ flex: 1, textAlign: 'center' }}>{homeScorers}</div>
+      <div style={{ flex: 1, textAlign: 'center' }}>{awayScorers}</div>
+    </div>
+  );
 }
 
 function getLiveData(match: RawMatch, lives: LiveMatch[]): LiveMatch | null {
@@ -345,7 +393,7 @@ export default function PredictionsScreen() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0' }}>
                         <div style={{ flex: 1, textAlign: 'center' }}>
-                          <div style={{ fontSize: 40, marginBottom: 4 }}>{FLAGS[home] ?? '🏳️'}</div>
+                          <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><Flag team={home} size={40} /></div>
                           <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{home}</div>
                         </div>
                         <div style={{ textAlign: 'center', padding: '0 16px' }}>
@@ -354,7 +402,7 @@ export default function PredictionsScreen() {
                           </div>
                         </div>
                         <div style={{ flex: 1, textAlign: 'center' }}>
-                          <div style={{ fontSize: 40, marginBottom: 4 }}>{FLAGS[away] ?? '🏳️'}</div>
+                          <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><Flag team={away} size={40} /></div>
                           <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{away}</div>
                         </div>
                       </div>
@@ -372,20 +420,20 @@ export default function PredictionsScreen() {
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: 'rgba(255,215,0,0.7)' }}>
-                          {m.group ?? m.round ?? 'WC 2026'}
+                          {formatStage(m)}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {isFinal && (
                             <span style={{ fontSize: 9, fontWeight: 800, color: '#4ade80', letterSpacing: 1 }}>✅ {t('predictions.termine').toUpperCase()}</span>
                           )}
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-                            {formatDate(m.date)}{m.time ? ` · ${m.time}` : ''}
+                            {formatKickoff(m.kickoffUtc, m.date, m.time)}
                           </span>
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div style={{ flex: 1, textAlign: 'center' }}>
-                          <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[home] ?? '🏳️'}</div>
+                          <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><Flag team={home} size={32} /></div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{home}</div>
                         </div>
                         <div style={{ padding: '0 12px', textAlign: 'center', minWidth: 80 }}>
@@ -401,10 +449,25 @@ export default function PredictionsScreen() {
                           )}
                         </div>
                         <div style={{ flex: 1, textAlign: 'center' }}>
-                          <div style={{ fontSize: 32, marginBottom: 4 }}>{FLAGS[away] ?? '🏳️'}</div>
+                          <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><Flag team={away} size={32} /></div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{away}</div>
                         </div>
                       </div>
+                      {isFinal && (
+                        <>
+                          <ScorersDisplay
+                            goals1={m.goals1}
+                            goals2={m.goals2}
+                            scorers1={liveData?.scorers1}
+                            scorers2={liveData?.scorers2}
+                          />
+                          {m.ground && (
+                            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                              📍 {m.ground}
+                            </div>
+                          )}
+                        </>
+                      )}
                       {!isFinal && (
                         <motion.button
                           type="button"
