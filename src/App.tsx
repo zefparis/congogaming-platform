@@ -25,6 +25,7 @@ import BottomNav from './components/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
 import { LanguageToggle } from './components/LanguageToggle';
 import { clearSession, getSession, refreshSession } from './lib/auth';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function PageWrap({ children, fullscreen = false }: { children: React.ReactNode; fullscreen?: boolean }) {
   if (fullscreen) {
@@ -231,8 +232,10 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <AuthBootstrap>
-      <AppShell />
-    </AuthBootstrap>
+    <ErrorBoundary>
+      <AuthBootstrap>
+        <AppShell />
+      </AuthBootstrap>
+    </ErrorBoundary>
   );
 }
