@@ -69,6 +69,18 @@ export class AdminAuthError extends Error {
   }
 }
 
+/** Clear all admin session data from localStorage + sessionStorage. */
+export function clearAdminSession(): void {
+  setAdminToken(null);
+  setAdminSecret(null);
+  setAdminPhone(null);
+  try {
+    sessionStorage.removeItem('cg_admin_role');
+  } catch {
+    /* ignore */
+  }
+}
+
 // Direct (no-retry, no auto-reauth) fetch used internally by request() and by
 // the silent re-auth path to avoid infinite loops.
 async function rawFetch(path: string, opts: RequestInit, token: string | null): Promise<Response> {
@@ -92,12 +104,19 @@ async function silentReauth(): Promise<string | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret, phone: getAdminPhone() || undefined }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // The cached secret is stale (e.g. after rotation). Invalidate the
+      // entire local session so the UI falls back to PinGate instead of
+      // looping silently on every subsequent request.
+      clearAdminSession();
+      return null;
+    }
     const data = (await res.json()) as { token?: string };
     if (data?.token) {
       setAdminToken(data.token);
       return data.token;
     }
+    clearAdminSession();
     return null;
   } catch {
     return null;
@@ -119,7 +138,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   }
 
   if (res.status === 401) {
-    setAdminToken(null);
+    clearAdminSession();
     throw new AdminAuthError();
   }
 
@@ -634,7 +653,7 @@ export async function approveKyc(
     body: JSON.stringify({}),
   });
   if (res.status === 401) {
-    setAdminToken(null);
+    clearAdminSession();
     throw new AdminAuthError();
   }
   if (!res.ok) {
@@ -658,7 +677,7 @@ export async function denyKyc(
     body: JSON.stringify({}),
   });
   if (res.status === 401) {
-    setAdminToken(null);
+    clearAdminSession();
     throw new AdminAuthError();
   }
   if (!res.ok) {
@@ -679,7 +698,7 @@ export async function downloadTransactionsCsv(params: Record<string, string | un
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (res.status === 401) {
-    setAdminToken(null);
+    clearAdminSession();
     throw new AdminAuthError();
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
