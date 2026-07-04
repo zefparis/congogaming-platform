@@ -8,8 +8,8 @@ import { isCongoLotoEnabled } from './lib/featureFlags.js';
 import { supabaseAdmin } from './lib/supabase.js';
 import { startReconciliationLoop } from './lib/unipesa-reconciliation.js';
 import { env } from './env.js';
-import { resolveMatchPredictions, fetchLiveMatches } from './routes/predictions.js';
-import { finalScore, isPlayed, teamName } from '../src/screens/predictionsShared.js';
+import { resolveMatchPredictions } from './routes/predictions.js';
+import { fetchMatchesForCompetition, getActiveCompetitions, type NormalizedMatch } from './lib/matchSources.js';
 
 /**
  * Self-healing recovery for Loto Express (Flash) draws.
@@ -241,10 +241,9 @@ function scheduleNextFlashDraw() {
 
 // =============================================================
 // Predictions auto-resolve — detection + resolution (every 15 min)
+// Multi-competition: iterates over all active competitions and
+// resolves pending predictions using the appropriate data source.
 // =============================================================
-
-const OPENFOOTBALL_URL =
-  'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
 
 async function getResolveMode(): Promise<'manual' | 'auto'> {
   const { data } = await supabaseAdmin
@@ -253,15 +252,6 @@ async function getResolveMode(): Promise<'manual' | 'auto'> {
     .eq('key', 'predictions_resolve_mode')
     .maybeSingle();
   return data?.value === 'auto' ? 'auto' : 'manual';
-}
-
-async function fetchOpenfootballMatches(): Promise<any[]> {
-  try {
-    const res = await fetch(OPENFOOTBALL_URL, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const json = await res.json() as { matches?: any[] };
-    return json.matches ?? [];
-  } catch { return []; }
 }
 
 async function detectAndResolvePredictions() {
@@ -275,10 +265,10 @@ async function detectAndResolvePredictions() {
   const mode = await getResolveMode();
   console.log(`[PREDICTIONS RESOLVE] Running detection (mode=${mode})`);
 
-  // 1. Get all pending predictions grouped by match_id
+  // 1. Get all pending predictions grouped by match_id + competition_id
   const { data: pendingPreds, error: pendErr } = await supabaseAdmin
     .from('predictions')
-    .select('match_id')
+    .select('match_id, competition_id')
     .eq('status', 'pending');
   if (pendErr) { console.error('[PREDICTIONS RESOLVE] Failed to fetch pending:', pendErr.message); return; }
 
@@ -287,67 +277,71 @@ async function detectAndResolvePredictions() {
     return;
   }
 
-  const pendingMatchIds = [...new Set(pendingPreds.map(p => String(p.match_id)))];
+  // Group pending match IDs by competition_id
+  const pendingByCompetition = new Map<string, Set<string>>();
+  for (const p of pendingPreds) {
+    const compId = (p as Record<string, unknown>).competition_id as string ?? 'worldcup2026';
+    const matchId = String(p.match_id);
+    if (!pendingByCompetition.has(compId)) pendingByCompetition.set(compId, new Set());
+    pendingByCompetition.get(compId)!.add(matchId);
+  }
 
   // 2. Filter out matches that already have a resolution row
+  const allPendingMatchIds = [...new Set(pendingPreds.map(p => String(p.match_id)))];
   const { data: alreadyResolved } = await supabaseAdmin
     .from('match_resolutions')
     .select('match_id')
-    .in('match_id', pendingMatchIds);
+    .in('match_id', allPendingMatchIds);
   const resolvedSet = new Set((alreadyResolved ?? []).map(r => r.match_id));
-  const unresolvedMatchIds = pendingMatchIds.filter(id => !resolvedSet.has(id));
 
-  if (unresolvedMatchIds.length === 0) {
-    console.log('[PREDICTIONS RESOLVE] All pending matches already resolved');
+  // 3. Get active competitions
+  const competitions = await getActiveCompetitions();
+  if (competitions.length === 0) {
+    console.log('[PREDICTIONS RESOLVE] No active competitions configured');
     return;
   }
 
-  // 3. Fetch openfootball matches + live data to find final scores
-  const ofMatches = await fetchOpenfootballMatches();
-  const liveMatches = await fetchLiveMatches();
-
-  // Build a lookup: match_id (num as string) → RawMatch
-  const matchLookup = new Map<string, any>();
-  for (const m of ofMatches) {
-    if (m.num != null) matchLookup.set(String(m.num), m);
-  }
-
-  // 4. For each unresolved match, check if it's final and has a score
+  // 4. For each competition, fetch matches and find ready-to-resolve ones
   const readyToResolve: { matchId: string; scoreHome: number; scoreAway: number }[] = [];
   let circuitBreakerCount = 0;
+  let totalUnresolved = 0;
 
-  for (const matchId of unresolvedMatchIds) {
-    const rawMatch = matchLookup.get(matchId);
-    if (!rawMatch) continue;
+  for (const comp of competitions) {
+    const pendingMatchIds = pendingByCompetition.get(comp.id);
+    if (!pendingMatchIds || pendingMatchIds.size === 0) continue;
 
-    // Check if match is played (has score in openfootball data)
-    const played = isPlayed(rawMatch);
-    const fs = finalScore(rawMatch);
+    const unresolvedIds = [...pendingMatchIds].filter(id => !resolvedSet.has(id));
+    if (unresolvedIds.length === 0) continue;
+    totalUnresolved += unresolvedIds.length;
 
-    // Also check live data for final status
-    const t1 = teamName(rawMatch.team1).toLowerCase();
-    const t2 = teamName(rawMatch.team2).toLowerCase();
-    const live = liveMatches.find(l =>
-      l.team1.toLowerCase() === t1 && l.team2.toLowerCase() === t2
-    );
-    const isLiveFinal = live?.status === 'final';
+    // Fetch matches for this competition via the unified abstraction
+    const matches = await fetchMatchesForCompetition(comp.id, comp);
+    if (matches.length === 0) continue;
 
-    if (!played && !isLiveFinal) continue;
-
-    // Circuit breaker: match is final but no score available
-    if ((played || isLiveFinal) && !fs) {
-      circuitBreakerCount++;
-      console.warn(`[PREDICTIONS RESOLVE] Circuit breaker: match ${matchId} is final but has no score — skipping (manual required)`);
-      continue;
+    // Build lookup by match ID
+    const matchLookup = new Map<string, NormalizedMatch>();
+    for (const m of matches) {
+      matchLookup.set(m.id, m);
     }
 
-    if (fs && fs.length >= 2) {
-      readyToResolve.push({ matchId, scoreHome: fs[0], scoreAway: fs[1] });
+    for (const matchId of unresolvedIds) {
+      const match = matchLookup.get(matchId);
+      if (!match) continue;
+
+      // Only resolve finished matches with scores
+      if (match.status !== 'finished') continue;
+      if (match.homeScore == null || match.awayScore == null) {
+        circuitBreakerCount++;
+        console.warn(`[PREDICTIONS RESOLVE] Circuit breaker: match ${matchId} (${comp.id}) is finished but has no score — skipping (manual required)`);
+        continue;
+      }
+
+      readyToResolve.push({ matchId, scoreHome: match.homeScore, scoreAway: match.awayScore });
     }
   }
 
   if (readyToResolve.length === 0) {
-    console.log(`[PREDICTIONS RESOLVE] No matches ready (circuit breaker: ${circuitBreakerCount}, unresolved: ${unresolvedMatchIds.length})`);
+    console.log(`[PREDICTIONS RESOLVE] No matches ready (circuit breaker: ${circuitBreakerCount}, unresolved: ${totalUnresolved})`);
     return;
   }
 
