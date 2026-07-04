@@ -20,12 +20,32 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import { adminApi } from '../../lib/adminApi';
+import { adminApi, AdminAuthError, clearAdminSession } from '../../lib/adminApi';
 import { fmtCdf, fmtInt, fmtRelative } from './format';
 
 type Overview = Awaited<ReturnType<typeof adminApi.overview>>;
 
 type Activity = Awaited<ReturnType<typeof adminApi.activity>>['events'][number];
+
+interface FetchError {
+  __error: string;
+  __isAuthError: boolean;
+}
+
+function isAuthError(e: unknown): boolean {
+  if (e instanceof AdminAuthError) return true;
+  if (e instanceof Error) {
+    const msg = e.message.toLowerCase();
+    return msg.includes('unauthorized') || msg.includes('401') || msg.includes('403');
+  }
+  return false;
+}
+
+function catchFetch<T>(fallback: T, e: unknown): T & Partial<FetchError> {
+  const authErr = isAuthError(e);
+  const message = e instanceof Error ? e.message : String(e);
+  return { ...fallback, __error: message, __isAuthError: authErr };
+}
 
 function Kpi({
   icon,
@@ -82,20 +102,28 @@ export default function OverviewTab() {
   );
   const [revenue, setRevenue] = useState<Array<{ day: string; profit_cdf: number }>>([]);
   const [events, setEvents] = useState<Activity[]>([]);
+  const [authError, setAuthError] = useState(false);
 
   async function loadAll() {
     const [ov, ap, rev] = await Promise.all([
-      adminApi.overview().catch(() => null),
-      adminApi.avadapayBalance(),
-      adminApi.revenue(7).catch(() => ({ series: [] as any })),
+      adminApi.overview().catch((e) => catchFetch<Overview>(null as unknown as Overview, e)),
+      adminApi.avadapayBalance().catch((e) => {
+        const authErr = isAuthError(e);
+        if (authErr) setAuthError(true);
+        return { balance_cdf: null as number | null, error: e instanceof Error ? e.message : String(e) };
+      }),
+      adminApi.revenue(7).catch((e) => catchFetch<{ series: Array<{ day: string; profit_cdf: number }> }>({ series: [] }, e)),
     ]);
-    if (ov) setOverview(ov);
+    if ((ov as Partial<FetchError>).__isAuthError) setAuthError(true);
+    if ((rev as Partial<FetchError>).__isAuthError) setAuthError(true);
+    if (ov && !(ov as Partial<FetchError>).__error) setOverview(ov);
     setAvadapay(ap as any);
     setRevenue(rev.series || []);
   }
 
   async function loadActivity() {
-    const a = await adminApi.activity(10).catch(() => ({ events: [] as Activity[] }));
+    const a = await adminApi.activity(10).catch((e) => catchFetch<{ events: Activity[] }>({ events: [] }, e));
+    if ((a as Partial<FetchError>).__isAuthError) setAuthError(true);
     setEvents(a.events || []);
   }
 
@@ -112,6 +140,26 @@ export default function OverviewTab() {
 
   return (
     <div className="space-y-6">
+      {authError && (
+        <div className="flex items-center justify-between rounded-2xl border border-red-500/40 bg-red-500/10 p-4">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-display text-lg text-red-300">Session admin expirée ou invalide</p>
+              <p className="text-sm text-red-300/70">Reconnexion nécessaire — les données affichées peuvent être incomplètes.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              clearAdminSession();
+              window.location.reload();
+            }}
+            className="rounded-lg bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/30"
+          >
+            Se reconnecter
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Kpi
           icon={<Coins size={20} />}
