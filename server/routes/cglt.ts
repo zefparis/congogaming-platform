@@ -52,7 +52,8 @@ function describeError(e: unknown): Record<string, unknown> {
 }
 
 // Whether the server-to-server UniPay key is present (never log the value).
-const GAMING_API_KEY_SET = Boolean(env.GAMING_API_KEY);
+// Trust boundary 1: checks CONGOGAMING_UNIPAY_API_KEY (new) or GAMING_API_KEY (legacy)
+const GAMING_API_KEY_SET = Boolean(env.CONGOGAMING_UNIPAY_API_KEY ?? env.GAMING_API_KEY);
 
 /**
  * CGLT gaming bridge — server-side proxy so the browser never sees the

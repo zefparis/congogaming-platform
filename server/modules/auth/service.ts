@@ -135,7 +135,8 @@ export async function registerUser(input: { phone: string; pin: string; referral
   // create the wallet on the first CGLT interaction if this call fails.
   const unipayPhone = toUnipayPhone(input.phone);
   const unipayUrl = env.UNIPAY_API_URL ?? 'https://unipay-api.onrender.com';
-  const gamingKey = env.GAMING_API_KEY;
+  // Trust boundary 1: use CONGOGAMING_UNIPAY_API_KEY (new) with legacy GAMING_API_KEY fallback
+  const gamingKey = env.CONGOGAMING_UNIPAY_API_KEY ?? env.GAMING_API_KEY;
   if (unipayPhone && gamingKey) {
     fetch(`${unipayUrl}/v1/wallet/register`, {
       method: 'POST',

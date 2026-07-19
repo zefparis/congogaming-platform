@@ -30,6 +30,9 @@ const envSchema = z.object({
   VITE_WS_URL: z.string().optional(),
   // UniPay CGLT gaming integration (server-to-server; key must NOT be bundled)
   UNIPAY_API_URL: z.string().url().optional(),
+  // Trust boundary 1 sender: CongoGaming → UniPay API (new dedicated key)
+  CONGOGAMING_UNIPAY_API_KEY: z.string().min(8).optional(),
+  // LEGACY — kept for dual-key rotation only; replaced by CONGOGAMING_UNIPAY_API_KEY
   GAMING_API_KEY: z.string().min(8).optional(),
   // Feature flags. Defaults preserve the production behaviour; set the
   // env var explicitly per environment to flip the flag.
