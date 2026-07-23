@@ -275,6 +275,30 @@ export async function resolveMatchPredictions(opts: ResolveOptions): Promise<Res
   return { ok: true, resolved, won_count, lost_count, total_points_paid };
 }
 
+/**
+ * Pure leaderboard ranking function — exported for unit testing.
+ *
+ * Sort by total points descending. Tie-break: older account (earlier
+ * created_at ISO string) ranks higher, rewarding platform seniority.
+ * This is deterministic and independent of DB row return order.
+ */
+export function rankLeaderboard(
+  totals: Map<string, number>,
+  userCreatedAt: Map<string, string>,
+  limit: number = 10,
+): [string, number][] {
+  return [...totals.entries()]
+    .sort((a, b) => {
+      const pointsDiff = b[1] - a[1];
+      if (pointsDiff !== 0) return pointsDiff;
+      // Tie-break: older account (smaller created_at) wins
+      const createdA = userCreatedAt.get(a[0]) ?? '';
+      const createdB = userCreatedAt.get(b[0]) ?? '';
+      return createdA.localeCompare(createdB);
+    })
+    .slice(0, limit);
+}
+
 export default async function predictionsRoutes(app: FastifyInstance) {
   // POST /api/predictions
   app.post<{
@@ -421,10 +445,15 @@ export default async function predictionsRoutes(app: FastifyInstance) {
 
   // GET /api/leaderboard
   app.get('/api/leaderboard', async (req, reply) => {
+    // ORDER BY user_id ensures stable, reproducible row order from Postgres
+    // regardless of execution plan. The tie-break itself uses account age
+    // (see rankLeaderboard below), but a stable input order is also needed
+    // so that Map insertion order is deterministic.
     const { data: preds, error: predErr } = await supabaseAdmin
       .from('predictions')
       .select('user_id, points_won')
-      .not('points_won', 'is', null);
+      .not('points_won', 'is', null)
+      .order('user_id', { ascending: true });
 
     if (predErr) return reply.code(500).send({ error: predErr.message });
 
@@ -434,19 +463,24 @@ export default async function predictionsRoutes(app: FastifyInstance) {
       totals.set(p.user_id, (totals.get(p.user_id) ?? 0) + won);
     }
 
-    const top10 = [...totals.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
+    if (totals.size === 0) return reply.send({ leaderboard: [] });
 
-    if (top10.length === 0) return reply.send({ leaderboard: [] });
-
-    const userIds = top10.map(([id]) => id);
+    // Fetch display_name + created_at for ALL users who have predictions,
+    // not just the top 10 — we need created_at for the tie-break before
+    // we can determine who the top 10 actually are.
+    const allUserIds = [...totals.keys()];
     const { data: users } = await supabaseAdmin
       .from('users')
-      .select('id, display_name')
-      .in('id', userIds);
+      .select('id, display_name, created_at')
+      .in('id', allUserIds);
 
     const userMap = new Map((users ?? []).map((u) => [u.id, u]));
+    const userCreatedAt = new Map<string, string>();
+    for (const u of users ?? []) {
+      userCreatedAt.set(u.id, String(u.created_at ?? ''));
+    }
+
+    const top10 = rankLeaderboard(totals, userCreatedAt, 10);
 
     const leaderboard = top10.map(([user_id, total_points_won]) => {
       const u = userMap.get(user_id);
