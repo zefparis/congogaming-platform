@@ -19,8 +19,6 @@ import LegalScreen from './screens/LegalScreen';
 import OkapiGame from './screens/okapi/OkapiGame';
 import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
-import PredictionsScreen from './screens/PredictionsScreen';
-import MesParis from './screens/MesParis';
 import BottomNav from './components/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
 import { LanguageToggle } from './components/LanguageToggle';
@@ -60,28 +58,6 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * KYC-required route gate. Redirects users with pending KYC status to /kyc.
- * Used for features that require verified identity (e.g., predictions).
- */
-function KycRequiredRoute({ children, dest = '/predictions' }: { children: React.ReactNode; dest?: string }) {
-  const session = getSession();
-  if (!session) return <Navigate to="/splash" replace />;
-  if (session.blocked || session.kyc_status === 'denied') {
-    clearSession();
-    return <Navigate to="/splash" replace />;
-  }
-  if (session.kyc_status !== 'approved' && session.kyc_status !== 'verify_age') {
-    try {
-      localStorage.setItem('kyc_redirect', dest);
-    } catch {
-      /* storage unavailable — KycScreen will fall back to '/' */
-    }
-    return <Navigate to="/kyc" replace />;
-  }
-  return <>{children}</>;
-}
-
-/**
  * /kyc itself is protected against anonymous access but bypasses the
  * kyc_status check (otherwise we'd loop forever).
  */
@@ -101,7 +77,7 @@ function KycRoute() {
 
 function AppRoutes() {
   const location = useLocation();
-  const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte', '/predictions', '/mes-paris'].includes(location.pathname);
+  const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
   // The farming progress bar is now a sticky mini-bar rendered inside each
   // game screen (under its header) — no floating overlay here.
   return (
@@ -123,17 +99,6 @@ function AppRoutes() {
           <Route path="/okapi-color" element={<Protected><PageWrap><OkapiColorScreen /></PageWrap></Protected>} />
           <Route path="/legal" element={<Protected><PageWrap><LegalScreen /></PageWrap></Protected>} />
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />
-          <Route
-            path="/predictions"
-            element={
-              <Protected>
-                <KycRequiredRoute dest="/predictions">
-                  <PageWrap><PredictionsScreen /></PageWrap>
-                </KycRequiredRoute>
-              </Protected>
-            }
-          />
-          <Route path="/mes-paris" element={<Protected><PageWrap><MesParis /></PageWrap></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

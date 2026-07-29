@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../lib/adminApi';
 import { fmtCdf, fmtDateTime } from './format';
-import PredictionsSubTab from './PredictionsSubTab';
 
 type OkapiRow = Awaited<ReturnType<typeof adminApi.okapiRounds>>['items'][number];
 type LotoRow = Awaited<ReturnType<typeof adminApi.lotoTirages>>['items'][number];
@@ -628,13 +627,12 @@ function OkapiColorSubTab() {
 }
 
 export default function GamesTab() {
-  const [sub, setSub] = useState<'okapi' | 'loto' | 'scratch' | 'okapicolor' | 'predictions'>('okapi');
+  const [sub, setSub] = useState<'okapi' | 'loto' | 'scratch' | 'okapicolor'>('okapi');
   const SUBTABS: { id: typeof sub; label: string }[] = [
     { id: 'okapi',       label: 'OKAPI CLIMB' },
     { id: 'okapicolor',  label: 'OKAPI COLOR' },
     { id: 'loto',        label: 'LOTO' },
     { id: 'scratch',     label: 'SCRATCH' },
-    { id: 'predictions', label: 'PRÉDICTIONS' },
   ];
   return (
     <div className="space-y-4">
@@ -657,7 +655,6 @@ export default function GamesTab() {
       {sub === 'okapicolor'  && <OkapiColorSubTab />}
       {sub === 'loto'        && <LotoSubTab />}
       {sub === 'scratch'     && <ScratchSubTab />}
-      {sub === 'predictions' && <PredictionsSubTab />}
     </div>
   );
 }

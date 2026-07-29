@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getSession } from '../lib/auth';
 
+const GAMES = [
+  { name: 'Loto Express', icon: '⚡', color: '#00A86B' },
+  { name: 'Okapi Climb', icon: '🏔️', color: '#FFD700' },
+  { name: 'Okapi Color', icon: '🔴', color: '#ef4444' },
+  { name: 'Scratch Card', icon: '🎫', color: '#FFD700' },
+];
+
 /* ── Design tokens ─────────────────────────────────────────── */
 const BG = '#0f0a2e';
 const BG_2 = '#07051e';
@@ -179,9 +186,9 @@ export default function SplashScreen() {
             </div>
           </section>
 
-          {/* Match card preview */}
+          {/* Games preview grid */}
           <section
-            aria-label="Aperçu match"
+            aria-label="Aperçu jeux"
             className="w-full md:flex-1 mt-4 md:mt-0"
             style={{ ...fadeUp(0.16), display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingRight: 16, paddingTop: 4 }}
           >
@@ -194,21 +201,18 @@ export default function SplashScreen() {
                 boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
               }}
             >
-              <div style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,215,0,0.7)', letterSpacing: 1.5, textTransform: 'uppercase' as const, marginBottom: 8 }}>
-                Round of 16 · 2 juillet
+              <div style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,215,0,0.7)', letterSpacing: 1.5, textTransform: 'uppercase' as const, marginBottom: 10 }}>
+                {t('splash.games_preview')}
               </div>
-              <div style={{ textAlign: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 24 }}>🇨🇩</span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: '0 6px' }}>VS</span>
-                <span style={{ fontSize: 24 }}>🇵🇹</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {GAMES.map((g) => (
+                  <div key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
+                    <span style={{ fontSize: 16 }}>{g.icon}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: g.color, letterSpacing: 0.5 }}>{g.name}</span>
+                  </div>
+                ))}
               </div>
-              <div style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: 2, marginBottom: 10 }}>
-                CD &nbsp;·&nbsp; PT
-              </div>
-              <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.08)', marginBottom: 8 }}>
-                <div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg, #FFD700, #D9A400)', borderRadius: 4 }} />
-              </div>
-              <div style={{ textAlign: 'center', fontSize: 8.5, color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: 0.5 }}>
+              <div style={{ textAlign: 'center', fontSize: 8.5, color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: 0.5, marginTop: 10 }}>
                 {t('splash.match_preview')}
               </div>
             </div>
@@ -273,7 +277,7 @@ export default function SplashScreen() {
         >
           <button
             type="button"
-            onClick={() => nav('/predictions')}
+            onClick={() => nav(getSession() ? '/' : '/register')}
             style={{
               width: '100%',
               padding: '16px 0',
@@ -446,9 +450,9 @@ export default function SplashScreen() {
             lineHeight: 1.85,
           }}
         >
-          Congo Gaming · Coupe du Monde 2026
+          Congo Gaming · Agré MJS N°047/2016
           <br />
-          Agré MJS N°047/2016 · DRC Officiel
+          ARPTC N°0573-0574/2023 · DRC Officiel
         </footer>
       </div>
     </div>
