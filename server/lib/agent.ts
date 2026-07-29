@@ -3,7 +3,7 @@ import { supabaseAdmin } from './supabase.js';
 export async function recordAgentCommission(
   userId: string,
   ticketId: string,
-  ticketType: 'okapi_color' | 'flash' | 'scratch' | 'okapi',
+  ticketType: 'flash' | 'scratch' | 'okapi',
   amountCdf: number,
 ): Promise<void> {
   try {
@@ -26,14 +26,43 @@ export async function recordAgentCommission(
     const commissionCdf = Math.floor(amountCdf * Number(agent.commission_rate));
     if (commissionCdf <= 0) return;
 
-    await supabaseAdmin.from('agent_commissions').insert({
+    const commissionType = 'ticket';
+
+    // Idempotency: check if a commission already exists for this ticket + type.
+    // The DB unique constraint (agent_commissions_ticket_id_commission_type_key)
+    // is the ultimate guard against race conditions, but this check avoids
+    // unnecessary error logs in the common retry case.
+    const { data: existing } = await supabaseAdmin
+      .from('agent_commissions')
+      .select('id')
+      .eq('ticket_id', ticketId)
+      .eq('commission_type', commissionType)
+      .maybeSingle();
+
+    if (existing) {
+      console.log(`[agent-commission] duplicate skipped for ticket ${ticketId} (${commissionType})`);
+      return;
+    }
+
+    const { error: insertErr } = await supabaseAdmin.from('agent_commissions').insert({
       agent_id:           agent.id,
       user_id:            userId,
       ticket_id:          ticketId,
       ticket_type:        ticketType,
       ticket_amount_cdf:  amountCdf,
       commission_cdf:     commissionCdf,
+      commission_type:    commissionType,
     });
+
+    if (insertErr) {
+      // 23505 = unique_violation — race condition: another request already inserted.
+      // This is expected and safe; the commission was already recorded.
+      if (insertErr.code === '23505') {
+        console.log(`[agent-commission] race-condition duplicate skipped for ticket ${ticketId} (${commissionType})`);
+        return;
+      }
+      throw insertErr;
+    }
 
     await supabaseAdmin.rpc('increment_agent_total', {
       agent_id: agent.id,
@@ -47,7 +76,7 @@ export async function recordAgentCommission(
 export async function recordAgentWinCommission(
   userId: string,
   ticketId: string,
-  ticketType: 'okapi_color' | 'flash' | 'scratch',
+  ticketType: 'flash' | 'scratch',
   gainCdf: number,
 ): Promise<void> {
   try {
@@ -69,21 +98,43 @@ export async function recordAgentWinCommission(
     const commissionCdf = Math.floor(gainCdf * winRate);
     if (commissionCdf <= 0) return;
 
-    await Promise.all([
-      supabaseAdmin.from('agent_commissions').insert({
-        agent_id:          agent.id,
-        user_id:           userId,
-        ticket_id:         ticketId,
-        ticket_type:       ticketType,
-        ticket_amount_cdf: gainCdf,
-        commission_cdf:    commissionCdf,
-        commission_type:   'win',
-      }),
-      supabaseAdmin.rpc('increment_agent_total', {
-        agent_id: agent.id,
-        delta:    commissionCdf,
-      }),
-    ]);
+    const commissionType = 'win';
+
+    // Idempotency: check if a win commission already exists for this ticket.
+    const { data: existing } = await supabaseAdmin
+      .from('agent_commissions')
+      .select('id')
+      .eq('ticket_id', ticketId)
+      .eq('commission_type', commissionType)
+      .maybeSingle();
+
+    if (existing) {
+      console.log(`[agent-win-commission] duplicate skipped for ticket ${ticketId} (${commissionType})`);
+      return;
+    }
+
+    const { error: insertErr } = await supabaseAdmin.from('agent_commissions').insert({
+      agent_id:          agent.id,
+      user_id:           userId,
+      ticket_id:         ticketId,
+      ticket_type:       ticketType,
+      ticket_amount_cdf: gainCdf,
+      commission_cdf:    commissionCdf,
+      commission_type:   commissionType,
+    });
+
+    if (insertErr) {
+      if (insertErr.code === '23505') {
+        console.log(`[agent-win-commission] race-condition duplicate skipped for ticket ${ticketId} (${commissionType})`);
+        return;
+      }
+      throw insertErr;
+    }
+
+    await supabaseAdmin.rpc('increment_agent_total', {
+      agent_id: agent.id,
+      delta:    commissionCdf,
+    });
   } catch (err) {
     console.error('[agent-win-commission] failed:', err);
   }

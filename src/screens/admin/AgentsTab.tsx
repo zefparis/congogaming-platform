@@ -136,6 +136,7 @@ function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => voi
   const [phone, setPhone] = useState('');
   const [operator, setOperator] = useState('');
   const [notes, setNotes] = useState('');
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
@@ -144,6 +145,7 @@ function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => voi
     if (!name.trim())     { setErr('Nom requis');       return; }
     if (!phone.trim())    { setErr('Téléphone requis');  return; }
     if (!operator)        { setErr('Opérateur requis');  return; }
+    if (pin && !/^\d{4,6}$/.test(pin)) { setErr('PIN doit être 4-6 chiffres'); return; }
     try {
       setLoading(true);
       const agent = await adminApi.agentCreate({
@@ -153,6 +155,7 @@ function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => voi
         phone:           phone.trim(),
         operator,
         notes:           notes.trim() || undefined,
+        pin:             pin || undefined,
       });
       onCreated(agent);
     } catch (e: any) {
@@ -218,6 +221,17 @@ function CreateAgentModal({ onCreated, onClose }: { onCreated: (a: Agent) => voi
             placeholder="Carrefour Limete, en face du Total"
           />
         </label>
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs text-white/50">PIN agent (4-6 chiffres, optionnel)</span>
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="••••"
+          />
+        </label>
         <label className="mb-5 block">
           <span className="mb-1 block text-xs text-white/50">Commission (%)</span>
           <input
@@ -253,6 +267,7 @@ function EditAgentModal({ agent, onUpdated, onClose }: { agent: Agent; onUpdated
   const [operator, setOperator] = useState(agent.operator ?? '');
   const [notes, setNotes] = useState(agent.notes ?? '');
   const [status, setStatus] = useState<'active' | 'suspended'>(agent.status);
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
@@ -260,6 +275,7 @@ function EditAgentModal({ agent, onUpdated, onClose }: { agent: Agent; onUpdated
     e.preventDefault();
     if (!phone.trim()) { setErr('Téléphone requis'); return; }
     if (!operator)    { setErr('Opérateur requis'); return; }
+    if (pin && !/^\d{4,6}$/.test(pin)) { setErr('PIN doit être 4-6 chiffres'); return; }
     try {
       setLoading(true);
       const updated = await adminApi.agentUpdate(agent.id, {
@@ -269,6 +285,7 @@ function EditAgentModal({ agent, onUpdated, onClose }: { agent: Agent; onUpdated
         phone:           phone.trim(),
         operator,
         notes:           notes.trim() || undefined,
+        pin:             pin || undefined,
       });
       onUpdated(updated);
     } catch (e: any) {
@@ -342,7 +359,7 @@ function EditAgentModal({ agent, onUpdated, onClose }: { agent: Agent; onUpdated
           />
         </label>
 
-        <label className="mb-5 block">
+        <label className="mb-3 block">
           <span className="mb-1 block text-xs text-white/50">Statut</span>
           <select
             value={status}
@@ -352,6 +369,18 @@ function EditAgentModal({ agent, onUpdated, onClose }: { agent: Agent; onUpdated
             <option value="active">Actif</option>
             <option value="suspended">Suspendu</option>
           </select>
+        </label>
+
+        <label className="mb-5 block">
+          <span className="mb-1 block text-xs text-white/50">Réinitialiser PIN (4-6 chiffres, vide = inchangé)</span>
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/30"
+            placeholder="••••"
+          />
         </label>
 
         <div className="flex gap-3">

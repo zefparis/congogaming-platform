@@ -4,6 +4,22 @@ import { useParams } from 'react-router-dom';
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.congogaming.com';
 const PLAY_URL = (import.meta.env.VITE_PLAY_URL as string | undefined) || 'https://www.congogaming.com';
 
+function agentTokenKey(qrCode: string): string {
+  return `cg_agent_token_${qrCode.toUpperCase()}`;
+}
+
+function getAgentToken(qrCode: string): string | null {
+  try { return localStorage.getItem(agentTokenKey(qrCode)); } catch { return null; }
+}
+
+function setAgentToken(qrCode: string, token: string): void {
+  try { localStorage.setItem(agentTokenKey(qrCode), token); } catch { /* ignore */ }
+}
+
+function clearAgentToken(qrCode: string): void {
+  try { localStorage.removeItem(agentTokenKey(qrCode)); } catch { /* ignore */ }
+}
+
 function fmtCdf(n: number) {
   return new Intl.NumberFormat('fr-FR').format(n) + ' CDF';
 }
@@ -26,7 +42,6 @@ const TIERS = {
 } as const;
 
 const TYPE_LABEL: Record<string, string> = {
-  okapi_color: 'Okapi Color',
   flash:       'Flash',
   scratch:     'Grattage',
   okapi:       'Okapi Climb',
@@ -53,6 +68,7 @@ interface AgentData {
     ticket_type: string;
     ticket_amount_cdf: number;
     commission_cdf: number;
+    commission_type: string;
     status: 'pending' | 'paid';
     created_at: string;
   }[];
@@ -67,15 +83,64 @@ export default function AgentDashboard() {
   const [requesting, setRequesting] = useState(false);
   const [payoutMsg, setPayoutMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // PIN auth state
+  const [authed, setAuthed] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+
+  async function handlePinSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!qrCode || pinSubmitting) return;
+    setPinError('');
+    setPinSubmitting(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/agents/${qrCode.toUpperCase()}/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinInput }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (json.code === 'NO_PIN_SET') {
+          setPinError('Aucun PIN défini. Contactez le support.');
+        } else if (json.code === 'INVALID_PIN') {
+          setPinError('PIN incorrect.');
+        } else {
+          setPinError(json.error || 'Erreur, réessayez.');
+        }
+        return;
+      }
+      setAgentToken(qrCode, json.token);
+      setAuthed(true);
+      setPinInput('');
+    } catch {
+      setPinError('Erreur réseau, réessayez.');
+    } finally {
+      setPinSubmitting(false);
+    }
+  }
+
   async function handleRequestPayout() {
     if (!qrCode || requesting) return;
+    const token = getAgentToken(qrCode);
+    if (!token) { setAuthed(false); return; }
     try {
       setRequesting(true);
       setPayoutMsg(null);
       const res = await fetch(`${BASE_URL}/api/agents/${qrCode.toUpperCase()}/request-payout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
       });
+      if (res.status === 401) {
+        clearAgentToken(qrCode);
+        setAuthed(false);
+        setPayoutMsg({ ok: false, text: 'Session expirée, veuillez saisir votre PIN.' });
+        return;
+      }
       const json = await res.json();
       if (!res.ok) {
         if (json.code === 'BELOW_MINIMUM') {
@@ -96,14 +161,30 @@ export default function AgentDashboard() {
 
   useEffect(() => {
     if (!qrCode) { setError(true); setLoading(false); return; }
-    fetch(`${BASE_URL}/api/agents/${qrCode.toUpperCase()}`, { cache: 'no-store' })
+    const token = getAgentToken(qrCode);
+    if (!token) {
+      setAuthed(false);
+      setLoading(false);
+      return;
+    }
+    fetch(`${BASE_URL}/api/agents/${qrCode.toUpperCase()}`, {
+      cache: 'no-store',
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
       .then(async r => {
+        if (r.status === 401) {
+          clearAgentToken(qrCode);
+          setAuthed(false);
+          setLoading(false);
+          return;
+        }
         if (!r.ok) throw new Error('not found');
+        setAuthed(true);
         return r.json() as Promise<AgentData>;
       })
-      .then(setData)
+      .then(d => { if (d) setData(d); })
       .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); });
   }, [qrCode]);
 
   const regUrl = `${PLAY_URL}/register?ref=${qrCode?.toUpperCase()}`;
@@ -123,6 +204,50 @@ export default function AgentDashboard() {
         <p style={{ fontSize: 48 }}>🔍</p>
         <p style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Agent introuvable</p>
         <p style={{ fontSize: 14 }}>Code QR invalide ou agent suspendu.</p>
+      </div>
+    );
+  }
+
+  // PIN gate — show PIN entry screen if not authenticated
+  if (!authed) {
+    return (
+      <div style={{ minHeight: '100dvh', background: '#04080f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, color: '#fff', fontFamily: 'system-ui, sans-serif', padding: 24, maxWidth: 400, margin: '0 auto' }}>
+        <p style={{ fontSize: 11, letterSpacing: 4, color: '#ffffff40', textTransform: 'uppercase' }}>CONGO GAMING · AGENT</p>
+        <p style={{ fontSize: 48 }}>🔒</p>
+        <p style={{ fontSize: 18, fontWeight: 600 }}>Entrez votre PIN</p>
+        <p style={{ fontSize: 13, color: '#ffffff60', textAlign: 'center' }}>Saisissez votre PIN à 4-6 chiffres pour accéder à votre dashboard.</p>
+        <form onSubmit={handlePinSubmit} style={{ width: '100%', maxWidth: 280 }}>
+          <input
+            type="password"
+            inputMode="numeric"
+            pattern="\d{4,6}"
+            value={pinInput}
+            onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="••••"
+            autoFocus
+            style={{
+              width: '100%', textAlign: 'center', fontSize: 24, letterSpacing: 8,
+              background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12,
+              padding: '14px', color: '#fff', outline: 'none',
+            }}
+          />
+          {pinError && (
+            <p style={{ fontSize: 13, color: '#f87171', textAlign: 'center', marginTop: 8 }}>{pinError}</p>
+          )}
+          <button
+            type="submit"
+            disabled={pinInput.length < 4 || pinSubmitting}
+            style={{
+              width: '100%', marginTop: 12, padding: '14px', borderRadius: 12,
+              background: pinInput.length >= 4 && !pinSubmitting ? '#F5A623' : '#333',
+              color: pinInput.length >= 4 && !pinSubmitting ? '#000' : '#666',
+              fontWeight: 700, border: 'none', fontSize: 14,
+              cursor: pinInput.length >= 4 && !pinSubmitting ? 'pointer' : 'default',
+            }}
+          >
+            {pinSubmitting ? '…' : 'Déverrouiller'}
+          </button>
+        </form>
       </div>
     );
   }
@@ -337,7 +462,7 @@ export default function AgentDashboard() {
               padding: '12px 16px', lineHeight: 1.6, marginTop: 8,
             }}>
               Vous gagnez 50 CDF sur chaque ticket joué par vos clients sur<br />
-              Okapi Color, Flash Loto et Scratch.<br />
+              Flash Loto et Scratch.<br />
               Les commissions sont actives tant que vos clients jouent sur Congo Gaming.<br />
               Congo Gaming se réserve le droit de modifier les conditions avec préavis de 30 jours.
             </div>

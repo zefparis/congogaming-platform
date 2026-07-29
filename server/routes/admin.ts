@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { z } from 'zod';
+import argon2 from 'argon2';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
@@ -1386,152 +1388,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     });
   });
 
-  // ---- OKAPI COLOR (admin) ----
-
-  app.get('/api/admin/okapi-color/overview', async (_req, reply) => {
-    const todayIso = startOfTodayIso();
-
-    const [ticketRes, jackpotRes] = await Promise.all([
-      supabaseAdmin
-        .from('okapi_color_tickets')
-        .select('prix_cdf, gains_cdf, status, created_at'),
-      supabaseAdmin
-        .from('okapi_color_jackpot')
-        .select('pot_cdf')
-        .eq('id', 1)
-        .single(),
-    ]);
-
-    if (ticketRes.error) return reply.code(500).send({ error: ticketRes.error.message });
-
-    const tickets = ticketRes.data || [];
-    let totalVendus = 0, totalEncaisse = 0, totalPaye = 0;
-    let todayVendus = 0, todayEncaisse = 0, todayPaye = 0;
-
-    for (const t of tickets) {
-      totalVendus++;
-      totalEncaisse += Number(t.prix_cdf || 0);
-      totalPaye += Number(t.gains_cdf || 0);
-      if (t.created_at >= todayIso) {
-        todayVendus++;
-        todayEncaisse += Number(t.prix_cdf || 0);
-        todayPaye += Number(t.gains_cdf || 0);
-      }
-    }
-
-    const pot = Number(jackpotRes.data?.pot_cdf ?? 0);
-    const payoutRate = totalEncaisse > 0 ? ((totalPaye / totalEncaisse) * 100).toFixed(2) + ' %' : 'N/A';
-
-    return reply.send({
-      total: { tickets: totalVendus, encaisse_cdf: totalEncaisse, paye_cdf: totalPaye, payout_rate: payoutRate },
-      today: { tickets: todayVendus, encaisse_cdf: todayEncaisse, paye_cdf: todayPaye },
-      jackpot_pot_cdf: pot,
-    });
-  });
-
-  app.get<{ Querystring: { page?: string; page_size?: string; status?: string } }>(
-    '/api/admin/okapi-color/tickets',
-    async (req, reply) => {
-      const page = Math.max(1, Number(req.query.page || 1));
-      const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size || 25)));
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      let query = supabaseAdmin
-        .from('okapi_color_tickets')
-        .select('id, user_id, numeros, prix_cdf, status, nb_rouges, nb_or, gains_cdf, tirage_id, created_at', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (req.query.status) query = query.eq('status', req.query.status);
-
-      const { data, error, count } = await query;
-      if (error) return reply.code(500).send({ error: error.message });
-
-      const ids = Array.from(new Set((data || []).map((t: any) => String(t.user_id))));
-      const phoneById = new Map<string, string>();
-      if (ids.length > 0) {
-        const { data: users } = await supabaseAdmin.from('users').select('id, phone').in('id', ids);
-        for (const u of users || []) phoneById.set(String(u.id), String(u.phone || ''));
-      }
-
-      return reply.send({
-        items: (data || []).map((t: any) => ({
-          ...t,
-          phone: maskPhone(phoneById.get(String(t.user_id))),
-        })),
-        page, page_size: pageSize, total: count ?? null,
-      });
-    },
-  );
-
-  app.post('/api/admin/okapi-color/draw', async (req, reply) => {
-    const { executerTirageOkapiColor, getOkapiColorSlotBoundaries } = await import('./okapi-color.js');
-    const { slotKey } = getOkapiColorSlotBoundaries();
-    const acquired = await acquireJobLock('okapi_color_draw', `admin:oc:${slotKey}`);
-    if (!acquired) {
-      return reply.code(409).send({ error: 'Draw already in progress for this slot', slot_key: slotKey });
-    }
-    try {
-      const result = await executerTirageOkapiColor({ reason: 'manual' });
-      return reply.send(result);
-    } catch (e: any) {
-      return reply.code(500).send({ error: e?.message || 'Draw failed' });
-    }
-  });
-
-  app.get('/api/admin/okapi-color/draws', async (_req, reply) => {
-    const { data, error } = await supabaseAdmin
-      .from('okapi_color_tirages')
-      .select('id, numeros_rouges, numeros_or, hash_pre, jackpot_paye, drawn_at')
-      .order('drawn_at', { ascending: false })
-      .limit(20);
-    if (error) return reply.code(500).send({ error: error.message });
-    return reply.send({ draws: data || [] });
-  });
-
-  app.post('/api/admin/okapi-color/jackpot/set', async (req, reply) => {
-    const { amount_cdf } = req.body as { amount_cdf: number };
-    if (amount_cdf === undefined || amount_cdf === null || Number(amount_cdf) < 0) {
-      return reply.code(400).send({ code: 'INVALID_AMOUNT' });
-    }
-    const newPot = Number(amount_cdf);
-
-    const { data: current } = await supabaseAdmin
-      .from('okapi_color_jackpot').select('pot_cdf').eq('id', 1).single();
-
-    const { error } = await supabaseAdmin
-      .from('okapi_color_jackpot')
-      .update({ pot_cdf: newPot, updated_at: new Date().toISOString() })
-      .eq('id', 1);
-    if (error) return reply.code(500).send({ code: 'DB_ERROR', error: error.message });
-
-    await audit(req, 'okapi_color_jackpot_set', null, newPot, null,
-      { old_pot: current?.pot_cdf, new_pot: newPot });
-
-    return reply.send({ ok: true, old_pot: current?.pot_cdf, new_pot: newPot });
-  });
-
-  app.post('/api/admin/okapi-color/jackpot/credit', async (req, reply) => {
-    const { delta_cdf } = req.body as { delta_cdf: number };
-    if (delta_cdf === undefined || delta_cdf === null || Number(delta_cdf) === 0) {
-      return reply.code(400).send({ code: 'INVALID_AMOUNT' });
-    }
-    const delta = Number(delta_cdf);
-
-    const { data: current } = await supabaseAdmin
-      .from('okapi_color_jackpot').select('pot_cdf').eq('id', 1).single();
-
-    const { error } = await supabaseAdmin.rpc('increment_okapi_color_jackpot', { delta });
-    if (error) return reply.code(500).send({ code: 'DB_ERROR', error: error.message });
-
-    const newPot = (Number(current?.pot_cdf) ?? 0) + delta;
-    await audit(req, 'okapi_color_jackpot_credit', null, delta, null,
-      { old_pot: current?.pot_cdf, new_pot: newPot });
-
-    return reply.send({ ok: true, old_pot: current?.pot_cdf, new_pot: newPot });
-  });
-
   app.get('/api/admin/transactions/export', async (req, reply) => {
     const { data, error } = await buildTxQuery(req.query).limit(10000);
     if (error) return reply.code(500).send({ error: error.message });
@@ -1587,18 +1443,26 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ agents: data || [] });
   });
 
+  const AGENT_OPERATORS = ['orange', 'vodacom', 'airtel', 'africell'] as const;
+
+  const CreateAgentSchema = z.object({
+    display_name: z.string().trim().min(1, 'display_name requis'),
+    zone: z.string().trim().optional(),
+    commission_rate: z.number().min(0).max(0.20, 'commission_rate must be between 0 and 0.20').optional(),
+    phone: z.string().trim().min(1, 'phone requis'),
+    operator: z.enum(AGENT_OPERATORS, { errorMap: () => ({ message: 'operator invalide' }) }),
+    notes: z.string().trim().optional(),
+    pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits').optional(),
+  });
+
   // POST /api/admin/agents — create a new agent
   app.post('/api/admin/agents', { preHandler: requireSuperAdmin }, async (req, reply) => {
-    const { display_name, zone, commission_rate, phone, operator, notes } = (req.body as any) || {};
-    if (!display_name?.trim()) {
-      return reply.code(400).send({ error: 'display_name requis' });
+    const parsed = CreateAgentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
     }
-    if (!phone?.trim()) {
-      return reply.code(400).send({ error: 'phone requis' });
-    }
-    if (!operator?.trim()) {
-      return reply.code(400).send({ error: 'operator requis' });
-    }
+    const { display_name, zone, commission_rate, phone, operator, notes, pin } = parsed.data;
+
     let qr_code = '';
     for (let i = 0; i < 10; i++) {
       const candidate = generateAgentCode();
@@ -1608,16 +1472,27 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
     if (!qr_code) return reply.code(500).send({ error: 'Could not generate unique QR code' });
 
+    let agent_pin_hash: string | null = null;
+    if (pin) {
+      agent_pin_hash = await argon2.hash(pin, {
+        type: argon2.argon2id,
+        memoryCost: 19_456,
+        timeCost: 2,
+        parallelism: 1,
+      });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('agents')
       .insert({
-        display_name: String(display_name).trim(),
+        display_name,
         qr_code,
-        zone:            zone      ? String(zone).trim()     : null,
-        commission_rate: commission_rate != null ? Number(commission_rate) : 0.05,
-        phone:           phone     ? String(phone).trim()    : null,
-        operator:        operator  ? String(operator).trim() : null,
-        notes:           notes     ? String(notes).trim()    : null,
+        zone:            zone      || null,
+        commission_rate: commission_rate ?? 0.05,
+        phone,
+        operator,
+        notes:           notes     || null,
+        agent_pin_hash,
       })
       .select()
       .single();
@@ -1626,20 +1501,42 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.code(201).send(data);
   });
 
-  // PATCH /api/admin/agents/:id — update status / zone / commission_rate
+  const UpdateAgentSchema = z.object({
+    status: z.enum(['active', 'suspended']).optional(),
+    zone: z.string().trim().optional(),
+    commission_rate: z.number().min(0).max(0.20, 'commission_rate must be between 0 and 0.20').optional(),
+    phone: z.string().trim().optional(),
+    operator: z.enum(AGENT_OPERATORS, { errorMap: () => ({ message: 'operator invalide' }) }).optional(),
+    notes: z.string().trim().optional(),
+    pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits').optional(),
+  });
+
+  // PATCH /api/admin/agents/:id — update status / zone / commission_rate / pin
   app.patch<{ Params: { id: string } }>(
     '/api/admin/agents/:id',
     { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const { id } = req.params;
-      const { status, zone, commission_rate, phone, operator, notes } = (req.body as any) || {};
+      const parsed = UpdateAgentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
+      }
+      const { status, zone, commission_rate, phone, operator, notes, pin } = parsed.data;
       const updates: Record<string, unknown> = {};
       if (status          !== undefined) updates.status          = status;
       if (zone            !== undefined) updates.zone            = zone;
-      if (commission_rate !== undefined) updates.commission_rate = Number(commission_rate);
+      if (commission_rate !== undefined) updates.commission_rate = commission_rate;
       if (phone           !== undefined) updates.phone           = phone;
       if (operator        !== undefined) updates.operator        = operator;
       if (notes           !== undefined) updates.notes           = notes;
+      if (pin             !== undefined) {
+        updates.agent_pin_hash = await argon2.hash(pin, {
+          type: argon2.argon2id,
+          memoryCost: 19_456,
+          timeCost: 2,
+          parallelism: 1,
+        });
+      }
       if (!Object.keys(updates).length) {
         return reply.code(400).send({ error: 'Nothing to update' });
       }
@@ -1654,6 +1551,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   // GET /api/admin/agents/:id/commissions — paginated commission list
   app.get<{ Params: { id: string } }>(
     '/api/admin/agents/:id/commissions',
+    { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const { id } = req.params;
       const { data, error } = await supabaseAdmin

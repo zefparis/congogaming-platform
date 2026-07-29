@@ -179,6 +179,7 @@ export interface AgentCommission {
   ticket_type: string;
   ticket_amount_cdf: number;
   commission_cdf: number;
+  commission_type: string;
   status: 'pending' | 'paid';
   created_at: string;
 }
@@ -504,81 +505,13 @@ export const adminApi = {
       revenue_today: number;
     }>('/api/admin/scratch/overview'),
 
-  okapiColorLive: () =>
-    fetch(`${BASE}/api/okapi-color/live`, { cache: 'no-store' }).then(async r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json() as Promise<{
-        enabled: boolean;
-        jackpotCdf: number;
-        jackpotThresholdCdf: number;
-        ticketPriceCdf: number;
-        currentDraw: { slotKey: string; status: string; drawAt: string; closeAt: string; secondsRemaining: number };
-        lastDraw: { drawNumber: number | null; numerosRouges: number[]; numerosOr: number[]; drawnAt: string; jackpotPaye: boolean; winnerCount: number; totalPaidCdf: number } | null;
-        publicStats: { ticketsCount: number; winnerCount: number; totalPaidCdf: number };
-      }>;
-    }),
-
-  okapiColorLatestDraws: () =>
-    fetch(`${BASE}/api/okapi-color/latest-draws`, { cache: 'no-store' }).then(async r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const json = await r.json() as {
-        tirages?: Array<{
-          id: string;
-          draw_number: number | null;
-          numeros_rouges: number[];
-          numeros_or: number[];
-          drawn_at: string;
-          jackpot_paye: boolean;
-        }>;
-      };
-      return Array.isArray(json?.tirages) ? json.tirages : [];
-    }),
-
-  okapiColorForceDraw: () => {
-    const secret = getAdminSecret();
-    if (!secret) return Promise.reject(new AdminAuthError('No admin secret — re-authentication required'));
-    return fetch(`${BASE}/api/okapi-color/draw`, {
-      method: 'POST',
-      headers: { 'x-admin-secret': secret },
-    }).then(async r => {
-      const json = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(json?.error || `HTTP ${r.status}`);
-      return json as { tirageId: string; rouges: number[]; ors: number[]; winners: number; totalPaidCdf: number };
-    });
-  },
-
-  okapiColorPurgePending: () => {
-    const secret = getAdminSecret();
-    if (!secret) return Promise.reject(new AdminAuthError('No admin secret — re-authentication required'));
-    return fetch(`${BASE}/api/okapi-color/purge-pending`, {
-      method: 'POST',
-      headers: { 'x-admin-secret': secret },
-    }).then(async r => {
-      const json = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(json?.error || `HTTP ${r.status}`);
-      return json as { scanned: number; refunded: number; total_refunded_cdf: number };
-    });
-  },
-
-  okapiColorJackpotSet: (amount_cdf: number) =>
-    request<{ ok: boolean; old_pot: number; new_pot: number }>(
-      '/api/admin/okapi-color/jackpot/set',
-      { method: 'POST', body: JSON.stringify({ amount_cdf }) },
-    ),
-
-  okapiColorJackpotCredit: (delta_cdf: number) =>
-    request<{ ok: boolean; old_pot: number; new_pot: number }>(
-      '/api/admin/okapi-color/jackpot/credit',
-      { method: 'POST', body: JSON.stringify({ delta_cdf }) },
-    ),
-
   agentsList: () =>
     request<{ agents: Agent[] }>('/api/admin/agents'),
 
-  agentCreate: (body: { display_name: string; zone?: string; commission_rate?: number; phone: string; operator: string; notes?: string }) =>
+  agentCreate: (body: { display_name: string; zone?: string; commission_rate?: number; phone: string; operator: string; notes?: string; pin?: string }) =>
     request<Agent>('/api/admin/agents', { method: 'POST', body: JSON.stringify(body) }),
 
-  agentUpdate: (id: string, body: { status?: string; zone?: string; commission_rate?: number; phone?: string; operator?: string; notes?: string }) =>
+  agentUpdate: (id: string, body: { status?: string; zone?: string; commission_rate?: number; phone?: string; operator?: string; notes?: string; pin?: string }) =>
     request<Agent>(`/api/admin/agents/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   agentCommissions: (id: string) =>
