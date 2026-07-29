@@ -332,60 +332,6 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* FIFA WC 2026 — Predictions */}
-      <div style={{ padding: '0 14px 12px' }}>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a0a40] to-[#0f0a2e] border border-yellow-400/30 p-5">
-          {/* Top badge */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold bg-yellow-400 text-black px-2 py-0.5 rounded-full uppercase">
-              🏆 FIFA WC 2026™
-            </span>
-            <span className="text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full uppercase">
-              ● EN DIRECT
-            </span>
-          </div>
-
-          {/* Title */}
-          <h2 className="text-2xl font-black text-white uppercase leading-tight mb-1">
-            PRONOSTIQUEZ
-            <span className="text-yellow-400"> &amp; GAGNEZ</span>
-          </h2>
-          <p className="text-sm text-white/60 mb-4">
-            Misez des points CDF sur les matchs restants
-          </p>
-
-          {/* Stats row */}
-          <div className="flex gap-3 mb-4">
-            <div className="bg-white/5 rounded-lg px-3 py-1.5 text-center">
-              <div className="text-lg font-black text-yellow-400">22</div>
-              <div className="text-[10px] text-white/40 uppercase">Matchs</div>
-            </div>
-            <div className="bg-white/5 rounded-lg px-3 py-1.5 text-center">
-              <div className="text-lg font-black text-yellow-400">×5</div>
-              <div className="text-[10px] text-white/40 uppercase">Max gain</div>
-            </div>
-            <div className="bg-white/5 rounded-lg px-3 py-1.5 text-center">
-              <div className="text-lg font-black text-yellow-400">CDF</div>
-              <div className="text-[10px] text-white/40 uppercase">Paiement</div>
-            </div>
-          </div>
-
-          {/* CTA Button */}
-          <button
-            type="button"
-            onClick={() => nav('/predictions')}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-black text-sm uppercase tracking-widest hover:from-yellow-300 active:scale-95 transition-all"
-          >
-            ⚡ JOUER MAINTENANT
-          </button>
-
-          {/* Congo Gaming badge */}
-          <div className="absolute top-4 right-4 text-xs text-white/20 font-bold">
-            CONGO GAMING
-          </div>
-        </div>
-      </div>
-
       <div className="p-4 space-y-4">
 
         {/* OKAPI CLIMB card */}
