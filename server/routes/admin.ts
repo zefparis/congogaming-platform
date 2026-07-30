@@ -9,6 +9,7 @@ import { tryNormalizeDrcPhone } from '../lib/phone.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { acquireJobLock } from '../lib/jobLock.js';
 import { env } from '../env.js';
+import { executerTirageOkapiColor, OKAPI_COLOR_CONFIG, computeOkapiColorState } from './okapi-color.js';
 
 // ---- Token / auth ----
 //
@@ -1593,6 +1594,215 @@ export default async function adminRoutes(app: FastifyInstance) {
 
       await audit(req, 'agent_payout', null, null, null, { agent_id: id, paid_cdf });
       return reply.send({ ok: true, paid_cdf });
+    },
+  );
+
+  // ----------------------------------------------------------
+  // Okapi Color admin endpoints
+  // ----------------------------------------------------------
+
+  // GET /api/admin/okapi-color/live — live state (proxies public endpoint)
+  app.get('/api/admin/okapi-color/live', { preHandler: requireAdmin }, async (_req, reply) => {
+    const now = new Date();
+    const { data: lastTirage } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .select('id, draw_number, slot_key, numeros_rouges, numeros_or, drawn_at, jackpot_paye, draw_at')
+      .order('drawn_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const secsSinceLast = lastTirage?.drawn_at
+      ? (now.getTime() - new Date(lastTirage.drawn_at).getTime()) / 1000
+      : Infinity;
+
+    const { state, slotKey, drawAt, closeAt, secondsRemaining } = computeOkapiColorState(now, secsSinceLast);
+
+    const { data: jackpotRow } = await supabaseAdmin
+      .from('okapi_color_jackpot')
+      .select('pot_cdf')
+      .eq('id', 1)
+      .maybeSingle();
+    const jackpot_cdf = Number(jackpotRow?.pot_cdf ?? 0);
+
+    let last_draw = null;
+    if (lastTirage) {
+      const { data: winTickets } = await supabaseAdmin
+        .from('okapi_color_tickets')
+        .select('id, nb_rouges, nb_or, gains_cdf')
+        .eq('tirage_id', lastTirage.id)
+        .in('status', ['gagnant', 'jackpot_attente'])
+        .gt('gains_cdf', 0)
+        .order('gains_cdf', { ascending: false })
+        .limit(10);
+      const totalPaid = (winTickets || []).reduce((s, w) => s + Number(w.gains_cdf), 0);
+      last_draw = {
+        drawNumber:    lastTirage.draw_number,
+        slotKey:       lastTirage.slot_key,
+        numerosRouges: lastTirage.numeros_rouges,
+        numerosOr:     lastTirage.numeros_or,
+        drawnAt:       lastTirage.drawn_at,
+        jackpotPaye:   lastTirage.jackpot_paye,
+        winnerCount:   (winTickets || []).length,
+        totalPaidCdf:  totalPaid,
+        winners: (winTickets || []).map((w) => ({
+          ticketRef: (w.id as string).slice(-4).toUpperCase(),
+          nbRouges:  w.nb_rouges,
+          nbOr:      w.nb_or,
+          gainsCdf:  Number(w.gains_cdf),
+        })),
+      };
+    }
+
+    const { data: recentRows } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .select('draw_number, slot_key, numeros_rouges, numeros_or, drawn_at, jackpot_paye')
+      .order('drawn_at', { ascending: false })
+      .limit(5);
+    const recentDraws = (recentRows || []).map((t) => ({
+      drawNumber:    t.draw_number,
+      slotKey:       t.slot_key,
+      numerosRouges: t.numeros_rouges,
+      numerosOr:     t.numeros_or,
+      drawnAt:       t.drawn_at,
+      jackpotPaye:   t.jackpot_paye,
+    }));
+
+    const { count: slotTicketsCount } = await supabaseAdmin
+      .from('okapi_color_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('slot_key', slotKey)
+      .eq('status', 'pending');
+
+    return reply.header('Cache-Control', 'no-store').send({
+      enabled:            env.OKAPI_COLOR_ENABLED ?? false,
+      serverTime:         now.toISOString(),
+      ticketPriceCdf:     OKAPI_COLOR_CONFIG.ticketPriceCdf,
+      jackpotCdf:         jackpot_cdf,
+      jackpotThresholdCdf: OKAPI_COLOR_CONFIG.jackpotCdf,
+      currentDraw: { slotKey, status: state, drawAt: drawAt.toISOString(), closeAt: closeAt.toISOString(), secondsRemaining },
+      lastDraw: last_draw,
+      recentDraws,
+      publicStats: { ticketsCount: slotTicketsCount ?? 0, winnerCount: last_draw?.winnerCount ?? 0, totalPaidCdf: last_draw?.totalPaidCdf ?? 0 },
+    });
+  });
+
+  // GET /api/admin/okapi-color/latest-draws
+  app.get('/api/admin/okapi-color/latest-draws', { preHandler: requireAdmin }, async (_req, reply) => {
+    const { data, error } = await supabaseAdmin
+      .from('okapi_color_tirages')
+      .select('id, draw_number, numeros_rouges, numeros_or, drawn_at, jackpot_paye, slot_key')
+      .order('drawn_at', { ascending: false })
+      .limit(10);
+    if (error) return reply.code(500).send({ error: error.message });
+    return reply.send(data || []);
+  });
+
+  // POST /api/admin/okapi-color/draw — force a draw
+  app.post('/api/admin/okapi-color/draw', { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const result = await executerTirageOkapiColor({ reason: 'manual' });
+      await audit(req, 'okapi_color_force_draw', null, null, null, { tirageId: result.tirageId });
+      return reply.send(result);
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message || 'Tirage failed' });
+    }
+  });
+
+  // POST /api/admin/okapi-color/purge-pending — cancel & refund pending tickets
+  app.post('/api/admin/okapi-color/purge-pending', { preHandler: requireSuperAdmin }, async (req, reply) => {
+    try {
+      const { data: claimed, error: claimErr } = await supabaseAdmin
+        .from('okapi_color_tickets')
+        .update({ status: 'cancelled', gains_cdf: 0, jackpot_en_attente: false })
+        .eq('status', 'pending')
+        .select('id, user_id, prix_cdf');
+      if (claimErr) return reply.code(500).send({ error: claimErr.message });
+
+      const tickets = claimed ?? [];
+      let refunded = 0;
+      let totalRefundedCdf = 0;
+      const failures: Array<{ ticket_id: string; error: string }> = [];
+
+      for (const t of tickets) {
+        const price = Number(t.prix_cdf || 0);
+        if (price <= 0) continue;
+        try {
+          const result = await recordLedgerEntry({
+            user_id:         String(t.user_id),
+            direction:       'credit',
+            amount:          price,
+            currency:        'CDF',
+            reason:          'okapi_color_ticket_cancel_refund',
+            reference_type:  'okapi_color_ticket',
+            reference_id:    String(t.id),
+            idempotency_key: `okapi-color:ticket:${t.id}:cancel:refund`,
+          });
+          if (result.applied || result.duplicate) {
+            refunded++;
+            totalRefundedCdf += price;
+          }
+        } catch (err: any) {
+          failures.push({ ticket_id: String(t.id), error: err?.message || 'refund failed' });
+        }
+      }
+
+      await audit(req, 'okapi_color_purge_pending', null, null, null, { scanned: tickets.length, refunded, totalRefundedCdf });
+      return reply.send({ scanned: tickets.length, refunded, total_refunded_cdf: totalRefundedCdf, failures });
+    } catch (e: any) {
+      return reply.code(500).send({ error: e?.message || 'Purge failed' });
+    }
+  });
+
+  // POST /api/admin/okapi-color/jackpot/set — set exact jackpot pot
+  app.post<{ Body: { amount: number } }>(
+    '/api/admin/okapi-color/jackpot/set',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const amount = Math.max(0, Math.floor(Number(req.body?.amount)));
+      if (isNaN(amount)) return reply.code(400).send({ error: 'Invalid amount' });
+
+      const { data: row } = await supabaseAdmin
+        .from('okapi_color_jackpot')
+        .select('pot_cdf')
+        .eq('id', 1)
+        .maybeSingle();
+      const old_pot = Number(row?.pot_cdf ?? 0);
+
+      const { error } = await supabaseAdmin
+        .from('okapi_color_jackpot')
+        .update({ pot_cdf: amount })
+        .eq('id', 1);
+      if (error) return reply.code(500).send({ error: error.message });
+
+      await audit(req, 'okapi_color_jackpot_set', null, null, null, { old_pot, new_pot: amount });
+      return reply.send({ old_pot, new_pot: amount });
+    },
+  );
+
+  // POST /api/admin/okapi-color/jackpot/credit — add/subtract from pot
+  app.post<{ Body: { delta: number } }>(
+    '/api/admin/okapi-color/jackpot/credit',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const delta = Math.floor(Number(req.body?.delta));
+      if (isNaN(delta) || delta === 0) return reply.code(400).send({ error: 'Invalid delta' });
+
+      const { data: row } = await supabaseAdmin
+        .from('okapi_color_jackpot')
+        .select('pot_cdf')
+        .eq('id', 1)
+        .maybeSingle();
+      const old_pot = Number(row?.pot_cdf ?? 0);
+      const new_pot = Math.max(0, old_pot + delta);
+
+      const { error } = await supabaseAdmin
+        .from('okapi_color_jackpot')
+        .update({ pot_cdf: new_pot })
+        .eq('id', 1);
+      if (error) return reply.code(500).send({ error: error.message });
+
+      await audit(req, 'okapi_color_jackpot_credit', null, null, null, { old_pot, new_pot, delta });
+      return reply.send({ old_pot, new_pot });
     },
   );
 

@@ -39,6 +39,7 @@ export default function HomeScreen() {
   const { balanceCglt, refresh: refreshCglt } = useCGLTBalance(true);
   const [flashPot, setFlashPot] = useState<number>(0);
   const [flashData, setFlashData] = useState<FlashLatest | null>(null);
+  const [okapiColorPot, setOkapiColorPot] = useState<number>(0);
   const [countdown, setCountdown] = useState<string>('--:--');
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function HomeScreen() {
 
     doRefresh();
     void refreshCglt();
+    api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
     api
       .flashLatest()
       .then((r) => {
@@ -507,6 +509,69 @@ export default function HomeScreen() {
               {t('home.play_now')}
             </motion.button>
           </div>
+        </div>
+
+        {/* OKAPI COLOR card */}
+        <div
+          onClick={() => nav('/okapi-color')}
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 16,
+            cursor: 'pointer',
+            minHeight: 220,
+            background: 'linear-gradient(135deg,#1a0505 0%,#3b0a0a 50%,#1a0505 100%)',
+            border: '1px solid rgba(220,38,38,0.3)',
+          }}
+        >
+            {/* Background image */}
+            <img
+              src="/images/okapicolor.png"
+              alt=""
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'right center',
+                zIndex: 0,
+              }}
+            />
+            {/* Dark overlay for text legibility */}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to right, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.40) 55%, rgba(0,0,0,0.05) 100%)',
+                zIndex: 1,
+              }}
+            />
+
+            <div style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '58%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Bebas Neue', fontSize: 13, color: '#00A86B', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00A86B' }} />
+                {t('home.color_live')}
+              </div>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFFFFF', lineHeight: 1, letterSpacing: 1 }}>OKAPI</div>
+              <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#ef4444', lineHeight: 1, letterSpacing: 2, marginBottom: 4 }}>COLOR</div>
+              <div style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 2 }}>{t('home.color_nums')}</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 6 }}>{t('home.color_freq')}</div>
+              <div style={{ color: '#FFD700', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
+                {t('home.color_jackpot', { amount: okapiColorPot.toLocaleString('fr-FR') })}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 16 }}>{t('home.ticket_price_1000')}</div>
+              <motion.button
+                whileHover={{ filter: 'brightness(1.1)' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => { e.stopPropagation(); nav('/okapi-color'); }}
+                style={{ ...ctaStyle, background: 'linear-gradient(135deg,#b91c1c,#ef4444)' }}
+              >
+                {t('home.play_now')}
+              </motion.button>
+            </div>
         </div>
 
         {/* SCRATCH CARD promo */}

@@ -8,6 +8,7 @@
 --
 -- Signatures verified via pg_get_function_identity_arguments.
 
+ALTER FUNCTION public.check_okapi_color_ticket_slot()                      SET search_path = public;
 ALTER FUNCTION public.increment_agent_total(agent_id uuid, delta integer)   SET search_path = public;
 ALTER FUNCTION public.get_agent_tier(total_cdf numeric)                     SET search_path = public;
 ALTER FUNCTION public.update_updated_at()                                   SET search_path = public;
