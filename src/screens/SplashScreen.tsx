@@ -6,6 +6,7 @@ import { getSession } from '../lib/auth';
 const GAMES = [
   { name: 'Loto Express', icon: '⚡', color: '#00A86B' },
   { name: 'Okapi Climb', icon: '🏔️', color: '#FFD700' },
+  { name: 'Okapi Color', icon: '🔴', color: '#ef4444' },
   { name: 'Scratch Card', icon: '🎫', color: '#FFD700' },
 ];
 

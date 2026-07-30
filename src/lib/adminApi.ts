@@ -527,6 +527,64 @@ export const adminApi = {
     }
     return `${BASE}/api/admin/transactions/export?${qs.toString()}`;
   },
+
+  okapiColorLive: () =>
+    request<{
+      enabled: boolean;
+      serverTime: string;
+      ticketPriceCdf: number;
+      jackpotCdf: number;
+      jackpotThresholdCdf: number;
+      currentDraw: { slotKey: string; status: string; drawAt: string; closeAt: string; secondsRemaining: number };
+      lastDraw: {
+        drawNumber: number | null;
+        slotKey: string;
+        numerosRouges: number[];
+        numerosOr: number[];
+        drawnAt: string;
+        jackpotPaye: boolean;
+        winnerCount: number;
+        totalPaidCdf: number;
+        winners: Array<{ ticketRef: string; nbRouges: number; nbOr: number; gainsCdf: number }>;
+      } | null;
+      recentDraws: Array<{ drawNumber: number | null; slotKey: string; numerosRouges: number[]; numerosOr: number[]; drawnAt: string; jackpotPaye: boolean }>;
+      publicStats: { ticketsCount: number; winnerCount: number; totalPaidCdf: number };
+    }>('/api/admin/okapi-color/live'),
+
+  okapiColorLatestDraws: () =>
+    request<Array<{
+      id: string;
+      draw_number: number | null;
+      numeros_rouges: number[];
+      numeros_or: number[];
+      drawn_at: string;
+      jackpot_paye: boolean;
+      slot_key: string;
+    }>>('/api/admin/okapi-color/latest-draws'),
+
+  okapiColorForceDraw: () =>
+    request<{ tirageId: string; rouges: number[]; ors: number[]; winners: number; totalPaidCdf: number; jackpotPaid: boolean }>(
+      '/api/admin/okapi-color/draw',
+      { method: 'POST' },
+    ),
+
+  okapiColorPurgePending: () =>
+    request<{ scanned: number; refunded: number; total_refunded_cdf: number; failures: Array<{ ticket_id: string; error: string }> }>(
+      '/api/admin/okapi-color/purge-pending',
+      { method: 'POST' },
+    ),
+
+  okapiColorJackpotSet: (amount: number) =>
+    request<{ old_pot: number; new_pot: number }>(
+      '/api/admin/okapi-color/jackpot/set',
+      { method: 'POST', body: JSON.stringify({ amount }) },
+    ),
+
+  okapiColorJackpotCredit: (delta: number) =>
+    request<{ old_pot: number; new_pot: number }>(
+      '/api/admin/okapi-color/jackpot/credit',
+      { method: 'POST', body: JSON.stringify({ delta }) },
+    ),
 };
 
 // Direct-fetch KYC actions. We bypass request() to guarantee:
