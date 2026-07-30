@@ -22,7 +22,6 @@ import agentsPublicRoutes from './routes/agents.js';
 import kycRoutes from './routes/kyc.js';
 import scratchRoutes from './routes/scratch.js';
 import freePlaysRoutes from './routes/free-plays.js';
-import okapiColorRoutes from './routes/okapi-color.js';
 import cgltRoutes from './routes/cglt.js';
 import farmingRoutes from './routes/farming.js';
 import { engine } from './lib/okapi-engine.js';
@@ -111,7 +110,6 @@ async function main() {
   await app.register(kycRoutes);
   await app.register(scratchRoutes);
   await app.register(freePlaysRoutes);
-  await app.register(okapiColorRoutes);
   await app.register(cgltRoutes);
   await app.register(farmingRoutes);
 
