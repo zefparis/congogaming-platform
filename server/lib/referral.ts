@@ -50,7 +50,7 @@ export async function onDepositSucceeded(
   }
 }
 
-export type WagerSource = 'loto' | 'flash' | 'scratch' | 'okapi' | 'okapi_color';
+export type WagerSource = 'loto' | 'flash' | 'scratch' | 'okapi';
 
 /**
  * Called after a successful bet (loto, flash, okapi, scratch, …).

@@ -5,8 +5,7 @@
 -- were not idempotent. A process crash between loto_settle_ticket_payout_atomic
 -- (idempotent) and the bare increment call would double-decrement the pot on retry.
 --
--- Solution: event ledger tables with UNIQUE event_key, mirroring the
--- okapi_color_jackpot_events pattern from 20260531_okapi_color_jackpot_events.sql
+-- Solution: event ledger tables with UNIQUE event_key.
 -- =============================================================
 
 -- ---- Loto Congo jackpot event ledger ----
@@ -109,25 +108,3 @@ revoke all on function public.apply_flash_jackpot_delta_idempotent(text, uuid, i
 grant execute on function public.apply_flash_jackpot_delta_idempotent(text, uuid, integer)
   to service_role;
 
-
--- =============================================================
--- H3: okapi_color_tirages — UNIQUE constraint on slot_key
--- =============================================================
--- Belt-and-suspenders guard: prevents two concurrent draw executions
--- (e.g. admin trigger + cron) from inserting two tirage rows for the same
--- slot, which would cause separate jackpot-decrement event_keys and
--- a double-decrement even though payouts are idempotent.
--- IF the constraint already exists from a prior migration this is a no-op.
--- =============================================================
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'okapi_color_tirages_slot_key_unique'
-      and conrelid = 'public.okapi_color_tirages'::regclass
-  ) then
-    alter table public.okapi_color_tirages
-      add constraint okapi_color_tirages_slot_key_unique unique (slot_key);
-  end if;
-end;
-$$;

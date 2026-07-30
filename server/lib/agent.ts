@@ -3,7 +3,7 @@ import { supabaseAdmin } from './supabase.js';
 export async function recordAgentCommission(
   userId: string,
   ticketId: string,
-  ticketType: 'flash' | 'scratch' | 'okapi',
+  ticketType: 'flash' | 'scratch' | 'okapi' | 'okapi_color',
   amountCdf: number,
 ): Promise<void> {
   try {
@@ -76,7 +76,7 @@ export async function recordAgentCommission(
 export async function recordAgentWinCommission(
   userId: string,
   ticketId: string,
-  ticketType: 'flash' | 'scratch',
+  ticketType: 'flash' | 'scratch' | 'okapi_color',
   gainCdf: number,
 ): Promise<void> {
   try {
