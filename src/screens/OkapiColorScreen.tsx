@@ -131,7 +131,7 @@ function TicketCard({ t }: { t: MyTicket }) {
   );
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.congogaming.com';
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.congogaming.com';
 
 // ---------------------------------------------------------------------------
 // Main component

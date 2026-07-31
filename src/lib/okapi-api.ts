@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.congogaming.com'
+const API_URL = import.meta.env.VITE_API_URL ?? 'https://api.congogaming.com'
 
 export type BetCurrency = 'CDF' | 'CGLT'
 export interface BetResponse { bet_id: string; balance: number | null; currency?: BetCurrency }

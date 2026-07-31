@@ -4,7 +4,7 @@
 // The browser must never hold it. This client therefore talks to our own
 // backend (`/api/cglt/*`), which proxies to UniPay with the secret key.
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.congogaming.com'
+const API_URL = import.meta.env.VITE_API_URL ?? 'https://api.congogaming.com'
 
 export interface CgltBalance {
   phone: string | null
