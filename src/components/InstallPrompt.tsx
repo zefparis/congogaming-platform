@@ -93,7 +93,7 @@ export default function InstallPrompt() {
       }}
     >
       <img
-        src="/images/okapi.PNG"
+        src="/images/okapi.png"
         alt=""
         aria-hidden
         width={40}

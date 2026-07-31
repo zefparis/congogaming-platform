@@ -280,7 +280,7 @@ export default function AccountScreen() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="font-display text-3xl text-gold tracking-wider">{t('account.title')}</h1>
         <img
-          src="/images/okapi.PNG"
+          src="/images/okapi.png"
           alt="Congo Gaming"
           className="h-10 w-auto object-contain cursor-pointer"
           onClick={() => {

@@ -76,7 +76,7 @@ export default function RegisterScreen() {
       <div className="flex items-center gap-3 mb-4">
         <Link to="/login" className="text-zinc-400 text-sm">{t('register.back')}</Link>
         <img
-          src="/images/okapi.PNG"
+          src="/images/okapi.png"
           alt="Congo Gaming"
           className="h-10 w-auto object-contain cursor-pointer ml-auto"
           onClick={() => {

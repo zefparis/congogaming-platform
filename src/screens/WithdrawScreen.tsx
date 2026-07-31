@@ -126,7 +126,7 @@ export default function WithdrawScreen() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <img
-          src="/images/okapi.PNG"
+          src="/images/okapi.png"
           alt="Congo Gaming"
           className="h-10 w-auto object-contain cursor-pointer"
           onClick={() => {
