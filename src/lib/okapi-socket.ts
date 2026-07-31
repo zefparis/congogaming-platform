@@ -14,13 +14,20 @@ export type StatusListener = (open: boolean) => void
 //   1. VITE_WS_URL (explicit override)
 //   2. Derive from VITE_API_URL by swapping http(s) -> ws(s). This is the
 //      common case: same Render service serves REST + WS on /ws.
-//   3. Fallback to localhost (dev).
+//   3. Derive from the current page origin (when VITE_API_URL is empty —
+//      relative API URLs in production through the Worker proxy).
+//   4. Fallback to api.congogaming.com (legacy dev/staging default).
 function resolveWsUrl(): string {
   const explicit = import.meta.env.VITE_WS_URL as string | undefined
   if (explicit && explicit.length > 0) return explicit
   const api = import.meta.env.VITE_API_URL as string | undefined
   if (api && api.length > 0) {
     return api.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')
+  }
+  // VITE_API_URL is empty — use the current page origin (relative mode).
+  // The Worker proxies /ws to the Render backend same as /api/*.
+  if (typeof window !== 'undefined' && window.location) {
+    return window.location.origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')
   }
   return 'wss://api.congogaming.com'
 }
