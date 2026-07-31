@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.congogaming.com';
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.congogaming.com';
 const PLAY_URL = (import.meta.env.VITE_PLAY_URL as string | undefined) || 'https://www.congogaming.com';
 
 function agentTokenKey(qrCode: string): string {

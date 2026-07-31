@@ -5,7 +5,7 @@
 // PIN prompt automatically.
 
 const BASE_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.congogaming.com';
+  (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.congogaming.com';
 const BASE = BASE_URL;
 const TOKEN_KEY = 'cg_admin_token';
 const SECRET_KEY = 'cg_admin_secret';

@@ -47,7 +47,7 @@ interface LiveData {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 function buildPlayUrl(): string {
   if (typeof window === 'undefined') return '/okapi-color';
