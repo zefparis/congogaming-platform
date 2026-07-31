@@ -110,7 +110,7 @@ export default function KycScreen() {
     <div className="min-h-screen flex flex-col p-6 pt-10">
       <div className="flex items-center gap-3 mb-4">
         <img
-          src="/images/okapi.PNG"
+          src="/images/okapi.png"
           alt="Congo Gaming"
           className="h-10 w-auto object-contain ml-auto"
         />

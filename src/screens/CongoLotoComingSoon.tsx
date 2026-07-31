@@ -47,7 +47,7 @@ export default function CongoLotoComingSoon() {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <img
-          src="/images/okapi.PNG"
+          src="/images/okapi.png"
           alt="Congo Gaming"
           className="h-9 w-auto object-contain"
         />

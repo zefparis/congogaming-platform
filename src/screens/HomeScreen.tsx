@@ -446,7 +446,7 @@ export default function HomeScreen() {
 
           {/* Sticker image */}
           <img
-            src="/images/okapi/bloto-ball.PNG"
+            src="/images/okapi/bloto-ball.png"
             alt=""
             className="float-y"
             style={{

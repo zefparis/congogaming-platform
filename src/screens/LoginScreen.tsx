@@ -100,7 +100,7 @@ export default function LoginScreen() {
     <div className="min-h-screen flex flex-col p-6 pt-12" style={{ position: 'relative' }}>
       <div className="flex items-center gap-3 mb-6">
         <img
-          src="/images/okapi.PNG"
+          src="/images/okapi.png"
           alt="Congo Gaming"
           className="h-10 w-auto object-contain cursor-pointer"
           onClick={() => {

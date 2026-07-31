@@ -148,7 +148,7 @@ export default function ResetPinScreen() {
     return (
       <div className="min-h-screen flex flex-col p-6 pt-10">
         <div className="flex items-center gap-3 mb-4">
-          <img src="/images/okapi.PNG" alt="Congo Gaming" className="h-10 w-auto object-contain" />
+          <img src="/images/okapi.png" alt="Congo Gaming" className="h-10 w-auto object-contain" />
           <div className="text-zinc-500 text-xs uppercase tracking-widest">{t('reset_pin.page_label')}</div>
         </div>
 
@@ -188,7 +188,7 @@ export default function ResetPinScreen() {
   return (
     <div className="min-h-screen flex flex-col p-6 pt-10">
       <div className="flex items-center gap-3 mb-4">
-        <img src="/images/okapi.PNG" alt="Congo Gaming" className="h-10 w-auto object-contain" />
+        <img src="/images/okapi.png" alt="Congo Gaming" className="h-10 w-auto object-contain" />
         <div className="text-zinc-500 text-xs uppercase tracking-widest">{t('reset_pin.page_label')}</div>
       </div>
 
