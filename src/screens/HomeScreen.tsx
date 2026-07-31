@@ -49,7 +49,8 @@ export default function HomeScreen() {
     };
 
     doRefresh();
-    void refreshCglt();
+    // Only fetch CGLT balance if a session is active (avoids 403 on anonymous load).
+    if (getSession()) void refreshCglt();
     api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
     api
       .flashLatest()
@@ -60,7 +61,7 @@ export default function HomeScreen() {
       .catch(() => {});
 
     // Refresh immediately when the tab regains visibility (app focus / tab switch back).
-    const onVisible = () => { if (document.visibilityState === 'visible') { doRefresh(); void refreshCglt(); } };
+    const onVisible = () => { if (document.visibilityState === 'visible') { doRefresh(); if (getSession()) void refreshCglt(); } };
     document.addEventListener('visibilitychange', onVisible);
 
     // Refresh every 15 seconds to catch admin adjustments promptly.

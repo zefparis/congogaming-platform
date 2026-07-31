@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api, type FarmingStatus } from '../lib/api';
+import { getSession } from '../lib/auth';
 
 const TIER_ORDER = ['debutant', 'bronze', 'argent', 'or', 'diamant'];
 
@@ -76,6 +77,8 @@ export default function FarmingBar({ top = 0, zIndex = 20 }: Props) {
   }, []);
 
   useEffect(() => {
+    // Only load when a session is active — avoids 403 on anonymous page load.
+    if (!getSession()) return;
     void load();
     const interval = window.setInterval(load, 20000);
     const onFocus = () => load();
