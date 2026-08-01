@@ -41,6 +41,7 @@ async function main() {
     origin: env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [
       'https://congogaming.com',
       'https://www.congogaming.com',
+      'https://secure.congogaming.com',
       'https://congogaming-platform-staging.vercel.app',
       // localhost is excluded from the fallback in production so that a missing
       // ALLOWED_ORIGINS env var on Render cannot silently open CORS to local origins.
