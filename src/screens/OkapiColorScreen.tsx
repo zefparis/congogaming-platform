@@ -179,9 +179,11 @@ export default function OkapiColorScreen() {
 
   // Poll live data every 2s — updates live state + drawAt, does NOT overwrite secs
   useEffect(() => {
+    let consecutiveFailures = 0;
     const fetch_ = () => {
       api.okapiColorLive()
         .then((d) => {
+          consecutiveFailures = 0;
           setLive(d);
           setLivePot((p) => p === 0 ? d.jackpotCdf : p);
           // Track server clock skew for drift correction
@@ -195,9 +197,18 @@ export default function OkapiColorScreen() {
           }
         })
         .catch((e) => {
+          consecutiveFailures++;
           // Log poll failures so they're no longer silent — helps diagnose
           // network/CORS/auth issues vs. server-side slowness.
           console.warn('[OkapiColor] live poll failed', e?.status ?? e?.message);
+          // After 5 consecutive failures (~10s), clear live state so the
+          // UI shows the loading banner instead of a frozen stale state.
+          // This is what prevents the "grayed-out grid" when the backend
+          // is down: without this, live stays on the last (possibly
+          // 'drawing') state forever and the grid never recovers.
+          if (consecutiveFailures >= 5) {
+            setLive(null);
+          }
         });
     };
     fetch_();
@@ -288,8 +299,16 @@ export default function OkapiColorScreen() {
   }, [live?.currentDraw.status]);
 
   const status     = live?.currentDraw.status ?? 'open';
+  // Use server-corrected time for the closeAt check — raw Date.now() would
+  // block the grid whenever the client clock drifts ahead of the server,
+  // even when the server reports status: 'open'. This was the root cause
+  // of the "grayed-out grid" bug: the countdown already used skew-corrected
+  // time, but isBlocked used raw client time, so the two disagreed.
+  const serverNow  = Date.now() + serverTimeSkewRef.current;
   const isBlocked  = status === 'closing' || status === 'drawing'
-    || (live != null && Date.now() >= new Date(live.currentDraw.closeAt).getTime());
+    || (live != null && serverNow >= new Date(live.currentDraw.closeAt).getTime());
+  // If the game is disabled server-side, treat the grid as blocked too.
+  const isDisabled = live != null && live.enabled === false;
   const isFull     = selected.length === 6;
   const jackpotPrizeCdf = live?.jackpotThresholdCdf ?? 250_000;
   const potCdf           = livePot;
@@ -300,12 +319,13 @@ export default function OkapiColorScreen() {
   const secStr     = String(secs % 60).padStart(2, '0');
 
   const toggle = (n: number) => {
-    if (isBlocked) return;
+    if (isBlocked || isDisabled) return;
     setSelected((p) => p.includes(n) ? p.filter((x) => x !== n) : p.length >= 6 ? p : [...p, n].sort((a, b) => a - b));
     if (buyState !== 'idle') { setBuyState('idle'); setBuyMsg(''); }
   };
 
   const quickPick = () => {
+    if (isBlocked || isDisabled) return;
     const s = new Set<number>();
     while (s.size < 6) s.add(Math.floor(Math.random() * 24) + 1);
     setSelected(Array.from(s).sort((a, b) => a - b));
@@ -313,7 +333,7 @@ export default function OkapiColorScreen() {
   };
 
   const submit = async () => {
-    if (!session || !isFull || buyState === 'pending' || isBlocked) return;
+    if (!session || !isFull || buyState === 'pending' || isBlocked || isDisabled) return;
     setBuyState('pending'); setBuyMsg('');
     try {
       await api.okapiColorBuyTicket(selected);
@@ -433,6 +453,27 @@ export default function OkapiColorScreen() {
 
       {/* State-aware main section */}
       <div id="live">
+
+      {/* Error / disabled banner — visible when the API is unreachable or
+          the game is disabled server-side. Prevents the "silent gray grid"
+          UX where the user sees a frozen UI with no explanation. */}
+      {isDisabled && (
+        <div className="mx-4 mt-4 rounded-2xl p-4 text-center"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+          <div className="font-display text-sm text-red-400 tracking-widest">
+            {t('okapi_color.game_disabled', { defaultValue: 'Le jeu est temporairement désactivé.' })}
+          </div>
+        </div>
+      )}
+      {live == null && (
+        <div className="mx-4 mt-4 rounded-2xl p-4 text-center"
+          style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)' }}>
+          <div className="font-display text-sm text-amber-400 tracking-widest">
+            {t('okapi_color.loading', { defaultValue: 'Chargement…' })}
+          </div>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
 
         {/* ── OPEN / CLOSING : selection grid ── */}
@@ -469,7 +510,7 @@ export default function OkapiColorScreen() {
                 {grid.map((n) => {
                   const on = selected.includes(n);
                   return (
-                    <motion.button key={n} whileTap={{ scale: 0.88 }} onClick={() => toggle(n)} disabled={isBlocked}
+                    <motion.button key={n} whileTap={{ scale: 0.88 }} onClick={() => toggle(n)} disabled={isBlocked || isDisabled}
                       className={`h-11 rounded-xl font-display text-base transition-all disabled:opacity-30 ${on ? 'text-white' : 'bg-zinc-900 border border-zinc-700 text-zinc-400'}`}
                       style={on ? { background: 'linear-gradient(135deg,#b91c1c,#ef4444)', boxShadow: '0 0 12px rgba(239,68,68,0.5)' } : undefined}>
                       {n}
@@ -478,7 +519,7 @@ export default function OkapiColorScreen() {
                 })}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <motion.button whileTap={{ scale: 0.97 }} onClick={quickPick} disabled={isBlocked}
+                <motion.button whileTap={{ scale: 0.97 }} onClick={quickPick} disabled={isBlocked || isDisabled}
                   className="h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-sm font-semibold flex items-center justify-center gap-2 text-zinc-200 disabled:opacity-40">
                   <Shuffle className="w-4 h-4" /> {t('okapi_color.quick_pick')}
                 </motion.button>
@@ -498,9 +539,9 @@ export default function OkapiColorScreen() {
                 <div className="mb-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{buyMsg}</div>
               )}
               <motion.button whileTap={{ scale: 0.97 }} onClick={submit}
-                disabled={!isFull || buyState === 'pending' || isBlocked}
+                disabled={!isFull || buyState === 'pending' || isBlocked || isDisabled}
                 className="w-full h-14 rounded-2xl font-display text-xl tracking-widest text-white flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={isFull && !isBlocked && buyState !== 'pending'
+                style={isFull && !isBlocked && !isDisabled && buyState !== 'pending'
                   ? { background: 'linear-gradient(135deg,#b91c1c,#ef4444)', boxShadow: '0 0 20px rgba(239,68,68,0.35)' }
                   : { background: '#27272a' }}>
                 {buyState === 'pending' ? <Loader2 className="w-5 h-5 animate-spin" /> : t('okapi_color.play_button', { price: price.toLocaleString('fr-FR') })}
