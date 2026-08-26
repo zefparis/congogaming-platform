@@ -162,37 +162,95 @@ export default function OkapiColorScreen() {
 
   const grid = useMemo(() => Array.from({ length: 24 }, (_, i) => i + 1), []);
 
+  // ── Client-side countdown clock ──────────────────────────────────────
+  // The server sends `drawAt` (ISO timestamp of the next draw). We compute
+  // secs = max(0, drawAt - Date.now()) locally every 250ms so the countdown
+  // never freezes even if the polling is slow or failing. The polling only
+  // updates `drawAt` (via setLive) when the slot changes — it no longer
+  // overwrites secs directly, which was causing the "rubber-banding" freeze.
+  const drawAtMsRef = useRef<number | null>(null);
+  const serverTimeSkewRef = useRef<number>(0); // serverTime - Date.now() in ms
+
   // Debug mount
   useEffect(() => {
     console.log('[OkapiColor] mounted');
     console.log('[OkapiColor] live endpoint = /api/okapi-color/live');
   }, []);
 
-  // Poll live data every 2s
+  // Poll live data every 2s — updates live state + drawAt, does NOT overwrite secs
   useEffect(() => {
     const fetch_ = () => {
       api.okapiColorLive()
-        .then((d) => { setLive(d); setSecs(d.currentDraw.secondsRemaining); setLivePot((p) => p === 0 ? d.jackpotCdf : p); })
-        .catch(() => {});
+        .then((d) => {
+          setLive(d);
+          setLivePot((p) => p === 0 ? d.jackpotCdf : p);
+          // Track server clock skew for drift correction
+          const serverMs = new Date(d.serverTime).getTime();
+          serverTimeSkewRef.current = serverMs - Date.now();
+          // Only update drawAt when the slot changes — avoids resetting the
+          // countdown every 2s with a potentially stale secondsRemaining.
+          const newDrawAtMs = new Date(d.currentDraw.drawAt).getTime();
+          if (drawAtMsRef.current !== newDrawAtMs) {
+            drawAtMsRef.current = newDrawAtMs;
+          }
+        })
+        .catch((e) => {
+          // Log poll failures so they're no longer silent — helps diagnose
+          // network/CORS/auth issues vs. server-side slowness.
+          console.warn('[OkapiColor] live poll failed', e?.status ?? e?.message);
+        });
     };
     fetch_();
     const id = setInterval(fetch_, 2000);
     return () => clearInterval(id);
   }, []);
 
-  // SSE — real-time jackpot pot
+  // SSE — real-time jackpot pot, with reconnection backoff
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/api/okapi-color/jackpot/stream`);
-    es.onmessage = (e) => {
-      try { const { pot_cdf } = JSON.parse(e.data); setLivePot(Number(pot_cdf)); } catch {}
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = 1000;
+    let closed = false;
+
+    const connect = () => {
+      if (closed) return;
+      es = new EventSource(`${API_BASE}/api/okapi-color/jackpot/stream`);
+      es.onopen  = () => { backoffMs = 1000; };
+      es.onmessage = (e) => {
+        try { const { pot_cdf } = JSON.parse(e.data); setLivePot(Number(pot_cdf)); } catch {}
+      };
+      es.onerror = () => {
+        es?.close();
+        if (closed) return;
+        // Reconnect with exponential backoff (capped at 30s) so the jackpot
+        // pot recovers automatically after a transient network error.
+        reconnectTimer = setTimeout(() => {
+          backoffMs = Math.min(backoffMs * 2, 30_000);
+          connect();
+        }, backoffMs);
+      };
     };
-    es.onerror = () => es.close();
-    return () => es.close();
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      es?.close();
+    };
   }, []);
 
-  // Local countdown tick
+  // Local countdown tick — computes secs from drawAt + client clock.
+  // This is the single source of truth for the countdown display: it runs
+  // independently of the polling and SSE, so it never freezes even if the
+  // network is flaky.
   useEffect(() => {
-    const id = setInterval(() => setSecs((s) => Math.max(0, s - 1)), 1000);
+    const id = setInterval(() => {
+      if (drawAtMsRef.current == null) return;
+      // Use server-corrected time to avoid drift if the client clock is off.
+      const now = Date.now() + serverTimeSkewRef.current;
+      const remaining = Math.round((drawAtMsRef.current - now) / 1000);
+      setSecs(Math.max(0, remaining));
+    }, 250);
     return () => clearInterval(id);
   }, []);
 

@@ -293,6 +293,13 @@ export default function OkapiColorTVScreen() {
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [videoFailed, setVideoFailed]     = useState(false);
 
+  // ── Client-side countdown clock ──────────────────────────────────────
+  // secs is derived from drawAt (server timestamp) + client clock, not from
+  // secondsRemaining on every poll — avoids the rubber-banding freeze when
+  // the poll response is delayed.
+  const drawAtMsRef = useRef<number | null>(null);
+  const serverTimeSkewRef = useRef<number>(0);
+
   useEffect(() => {
     const check = () => setIsLargeScreen(window.innerWidth >= 900);
     check();
@@ -303,7 +310,7 @@ export default function OkapiColorTVScreen() {
   const playUrl = buildPlayUrl();
   const qrUrl   = buildQrUrl(playUrl);
 
-  // Poll live data every 2s
+  // Poll live data every 2s — updates live state + drawAt, does NOT overwrite secs
   useEffect(() => {
     const fetchLive = async () => {
       try {
@@ -311,10 +318,13 @@ export default function OkapiColorTVScreen() {
         if (!r.ok) { setError(true); return; }
         const data: LiveData = await r.json();
         setError(false);
-        setLive(() => {
-          setSecs(data.currentDraw.secondsRemaining);
-          return data;
-        });
+        setLive(data);
+        const serverMs = new Date(data.serverTime).getTime();
+        serverTimeSkewRef.current = serverMs - Date.now();
+        const newDrawAtMs = new Date(data.currentDraw.drawAt).getTime();
+        if (drawAtMsRef.current !== newDrawAtMs) {
+          drawAtMsRef.current = newDrawAtMs;
+        }
       } catch { setError(true); }
     };
     fetchLive();
@@ -322,9 +332,13 @@ export default function OkapiColorTVScreen() {
     return () => clearInterval(id);
   }, []);
 
-  // Local countdown tick every second
+  // Local countdown tick — single source of truth, independent of polling
   useEffect(() => {
-    const id = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000);
+    const id = setInterval(() => {
+      if (drawAtMsRef.current == null) return;
+      const now = Date.now() + serverTimeSkewRef.current;
+      setSecs(Math.max(0, Math.round((drawAtMsRef.current - now) / 1000)));
+    }, 250);
     return () => clearInterval(id);
   }, []);
 
