@@ -137,6 +137,49 @@ async function main() {
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 }
 
+// ---------------------------------------------------------------------------
+// Process-level safety nets.
+//
+// Without these handlers, an uncaught exception or an unhandled promise
+// rejection crashes the process immediately (Node 20+ default) with no
+// log line — which is exactly the signature of the 14:40-14:50 log gap
+// (JSON log cut mid-write, no "Next draw in Xs", silent 10-min outage).
+//
+// We log the error with a clear marker so it is grep-able in the hosting
+// platform's log stream, then exit. We deliberately do NOT continue
+// running after an uncaughtException — the process state may be
+// corrupted (the V8 docs are explicit about this). The hosting platform
+// (Render / Docker) will restart the process automatically.
+// ---------------------------------------------------------------------------
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL/uncaughtException] Process will exit:', err);
+  // Give stdout a chance to flush before exiting.
+  setImmediate(() => process.exit(1));
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL/unhandledRejection] Unhandled promise rejection:', reason);
+  // Same rationale: log and exit so the platform supervisor restarts us
+  // in a known-good state instead of continuing with a corrupted async
+  // context.
+  setImmediate(() => process.exit(1));
+});
+
+// ---------------------------------------------------------------------------
+// Memory watchdog — logs heap usage every 60s so we can correlate OOM
+// kills with memory growth in the hosting platform's log stream.
+// ---------------------------------------------------------------------------
+setInterval(() => {
+  const mem = process.memoryUsage();
+  console.log('[mem-watchdog]', {
+    rssMb:        Math.round(mem.rss / 1024 / 1024),
+    heapUsedMb:   Math.round(mem.heapUsed / 1024 / 1024),
+    heapTotalMb:  Math.round(mem.heapTotal / 1024 / 1024),
+    externalMb:   Math.round(mem.external / 1024 / 1024),
+    arrayBuffersMb: Math.round(mem.arrayBuffers / 1024 / 1024),
+  });
+}, 60_000).unref();
+
 main().catch((err) => {
   console.error(err);
   process.exit(1);

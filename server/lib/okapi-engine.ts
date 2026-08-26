@@ -51,74 +51,92 @@ export class GameEngine extends EventEmitter {
   private tickHandle: NodeJS.Timeout | null = null
 
   start() {
-    this.cycle()
+    this.cycle().catch((err) => {
+      // A top-level rejection from cycle() would be an unhandledRejection
+      // and crash the entire process (killing the API server, the cron
+      // schedulers, and every WebSocket client). Wrap the recursive loop
+      // so an engine failure is contained: log it, wait, and retry.
+      console.error('[okapi-engine] cycle() crashed, retrying in 5s:', err)
+      setTimeout(() => this.start(), 5000)
+    })
   }
 
   private async cycle() {
-    // WAITING
-    this.state = 'WAITING'
-    this.startTime = null
-    this.bets.clear()
+    try {
+      // WAITING
+      this.state = 'WAITING'
+      this.startTime = null
+      this.bets.clear()
 
-    // Pre-generate crash point and create the round row BEFORE opening
-    // betting. Bets placed during WAITING reference `engine.roundId`, so
-    // the round must exist by then — otherwise every bet is persisted
-    // with round_id=null and admin aggregations (joueurs / mises /
-    // cashouts / profit maison) join nothing and report 0.
-    this.crashPoint = generateCrashPoint()
-    this.roundId = await this.createRound(this.crashPoint)
+      // Pre-generate crash point and create the round row BEFORE opening
+      // betting. Bets placed during WAITING reference `engine.roundId`, so
+      // the round must exist by then — otherwise every bet is persisted
+      // with round_id=null and admin aggregations (joueurs / mises /
+      // cashouts / profit maison) join nothing and report 0.
+      this.crashPoint = generateCrashPoint()
+      this.roundId = await this.createRound(this.crashPoint)
 
-    // If round creation failed, abort and retry after delay
-    if (!this.roundId) {
-      console.error('[okapi-engine] createRound failed, aborting cycle and retrying in 5s')
+      // If round creation failed, abort and retry after delay
+      if (!this.roundId) {
+        console.error('[okapi-engine] createRound failed, aborting cycle and retrying in 5s')
+        await sleep(5000)
+        this.cycle()
+        return
+      }
+
+      let countdown = Math.ceil(WAIT_MS / 1000)
+      this.emit('broadcast', { type: 'WAITING', countdown })
+      const waitInterval = setInterval(() => {
+        countdown -= 1
+        if (countdown >= 0) {
+          this.emit('broadcast', { type: 'WAITING', countdown })
+        }
+      }, 1000)
+
+      await sleep(WAIT_MS)
+      clearInterval(waitInterval)
+
+      // PLAYING
+      this.state = 'PLAYING'
+      this.startTime = Date.now()
+      this.emit('broadcast', { type: 'PLAYING', startTime: this.startTime })
+
+      await new Promise<void>((resolve) => {
+        this.tickHandle = setInterval(() => {
+          if (this.state !== 'PLAYING' || this.startTime == null || this.crashPoint == null) return
+          const elapsed = (Date.now() - this.startTime) / 1000
+          const m = multiplierAt(elapsed)
+          if (m >= this.crashPoint) {
+            if (this.tickHandle) clearInterval(this.tickHandle)
+            this.tickHandle = null
+            resolve()
+          } else {
+            this.emit('broadcast', { type: 'TICK', multiplier: m })
+          }
+        }, TICK_MS)
+      })
+
+      // CRASHED
+      this.state = 'CRASHED'
+      const cp = this.crashPoint!
+      this.history = [cp, ...this.history].slice(0, 50)
+      this.emit('broadcast', { type: 'CRASHED', crashPoint: cp })
+
+      // Persist round end + mark uncashed bets as lost
+      await this.finalizeRound(cp)
+
+      await sleep(POST_CRASH_MS)
+      this.cycle()
+    } catch (err) {
+      // Any throw inside cycle() (DB error in finalizeRound, corrupted
+      // state, etc.) is caught here so it does not become an
+      // unhandledRejection that kills the whole process. We log it and
+      // re-enter the loop after a cooldown.
+      console.error('[okapi-engine] cycle() error, restarting in 5s:', err)
+      if (this.tickHandle) { clearInterval(this.tickHandle); this.tickHandle = null }
       await sleep(5000)
       this.cycle()
-      return
     }
-
-    let countdown = Math.ceil(WAIT_MS / 1000)
-    this.emit('broadcast', { type: 'WAITING', countdown })
-    const waitInterval = setInterval(() => {
-      countdown -= 1
-      if (countdown >= 0) {
-        this.emit('broadcast', { type: 'WAITING', countdown })
-      }
-    }, 1000)
-
-    await sleep(WAIT_MS)
-    clearInterval(waitInterval)
-
-    // PLAYING
-    this.state = 'PLAYING'
-    this.startTime = Date.now()
-    this.emit('broadcast', { type: 'PLAYING', startTime: this.startTime })
-
-    await new Promise<void>((resolve) => {
-      this.tickHandle = setInterval(() => {
-        if (this.state !== 'PLAYING' || this.startTime == null || this.crashPoint == null) return
-        const elapsed = (Date.now() - this.startTime) / 1000
-        const m = multiplierAt(elapsed)
-        if (m >= this.crashPoint) {
-          if (this.tickHandle) clearInterval(this.tickHandle)
-          this.tickHandle = null
-          resolve()
-        } else {
-          this.emit('broadcast', { type: 'TICK', multiplier: m })
-        }
-      }, TICK_MS)
-    })
-
-    // CRASHED
-    this.state = 'CRASHED'
-    const cp = this.crashPoint!
-    this.history = [cp, ...this.history].slice(0, 50)
-    this.emit('broadcast', { type: 'CRASHED', crashPoint: cp })
-
-    // Persist round end + mark uncashed bets as lost
-    await this.finalizeRound(cp)
-
-    await sleep(POST_CRASH_MS)
-    this.cycle()
   }
 
   private async createRound(crashPoint: number): Promise<string | null> {

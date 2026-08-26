@@ -960,14 +960,42 @@ const okapiColorRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       })
       .subscribe();
 
+    // Track the last time we successfully wrote to the client. If the
+    // underlying TCP socket is dead but the 'close' event has not fired
+    // (common on flaky 3G/4G in DRC where the OS doesn't detect a
+    // half-open connection for minutes), the ping writes will fail
+    // silently and the Supabase realtime channel will leak — eventually
+    // causing an OOM kill. The watchdog below force-cleans the channel
+    // after a period of write failures.
+    let lastWriteOk = Date.now();
+    const trackWrite = (chunk: string): boolean => {
+      try {
+        const ok = reply.raw.write(chunk);
+        if (ok) lastWriteOk = Date.now();
+        return ok;
+      } catch {
+        return false;
+      }
+    };
+
     const ping = setInterval(() => {
-      reply.raw.write(': ping\n\n');
+      const ok = trackWrite(': ping\n\n');
+      // If writes have been failing for more than 90s, the socket is
+      // dead — force-close so 'close' fires and cleanup runs.
+      if (!ok && Date.now() - lastWriteOk > 90_000) {
+        try { reply.raw.destroy(); } catch {}
+      }
     }, 15_000);
 
-    req.raw.on('close', () => {
+    // Also detect a dead socket via the raw 'error' event (EPIPE,
+    // ECONNRESET) which may fire before 'close' on some platforms.
+    const cleanup = () => {
       clearInterval(ping);
-      supabaseAdmin.removeChannel(channel);
-    });
+      try { supabaseAdmin.removeChannel(channel); } catch {}
+    };
+
+    req.raw.on('close', cleanup);
+    req.raw.on('error', cleanup);
   });
 };
 
