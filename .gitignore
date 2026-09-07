@@ -3,6 +3,8 @@ dist
 *.tsbuildinfo
 .env
 .env.local
+.env.staging
+.env*.local
 .DS_Store
 *.log
 .vercel
@@ -10,3 +12,11 @@ dist
 token.json
 webhook-test.mjs
 *.pem
+*.key
+gitleaks-report.json
+
+# NOTE: .env.production is intentionally TRACKED — it contains only the
+# non-secret VITE_API_URL= build flag (empty on purpose, see its comments).
+# NEVER put secrets in it: it is committed. Secrets go in .env (ignored)
+# or in the deployment platform's environment variables.
+# The gitleaks pre-commit hook + CI will block committed secrets.
