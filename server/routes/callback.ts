@@ -17,9 +17,24 @@ function eventHash(body: Record<string, any>): string {
 }
 
 export default async function callbackRoutes(app: FastifyInstance) {
-  app.post('/api/callback', async (req, reply) => {
-    const body = (req.body || {}) as Record<string, any>;
-    app.log.info({ body }, 'unipesa callback');
+  // Dedicated rate limit for the Unipesa webhook callback.
+  // The global limiter (600/min) is too permissive for a public endpoint
+  // that accepts signed payment notifications. Legitimate callback volume
+  // is low (one per deposit/withdrawal event), so 120/min per IP is
+  // generous for the provider yet blocks flood/replay attacks.
+  app.post(
+    '/api/callback',
+    {
+      config: {
+        rateLimit: {
+          max: 120,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    async (req, reply) => {
+      const body = (req.body || {}) as Record<string, any>;
+      app.log.info({ body }, 'unipesa callback');
 
     const valid = verifyCallbackSignature(body);
     if (!valid) {

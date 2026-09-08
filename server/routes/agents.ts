@@ -57,8 +57,27 @@ const AgentAuthSchema = z.object({
 
 export default async function agentsPublicRoutes(app: FastifyInstance) {
   // POST /api/agents/:qrCode/auth — exchange PIN for a session token
+  //
+  // Dedicated rate limit: 5 attempts / 15 min per (QR code + IP).
+  // The PIN space is only 4-6 digits (10^4 to 10^6), so the global 600/min
+  // limiter would allow a distributed brute-force. This per-QR+IP limit
+  // caps an attacker at 5 guesses per 15 min per identity, with the
+  // shared-IP (CGNAT) dimension still bounded by the QR-code key.
   app.post<{ Params: { qrCode: string } }>(
     '/api/agents/:qrCode/auth',
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '15 minutes',
+          keyGenerator: (req: FastifyRequest) => {
+            const qr = (req.params as { qrCode?: string })?.qrCode?.toUpperCase() || 'unknown';
+            const xff = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+            return `agent-auth:${qr}:${xff || req.ip}`;
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const { qrCode } = req.params;
       const parsed = AgentAuthSchema.safeParse(req.body);
@@ -161,6 +180,9 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
   );
 
   // POST /api/agents/:qrCode/request-payout — requires agent auth
+  //
+  // Uses request_agent_payout_atomic RPC (SELECT FOR UPDATE) to prevent
+  // double-payout from concurrent requests (double-click, retry, parallel).
   app.post<{ Params: { qrCode: string } }>(
     '/api/agents/:qrCode/request-payout',
     async (req, reply) => {
@@ -168,7 +190,7 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
 
       const { data: agent, error } = await supabaseAdmin
         .from('agents')
-        .select('id, status, total_earned_cdf, min_payout_cdf, payout_requested_at')
+        .select('id, status, min_payout_cdf')
         .eq('qr_code', qrCode.toUpperCase())
         .eq('status', 'active')
         .maybeSingle();
@@ -184,40 +206,34 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
         return reply.code(401).send({ error: 'Invalid or expired agent token', code: 'AGENT_AUTH_INVALID' });
       }
 
-      const { data: pendingRows } = await supabaseAdmin
-        .from('agent_commissions')
-        .select('commission_cdf')
-        .eq('agent_id', agent.id)
-        .eq('status', 'pending');
+      // Atomic payout request via RPC (SELECT FOR UPDATE on the agent row).
+      const { data: result, error: rpcErr } = await supabaseAdmin
+        .rpc('request_agent_payout_atomic', {
+          p_agent_id: agent.id,
+          p_min_payout_cdf: Number(agent.min_payout_cdf ?? 2000),
+        });
 
-      const total        = (pendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
-      const totalEarned  = Number(agent.total_earned_cdf ?? 0);
-      const agentTier    = totalEarned >= 5000000 ? 'diamond'
-                         : totalEarned >= 1000000 ? 'gold' : 'standard';
-      const minimum      = agentTier === 'diamond' ? 1000 : Number(agent.min_payout_cdf ?? 2000);
-
-      if (total < minimum) {
-        return reply.code(400).send({ code: 'BELOW_MINIMUM', minimum, current: total });
+      if (rpcErr) {
+        req.log.error({ err: rpcErr.message, agent_id: agent.id }, '[agents/payout] RPC failed');
+        return reply.code(500).send({ error: rpcErr.message });
       }
 
-      if (agent.payout_requested_at) {
-        const msSince = Date.now() - new Date(agent.payout_requested_at).getTime();
-        if (msSince < 24 * 60 * 60 * 1000) {
-          return reply.code(400).send({ code: 'ALREADY_REQUESTED' });
-        }
+      const row = (result || [])[0] as
+        | { ok: boolean; code: string | null; amount: number; minimum: number; current: number }
+        | undefined;
+      if (!row) {
+        req.log.error({ agent_id: agent.id }, '[agents/payout] RPC returned no row');
+        return reply.code(500).send({ error: 'payout_rpc_no_result' });
       }
 
-      const { error: updateErr } = await supabaseAdmin
-        .from('agents')
-        .update({
-          payout_requested_at:         new Date().toISOString(),
-          payout_requested_amount_cdf: total,
-        })
-        .eq('id', agent.id);
+      if (!row.ok) {
+        if (row.code === 'ALREADY_REQUESTED') return reply.code(400).send({ code: 'ALREADY_REQUESTED' });
+        if (row.code === 'BELOW_MINIMUM')     return reply.code(400).send({ code: 'BELOW_MINIMUM', minimum: row.minimum, current: row.current });
+        if (row.code === 'AGENT_NOT_FOUND')   return reply.code(404).send({ error: 'Agent introuvable' });
+        return reply.code(500).send({ error: row.code || 'payout_failed' });
+      }
 
-      if (updateErr) return reply.code(500).send({ error: updateErr.message });
-
-      return reply.send({ ok: true, amount: total });
+      return reply.send({ ok: true, amount: row.amount });
     },
   );
 }

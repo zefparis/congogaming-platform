@@ -164,21 +164,27 @@ export default async function adminRoutes(app: FastifyInstance) {
   // Both `secret` and `phone` are REQUIRED. The phone identifies the admin
   // user account, and its `users.role` (admin / super_admin) is embedded in
   // the token. There is no anonymous / legacy admin login.
-  app.post<{ Body: { secret?: string; phone?: string } }>(
+  const AdminAuthSchema = z.object({
+    secret: z.string().min(1, 'secret is required'),
+    phone: z.string().min(1, 'Téléphone admin requis'),
+  });
+
+  app.post(
     '/api/admin/auth',
     { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
     async (req, reply) => {
-      const provided = String(req.body?.secret || '');
+      const parsed = AdminAuthSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
+      }
+      const { secret: provided, phone: phoneRaw } = parsed.data;
+
       const expected = process.env.LOTO_ADMIN_SECRET || '';
       if (!expected) return reply.code(500).send({ error: 'Admin not configured' });
-      if (!provided || !constantTimeStringEqual(provided, expected)) {
+      if (!constantTimeStringEqual(provided, expected)) {
         return reply.code(401).send({ error: 'Invalid secret' });
       }
 
-      const phoneRaw = String(req.body?.phone || '').trim();
-      if (!phoneRaw) {
-        return reply.code(400).send({ error: 'Téléphone admin requis' });
-      }
       // Normalise to canonical 0XXXXXXXXX format used in users.phone.
       const phone = tryNormalizeDrcPhone(phoneRaw) || phoneRaw;
 

@@ -14,11 +14,19 @@ const fetchWithProxy: typeof fetch = proxyAgent
 
 export function calculateSignature(data: Record<string, any>, secretKey: string): string {
   let stringForSignature = '';
-  for (const [key, value] of Object.entries(data)) {
+  // Sort keys alphabetically so the signature is deterministic regardless
+  // of JS object iteration order (V8 preserves insertion order for string
+  // keys, but the Unipesa provider and our test payloads may not share the
+  // same key order). This prevents signature mismatches on callbacks where
+  // the provider re-serializes the body in a different order.
+  const sortedKeys = Object.keys(data).sort();
+  for (const key of sortedKeys) {
     if (key === 'signature') continue;
+    const value = data[key];
     if (value !== null && typeof value === 'object') {
-      for (const [k, v] of Object.entries(value)) {
-        stringForSignature += `${key}.${k}${v}`;
+      // Nested objects: sort their keys too for deterministic signing.
+      for (const k of Object.keys(value).sort()) {
+        stringForSignature += `${key}.${k}${value[k]}`;
       }
     } else {
       stringForSignature += `${key}${value}`;

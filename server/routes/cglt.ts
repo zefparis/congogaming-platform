@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { env } from '../env.js';
 import { getCGLTBalance, getUserUnipayPhone, creditCGLT, debitCGLT, CgltError } from '../lib/unipay-cglt.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
@@ -20,6 +21,21 @@ const WITHDRAW_RATE_LIMIT = 3; // max successful withdrawals…
 const WITHDRAW_RATE_WINDOW_MS = 60 * 60 * 1000; // …per rolling hour, per user.
 
 const UNIPAY_API = env.UNIPAY_API_URL ?? 'https://unipay-api.onrender.com';
+
+// ---- Zod schemas (coherent with the rest of the codebase) ----
+
+const CgltSwapSchema = z.object({
+  amount_cdf: z.number({ invalid_type_error: 'amount_cdf must be a number' })
+    .int('amount_cdf must be an integer')
+    .positive('amount_cdf must be positive'),
+});
+
+const CgltWithdrawSchema = z.object({
+  amount_cglt: z.number({ invalid_type_error: 'amount_cglt must be a number' })
+    .int('amount_cglt must be an integer')
+    .positive('amount_cglt must be positive'),
+  phone: z.string({ invalid_type_error: 'phone must be a string' }).min(1, 'phone is required'),
+});
 
 /**
  * Normalize an arbitrary DRC phone input (`+243…`, `243…`, `0…`, or bare
@@ -106,11 +122,11 @@ const cgltRoutes: FastifyPluginAsync = async (app) => {
    */
   app.post('/api/cglt/swap', { preHandler: app.requireAuth }, async (req, reply) => {
     const user_id = req.user.id;
-    const body = (req.body ?? {}) as { amount_cdf?: number };
-    const amount = Math.trunc(Number(body.amount_cdf));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return reply.code(400).send({ error: 'invalid_amount' });
+    const parsed = CgltSwapSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'invalid_amount' });
     }
+    const amount = parsed.data.amount_cdf;
 
     // Resolve phone OUTSIDE the inner steps but INSIDE a guard, so a Supabase
     // throw here is logged instead of producing an opaque 500.
@@ -234,17 +250,16 @@ const cgltRoutes: FastifyPluginAsync = async (app) => {
    */
   app.post('/api/cglt/withdraw', { preHandler: app.requireAuth }, async (req, reply) => {
     const user_id = req.user.id;
-    const body = (req.body ?? {}) as { amount_cglt?: number; phone?: string };
-
-    const amount = Math.trunc(Number(body.amount_cglt));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return reply.code(400).send({ error: 'invalid_amount' });
+    const parsed = CgltWithdrawSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'invalid_body' });
     }
+    const amount = parsed.data.amount_cglt;
     if (amount < MIN_CGLT_WITHDRAW) {
       return reply.code(400).send({ error: 'amount_too_small', min: MIN_CGLT_WITHDRAW });
     }
 
-    const destPhone = normalizeUnipayPhone(String(body.phone ?? ''));
+    const destPhone = normalizeUnipayPhone(parsed.data.phone);
     if (!destPhone) {
       return reply.code(400).send({ error: 'invalid_phone' });
     }
