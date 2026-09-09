@@ -84,6 +84,13 @@ export async function getUserUnipayPhone(userId: string): Promise<string | null>
   return toUnipayPhone(String(data.phone));
 }
 
+/**
+ * Timeout for UniPay CGLT server-to-server calls. Without it, a hanging
+ * UniPay backend would block the request indefinitely (no AbortSignal on the
+ * raw fetch). 15s matches the Avada/Unipesa CDF timeout for consistency.
+ */
+const CGLT_TIMEOUT_MS = 15_000;
+
 async function call<T>(path: string, init: RequestInit): Promise<T> {
   const key = assertConfigured();
   const res = await fetch(`${UNIPAY_API}${path}`, {
@@ -93,6 +100,16 @@ async function call<T>(path: string, init: RequestInit): Promise<T> {
       'x-api-key': key,
       ...(init.headers ?? {}),
     },
+    signal: AbortSignal.timeout(CGLT_TIMEOUT_MS),
+  }).catch((err: unknown) => {
+    // Surface timeout/network errors loudly — previously these would hang
+    // silently or bubble up as opaque 500s.
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      console.error(`[CGLT_TIMEOUT] ${init.method ?? 'GET'} ${path} exceeded ${CGLT_TIMEOUT_MS}ms`);
+    } else {
+      console.error(`[CGLT_NETWORK_ERROR] ${init.method ?? 'GET'} ${path}:`, err instanceof Error ? err.message : err);
+    }
+    throw err;
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {

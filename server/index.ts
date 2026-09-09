@@ -31,6 +31,33 @@ import { env } from './env.js';
 
 const isProduction = env.NODE_ENV === 'production';
 
+/**
+ * Fail-closed check: in production, FIXIE_URL is required for Unipesa
+ * payment calls that rely on IP whitelisting. Without it, the service would
+ * silently fall back to a direct connection and get rejected by the whitelist
+ * — or worse, work unpredictably if the whitelist is not strict.
+ *
+ * The per-call guard in unipesa.ts throws FIXIE_PROXY_REQUIRED regardless of
+ * NODE_ENV. This boot check is an early, loud failure so the service never
+ * starts in a broken state in production.
+ */
+function assertFixieConfigured(): void {
+  const skip = env.UNIPESA_SKIP_FIXIE_CHECK === '1' || env.UNIPESA_SKIP_FIXIE_CHECK === 'true';
+  if (skip) {
+    console.warn('[WARN] UNIPESA_SKIP_FIXIE_CHECK is set — Unipesa calls will bypass the Fixie proxy. This must NEVER be used in production.');
+    return;
+  }
+  if (isProduction && !env.FIXIE_URL) {
+    console.error('[FATAL] FIXIE_URL is not set in production. Unipesa payment calls require a whitelisted egress IP. Refusing to start.');
+    process.exit(1);
+  }
+  if (!isProduction && !env.FIXIE_URL) {
+    console.warn('[WARN] FIXIE_URL is not set — Unipesa calls will throw FIXIE_PROXY_REQUIRED at call time. Set UNIPESA_SKIP_FIXIE_CHECK=1 for local dev/mock only.');
+  }
+}
+
+assertFixieConfigured();
+
 const app = Fastify({
   logger: isProduction ? { level: 'warn' } : true,
   trustProxy: true,
@@ -86,6 +113,30 @@ async function main() {
   });
 
   app.get('/health', async () => ({ ok: true, service: 'congo-gaming-api' }));
+
+  // ── TEMPORARY diagnostic: verify Fixie egress IP ────────────────────────
+  // Reuses the EXACT same fetchWithProxy as unipesa.ts so the test is
+  // representative of the real payment path. Protected by LOTO_ADMIN_SECRET.
+  // Remove after verification.
+  app.get('/api/debug/egress-ip', async (req, reply) => {
+    const provided = (req.headers['x-admin-secret'] as string | undefined) ?? '';
+    if (!env.LOTO_ADMIN_SECRET || provided !== env.LOTO_ADMIN_SECRET) {
+      return reply.status(403).send({ error: 'admin secret required' });
+    }
+    try {
+      const { fetchWithProxy } = await import('./lib/unipesa.js');
+      const res = await fetchWithProxy('https://api.ipify.org?format=json', {});
+      const data = await res.json();
+      return {
+        fixie_url_set: !!env.FIXIE_URL,
+        skip_flag_set: env.UNIPESA_SKIP_FIXIE_CHECK === '1' || env.UNIPESA_SKIP_FIXIE_CHECK === 'true',
+        unipesa_path_ip: (data as any).ip,
+        expected_fixie_ips: ['54.195.3.54', '54.217.142.99'],
+      };
+    } catch (e) {
+      return reply.status(500).send({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
 
   if (!isProduction) {
     app.get('/api/myip', async (req, reply) => {

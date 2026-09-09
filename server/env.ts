@@ -12,6 +12,10 @@ const envSchema = z.object({
   UNIPESA_SECRET_KEY: z.string().min(1, 'UNIPESA_SECRET_KEY is required'),
   UNIPESA_CALLBACK_URL: z.string().url('UNIPESA_CALLBACK_URL must be a valid URL'),
   FIXIE_URL: z.string().optional(),
+  // Explicit bypass for local dev/mock only. When set to '1' or 'true',
+  // Unipesa calls skip the Fixie proxy requirement. MUST NOT be set in
+  // production — a [WARN] is logged at boot and at each bypassed call.
+  UNIPESA_SKIP_FIXIE_CHECK: z.string().optional(),
   PG_API_KEY: z.string().min(1, 'PG_API_KEY is required'),
   PG_PROXY_URL: z.string().url('PG_PROXY_URL must be a valid URL').optional(),
   ALLOWED_ORIGINS: z.string().optional(),

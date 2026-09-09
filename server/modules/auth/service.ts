@@ -149,6 +149,9 @@ export async function registerUser(input: { phone: string; pin: string; referral
         pin: input.pin,
         full_name: undefined,
       }),
+      // Previously no AbortSignal — a hanging UniPay would leak an untracked
+      // promise. 15s matches the CGLT call timeout for consistency.
+      signal: AbortSignal.timeout(15_000),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -162,10 +165,18 @@ export async function registerUser(input: { phone: string; pin: string; referral
         }
       })
       .catch((err) => {
-        console.error(
-          `[auth] UniPay wallet provisioning error for user ${data.id}:`,
-          err instanceof Error ? err.message : String(err),
-        );
+        // Distinguish timeout from other errors so a hanging UniPay is
+        // visible in logs rather than silently swallowed.
+        if (err instanceof Error && err.name === 'TimeoutError') {
+          console.error(
+            `[auth] UniPay wallet provisioning timed out for user ${data.id} (15s) — lazy provisioning will retry on first CGLT interaction`,
+          );
+        } else {
+          console.error(
+            `[auth] UniPay wallet provisioning error for user ${data.id}:`,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
       });
   }
 
