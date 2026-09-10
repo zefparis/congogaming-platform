@@ -92,6 +92,21 @@ async function call(
     (err as any).response = json;
     throw err;
   }
+  // Unipesa returns HTTP 200 even when the provider call fails. The
+  // result.code field is 0 on success and non-zero on failure (e.g.
+  // 10301 = "REQUEST SENDING ERROR | get token error" when the
+  // operator API is unreachable). Without this check, failed
+  // provider calls are silently treated as "processing" and the
+  // transaction gets stuck forever (no callback will ever arrive).
+  if (json?.result && typeof json.result === 'object') {
+    const code = (json.result as any).code;
+    const message = (json.result as any).message;
+    if (code !== undefined && code !== 0 && code !== '0') {
+      const err = new Error(`Unipesa provider error: code=${code} message=${message ?? '(no message)'}`);
+      (err as any).response = json;
+      throw err;
+    }
+  }
   return json;
 }
 
