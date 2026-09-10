@@ -166,7 +166,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const order_id = (req.query as any)?.order_id as string | undefined;
     const circuitInfo = getUnipesaCircuitInfo();
 
-    // If no order_id, show recent pending withdrawals for diagnosis
+    // If no order_id, show recent pending AND recent withdrawals for diagnosis
     if (!order_id) {
       const { data: pending } = await supabaseAdmin
         .from('transactions')
@@ -174,7 +174,13 @@ export default async function adminRoutes(app: FastifyInstance) {
         .eq('status', 1)
         .order('created_at', { ascending: false })
         .limit(10);
-      return reply.send({ circuit: circuitInfo, pendingTransactions: pending || [] });
+      const { data: recentWithdrawals } = await supabaseAdmin
+        .from('transactions')
+        .select('id, order_id, type, amount, provider_id, status, created_at')
+        .eq('type', 'withdrawal')
+        .order('created_at', { ascending: false })
+        .limit(15);
+      return reply.send({ circuit: circuitInfo, pendingTransactions: pending || [], recentWithdrawals: recentWithdrawals || [] });
     }
     try {
       const status = await paymentStatus(order_id);
