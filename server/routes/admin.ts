@@ -163,7 +163,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   // ---- Temporary debug endpoint: diagnose LOTO_ADMIN_SECRET mismatch ----
   // Returns length, first/last 2 chars (masked), and trailing-whitespace info
   // WITHOUT revealing the full secret. Remove after diagnosis is complete.
-  app.get('/api/admin/debug/secret-info', async (_req, reply) => {
+  app.get('/api/admin/diag-secret', async (_req, reply) => {
     const s = process.env.LOTO_ADMIN_SECRET || '';
     return reply.send({
       configured: s.length > 0,
@@ -240,7 +240,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const url = req.routeOptions?.url || req.url;
     if (!url.startsWith('/api/admin/')) return;
     if (url === '/api/admin/auth') return;
-    if (url === '/api/admin/debug/secret-info') return;
+    if (url === '/api/admin/diag-secret') return;
     return requireAdmin(req, reply);
   });
 
