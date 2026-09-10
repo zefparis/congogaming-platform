@@ -160,6 +160,24 @@ function daysAgoIso(days: number): string {
 }
 
 export default async function adminRoutes(app: FastifyInstance) {
+  // ---- Temporary debug endpoint: diagnose LOTO_ADMIN_SECRET mismatch ----
+  // Returns length, first/last 2 chars (masked), and trailing-whitespace info
+  // WITHOUT revealing the full secret. Remove after diagnosis is complete.
+  app.get('/api/admin/debug/secret-info', async (_req, reply) => {
+    const s = process.env.LOTO_ADMIN_SECRET || '';
+    return reply.send({
+      configured: s.length > 0,
+      length: s.length,
+      firstTwo: s.length >= 2 ? s.slice(0, 2) + '…' : '(too short)',
+      lastTwo: s.length >= 2 ? '…' + s.slice(-2) : '(too short)',
+      hasTrailingWhitespace: /\s$/.test(s),
+      hasLeadingWhitespace: /^\s/.test(s),
+      hasNewline: /\n/.test(s),
+      charCodeFirst: s.length > 0 ? s.charCodeAt(0) : null,
+      charCodeLast: s.length > 0 ? s.charCodeAt(s.length - 1) : null,
+    });
+  });
+
   // ---- Auth ----
   // Both `secret` and `phone` are REQUIRED. The phone identifies the admin
   // user account, and its `users.role` (admin / super_admin) is embedded in
@@ -222,6 +240,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const url = req.routeOptions?.url || req.url;
     if (!url.startsWith('/api/admin/')) return;
     if (url === '/api/admin/auth') return;
+    if (url === '/api/admin/debug/secret-info') return;
     return requireAdmin(req, reply);
   });
 
