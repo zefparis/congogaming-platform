@@ -5,6 +5,7 @@ import argon2 from 'argon2';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
+import { paymentStatus } from '../lib/unipesa.js';
 import { tryNormalizeDrcPhone } from '../lib/phone.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { acquireJobLock } from '../lib/jobLock.js';
@@ -160,6 +161,26 @@ function daysAgoIso(days: number): string {
 }
 
 export default async function adminRoutes(app: FastifyInstance) {
+  // ---- Temporary diagnostic: Unipesa transaction status + circuit breaker ----
+  app.get('/api/admin/diag-unipesa', async (req, reply) => {
+    const order_id = (req.query as any)?.order_id as string | undefined;
+    const circuitInfo = getUnipesaCircuitInfo();
+    if (!order_id) {
+      return reply.send({ circuit: circuitInfo, hint: 'Add ?order_id=... to query a specific transaction' });
+    }
+    try {
+      const status = await paymentStatus(order_id);
+      return reply.send({ circuit: circuitInfo, order_id, unipesa: status });
+    } catch (err: any) {
+      return reply.send({
+        circuit: circuitInfo,
+        order_id,
+        error: err?.message || String(err),
+        response: err?.response || null,
+      });
+    }
+  });
+
   // ---- Auth ----
   // Both `secret` and `phone` are REQUIRED. The phone identifies the admin
   // user account, and its `users.role` (admin / super_admin) is embedded in
@@ -222,6 +243,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const url = req.routeOptions?.url || req.url;
     if (!url.startsWith('/api/admin/')) return;
     if (url === '/api/admin/auth') return;
+    if (url === '/api/admin/diag-unipesa') return;
     return requireAdmin(req, reply);
   });
 
