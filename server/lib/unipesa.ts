@@ -98,7 +98,16 @@ async function call(
   // operator API is unreachable). Without this check, failed
   // provider calls are silently treated as "processing" and the
   // transaction gets stuck forever (no callback will ever arrive).
-  if (json?.result && typeof json.result === 'object') {
+  //
+  // IMPORTANT: this check only applies to payment INITIATION calls
+  // (/payment_c2b, /payment_b2c). The /status endpoint also returns
+  // a non-zero result.code when the TRANSACTION failed (e.g. 10301
+  // for a failed Airtel withdrawal) — but the response still contains
+  // the authoritative status (status=3) that the reconciliation job
+  // needs to refund the user. Throwing on /status would prevent the
+  // reconciliation job from ever resolving failed transactions.
+  const isStatusEndpoint = path === '/status' || path === '/balance';
+  if (!isStatusEndpoint && json?.result && typeof json.result === 'object') {
     const code = (json.result as any).code;
     const message = (json.result as any).message;
     if (code !== undefined && code !== 0 && code !== '0') {
