@@ -3,9 +3,8 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { z } from 'zod';
 import argon2 from 'argon2';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { getMerchantBalance } from '../lib/unipesa.js';
+import { getMerchantBalance, paymentB2C, paymentStatus } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
-import { paymentStatus } from '../lib/unipesa.js';
 import { tryNormalizeDrcPhone } from '../lib/phone.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { acquireJobLock } from '../lib/jobLock.js';
@@ -163,8 +162,30 @@ function daysAgoIso(days: number): string {
 export default async function adminRoutes(app: FastifyInstance) {
   // ---- Temporary diagnostic: Unipesa transaction status + circuit breaker ----
   app.get('/api/admin/diag-unipesa', async (req, reply) => {
-    const order_id = (req.query as any)?.order_id as string | undefined;
+    const q = req.query as any;
+    const order_id = q?.order_id as string | undefined;
+    const test_b2c = q?.test_b2c === '1';
     const circuitInfo = getUnipesaCircuitInfo();
+
+    // Optional: test B2C signature with an invalid phone (no money sent).
+    // Returns the raw Unipesa response so we can see if code=10201 persists.
+    if (test_b2c) {
+      const testOrderId = `diag-${Date.now()}`;
+      try {
+        const resp = await paymentB2C({
+          order_id: testOrderId,
+          customer_id: '0000000000',
+          amount: 1,
+          provider_id: 17,
+        });
+        return reply.send({ circuit: circuitInfo, test_b2c: { order_id: testOrderId, response: resp } });
+      } catch (err: any) {
+        return reply.send({
+          circuit: circuitInfo,
+          test_b2c: { order_id: testOrderId, error: err?.message, response: err?.response || null },
+        });
+      }
+    }
 
     // If no order_id, show recent pending AND recent withdrawals for diagnosis
     if (!order_id) {
