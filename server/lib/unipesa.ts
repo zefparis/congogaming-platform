@@ -54,6 +54,35 @@ export function calculateSignature(data: Record<string, any>, secretKey: string)
   return createHmac('sha512', secretKey).update(stringForSignature).digest('hex').toLowerCase();
 }
 
+/**
+ * Calculate signature using INSERTION ORDER (not sorted).
+ *
+ * Used for OUTBOUND calls to Unipesa (/payment_c2b, /payment_b2c).
+ * The Unipesa API validates outbound signatures using the key order
+ * as received in the JSON body — it does NOT re-sort keys before
+ * recomputing the HMAC. Using sorted keys for outbound calls produces
+ * a different signature string that Unipesa rejects with
+ * code=10201 "MERCHANT AUTHENTICATION ERROR | Signature is not valid".
+ *
+ * The sorted `calculateSignature` above is kept for INBOUND callback
+ * verification, where Unipesa sends the body and may serialize keys
+ * in a different order than our insertion order.
+ */
+export function calculateSignatureOutbound(data: Record<string, any>, secretKey: string): string {
+  let stringForSignature = '';
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'signature') continue;
+    if (value !== null && typeof value === 'object') {
+      for (const [k, v] of Object.entries(value as Record<string, any>)) {
+        stringForSignature += `${key}.${k}${v}`;
+      }
+    } else {
+      stringForSignature += `${key}${value}`;
+    }
+  }
+  return createHmac('sha512', secretKey).update(stringForSignature).digest('hex').toLowerCase();
+}
+
 function env(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env ${name}`);
@@ -142,7 +171,7 @@ export async function paymentC2B(opts: {
     callback_url,
     provider_id: opts.provider_id,
   };
-  payload.signature = calculateSignature(payload, secret);
+  payload.signature = calculateSignatureOutbound(payload, secret);
   return call('/payment_c2b', payload, signal);
 }
 
@@ -165,7 +194,7 @@ export async function paymentB2C(opts: {
     callback_url,
     provider_id: opts.provider_id,
   };
-  payload.signature = calculateSignature(payload, secret);
+  payload.signature = calculateSignatureOutbound(payload, secret);
   return call('/payment_b2c', payload, signal);
 }
 
