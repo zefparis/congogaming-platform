@@ -221,6 +221,11 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   app.get('/api/auth/me', { preHandler: app.requireAuth }, async (req, reply) => {
     const user = await getUserById(req.user.id);
     if (!user || user.blocked) return reply.code(401).send({ error: 'Unauthorized' });
+    // Defense-in-depth against edge/CDN caching of a user-specific response.
+    // The hcs-u7-proxy Worker now bypasses its cache for authenticated
+    // requests and for /api/auth/* paths, but we also forbid caching here so
+    // any other layer (browser, intermediate proxy) never stores the profile.
+    reply.header('Cache-Control', 'no-store');
     return reply.send({ user });
   });
 

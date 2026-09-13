@@ -15,6 +15,14 @@ const SelfExclusionSchema = z.object({
 });
 
 export default async function meRoutes(app: FastifyInstance) {
+  // Defense-in-depth: every /api/me/* response is user-specific. Forbid
+  // caching so no edge/CDN/browser layer can ever serve one user's data to
+  // another. (The hcs-u7-proxy Worker also bypasses its cache for these
+  // paths and for authenticated requests, but this makes the contract
+  // explicit at the origin.)
+  app.addHook('onRequest', async (_req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+  });
   // ---------------- LIMITS ----------------
   app.get('/api/me/limits', { preHandler: app.requireAuth }, async (req, reply) => {
     const { data, error } = await supabaseAdmin
