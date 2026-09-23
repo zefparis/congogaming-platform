@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "vite",
@@ -12,9 +12,9 @@
     "preview": "vite preview",
     "server": "tsx watch server/index.ts",
     "server:start": "tsx server/index.ts",
-    "build:server": "esbuild server/index.ts --bundle --platform=node --target=node20 --outfile=dist/server/index.js --external:@supabase/supabase-js --external:pg --external:bcrypt --external:sharp",
-    "start:server": "node dist/server/index.js",
-    "start": "node dist/server/index.js",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --target=node24 --outfile=dist/server/index.cjs --external:@supabase/supabase-js --external:pg --external:bcrypt --external:sharp --external:argon2",
+    "start:server": "node dist/server/index.cjs",
+    "start": "node dist/server/index.cjs",
     "dev:all": "concurrently -n web,api -c green,cyan \"npm run dev\" \"npm run server\""
   },
   "dependencies": {
@@ -22,7 +22,7 @@
     "@fastify/cors": "^10.0.1",
     "@fastify/rate-limit": "^10.2.1",
     "@supabase/supabase-js": "^2.105.4",
-    "@types/node": "^20.17.0",
+    "@types/node": "^24.0.0",
     "argon2": "^0.44.0",
     "dotenv": "^16.4.5",
     "esbuild": "^0.20.0",
