@@ -172,3 +172,20 @@ $$;
 
 revoke all on function public.increment_agent_total(uuid, integer) from public, anon, authenticated;
 grant execute on function public.increment_agent_total(uuid, integer) to service_role;
+
+
+-- ============================================================
+-- 5. RLS + droits tables — deny-all anon/authenticated
+-- ============================================================
+-- Modèle : 20260908_agents_rls.sql (qui s'applique avant celle-ci en
+-- chaîne complète, mais la baseline est auto-suffisante pour un env
+-- où les tables auraient été créées manuellement sans cette migration).
+-- Aucune policy n'est créée : RLS activée + zéro policy = deny-all.
+-- Tout accès passe par la service_role du backend (bypass RLS).
+alter table public.agents enable row level security;
+alter table public.agent_commissions enable row level security;
+
+revoke insert, update, delete on public.agents from anon, authenticated;
+revoke insert, update, delete on public.agent_commissions from anon, authenticated;
+revoke select on public.agents from anon, authenticated;
+revoke select on public.agent_commissions from anon, authenticated;

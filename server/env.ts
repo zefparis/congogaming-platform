@@ -1,4 +1,13 @@
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+// Test runs (`node --test` / `npx tsx --test`) spawn child processes with
+// NODE_TEST_CONTEXT set — only then load the committed .env.test, which
+// contains fake values only. dotenv never overrides real env vars.
+// Path resolved from cwd: tests are run from the repo root.
+if (process.env.NODE_TEST_CONTEXT) {
+  dotenv.config({ path: '.env.test' });
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

@@ -15,7 +15,8 @@
     "build:server": "esbuild server/index.ts --bundle --platform=node --target=node24 --outfile=dist/server/index.cjs --external:@supabase/supabase-js --external:pg --external:bcrypt --external:sharp --external:argon2",
     "start:server": "node dist/server/index.cjs",
     "start": "node dist/server/index.cjs",
-    "dev:all": "concurrently -n web,api -c green,cyan \"npm run dev\" \"npm run server\""
+    "dev:all": "concurrently -n web,api -c green,cyan \"npm run dev\" \"npm run server\"",
+    "test": "tsx --test \"server/**/*.test.ts\""
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
