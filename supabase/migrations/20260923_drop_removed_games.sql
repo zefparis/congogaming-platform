@@ -51,5 +51,6 @@ drop table if exists public.okapi_auto_sessions;
 
 drop table if exists public.free_plays;
 
-drop table if exists public.player_farming;
+-- farming_rewards.player_farming_id -> player_farming : drop child first.
 drop table if exists public.farming_rewards;
+drop table if exists public.player_farming;
