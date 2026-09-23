@@ -16,6 +16,30 @@
 -- Tous les RPC sont SECURITY DEFINER + REVOKE EXECUTE de public/anon/authenticated.
 
 -- ============================================================
+-- Prérequis (idempotent) — ordre de chaîne sur env vierge
+-- ============================================================
+-- Cette migration trie avant 20260529_responsible_gaming_and_referrals
+-- (ordre alphabétique des fichiers), qui crée users.referred_by et la
+-- table referral_rewards. En prod ces objets existaient déjà (créés
+-- manuellement ou appliqués dans un autre ordre). Sur une base vierge
+-- ils sont créés ici à l'identique ; le IF NOT EXISTS rend ce bloc
+-- sans effet en prod.
+alter table public.users
+  add column if not exists referred_by uuid references public.users(id) on delete set null;
+
+create table if not exists public.referral_rewards (
+  id uuid primary key default gen_random_uuid(),
+  referrer_id uuid not null references public.users(id) on delete cascade,
+  referred_id uuid not null references public.users(id) on delete cascade,
+  amount_cdf numeric(15,2) not null default 0,
+  status text not null default 'pending' check (status in ('pending','credited','cancelled')),
+  trigger_event text,
+  created_at timestamptz not null default now(),
+  credited_at timestamptz,
+  unique(referrer_id, referred_id)
+);
+
+-- ============================================================
 -- Schema changes
 -- ============================================================
 alter table public.users

@@ -8,6 +8,19 @@
 -- mode entièrement idempotent (IF NOT EXISTS / CREATE OR REPLACE)
 -- pour être SANS EFFET sur la prod actuelle.
 --
+-- Datée 20260728 — volontairement AVANT 20260729 : elle décrit l'état
+-- des tables agents telles qu'elles existaient AVANT les migrations
+-- 20260729_agent_security_idempotence, 20260908_agents_rls et
+-- 20260908_agent_payout_atomic. Tout ce que ces migrations ajoutent
+-- est laissé à leur charge :
+--   * agents.agent_pin_hash                       → 20260729
+--   * agent_commissions.commission_type           → 20260729
+--   * unique (ticket_id, commission_type)         → 20260729
+--   * RLS + revoke sur agents/agent_commissions   → 20260908_agents_rls
+--   * RPC request_agent_payout_atomic             → 20260908_agent_payout_atomic
+--   * agent_payouts, agent_commissions.payout_id,
+--     RPC pay_agent_commissions_atomic            → 20260924_agents_payouts
+--
 -- ⚠️ INCERTITUDES (le schéma réel est manuel, non observable ici) :
 --   * types exacts : commission_rate (numeric(5,4) ?), total_earned_cdf
 --     (integer vs numeric vs bigint), ticket_amount_cdf / commission_cdf
@@ -29,11 +42,6 @@
 --     de remplacer (les noms d'arguments font partie de la signature
 --     pour les appels nommés PostgREST). Comparer via la requête
 --     d'introspection fournie dans le rapport avant d'appliquer.
---
--- Les colonnes ajoutées par des migrations trackées ultérieures sont
--- rappelées en commentaire mais NE sont PAS re-créées ici (déjà
--- couvertes par 20260729_agent_security_idempotence.sql,
--- 20260908_agent_payout_atomic.sql, 20260908_agents_rls.sql).
 -- ================================================================
 
 
@@ -52,12 +60,9 @@ create table if not exists public.agents (
   notes                       text,
   min_payout_cdf              integer not null default 2000,
   total_earned_cdf            bigint not null default 0,
-  -- agent_pin_hash            : ajouté par 20260729_agent_security_idempotence.sql
-  -- payout_requested_at       : utilisé par 20260908_agent_payout_atomic.sql
-  -- payout_requested_amount_cdf : idem
-  payout_requested_at         timestamptz,
+  payout_requested_at         timestamptz,                         -- lu par request_agent_payout_atomic (20260908)
   payout_requested_amount_cdf integer,
-  agent_pin_hash              text,
+  -- agent_pin_hash            : ajouté par 20260729_agent_security_idempotence.sql
   created_at                  timestamptz not null default now()
 );
 
@@ -73,9 +78,8 @@ alter table public.agents add column if not exists min_payout_cdf integer not nu
 alter table public.agents add column if not exists total_earned_cdf bigint not null default 0;
 alter table public.agents add column if not exists payout_requested_at timestamptz;
 alter table public.agents add column if not exists payout_requested_amount_cdf integer;
--- agent_pin_hash : déjà couvert par 20260729 (IF NOT EXISTS), répété
--- ici pour que la baseline soit auto-suffisante sur un environnement neuf.
-alter table public.agents add column if not exists agent_pin_hash text;
+-- agent_pin_hash : ajouté par 20260729 (DO-block IF NOT EXISTS) — pas
+-- dupliqué ici pour que la baseline reflète l'état pré-20260729.
 
 -- Unicité du code agent (lookup par qr_code dans auth + agents routes).
 create unique index if not exists agents_qr_code_uidx on public.agents (qr_code);
@@ -92,9 +96,10 @@ create table if not exists public.agent_commissions (
   ticket_type        text,                                       -- 'okapi_color' (+ historique loto/flash/scratch/okapi)
   ticket_amount_cdf  integer,                                    -- mise (type 'ticket') ou gain brut (type 'win')
   commission_cdf     integer not null,
-  commission_type    text not null default 'ticket',             -- 'ticket' | 'win'
   status             text not null default 'pending',            -- 'pending' | 'paid'
   created_at         timestamptz not null default now()
+  -- commission_type  : ajouté par 20260729_agent_security_idempotence.sql
+  -- payout_id        : ajouté par 20260924_agents_payouts.sql
 );
 
 alter table public.agent_commissions add column if not exists user_id uuid;
@@ -102,26 +107,15 @@ alter table public.agent_commissions add column if not exists ticket_id uuid;
 alter table public.agent_commissions add column if not exists ticket_type text;
 alter table public.agent_commissions add column if not exists ticket_amount_cdf integer;
 alter table public.agent_commissions add column if not exists commission_cdf integer;
-alter table public.agent_commissions add column if not exists commission_type text not null default 'ticket';
 alter table public.agent_commissions add column if not exists status text not null default 'pending';
 alter table public.agent_commissions add column if not exists created_at timestamptz not null default now();
 
 create index if not exists agent_commissions_agent_idx
   on public.agent_commissions (agent_id, status, created_at desc);
 
--- Idempotence commission : déjà couverte par 20260729
--- (agent_commissions_ticket_id_commission_type_key). Répétée ici en
--- guard DO-block pour que la baseline soit auto-suffisante.
-do $$ begin
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'agent_commissions_ticket_id_commission_type_key'
-  ) then
-    alter table public.agent_commissions
-      add constraint agent_commissions_ticket_id_commission_type_key
-      unique (ticket_id, commission_type);
-  end if;
-end $$;
+-- Contrainte unique (ticket_id, commission_type) : ajoutée par
+-- 20260729_agent_security_idempotence.sql (DO-block idempotent) —
+-- pas dupliquée ici car elle dépend de la colonne commission_type.
 
 
 -- ============================================================
@@ -175,17 +169,32 @@ grant execute on function public.increment_agent_total(uuid, integer) to service
 
 
 -- ============================================================
--- 5. RLS + droits tables — deny-all anon/authenticated
+-- 5. RPC get_agent_tier — rang de l'agent
 -- ============================================================
--- Modèle : 20260908_agents_rls.sql (qui s'applique avant celle-ci en
--- chaîne complète, mais la baseline est auto-suffisante pour un env
--- où les tables auraient été créées manuellement sans cette migration).
--- Aucune policy n'est créée : RLS activée + zéro policy = deny-all.
--- Tout accès passe par la service_role du backend (bypass RLS).
-alter table public.agents enable row level security;
-alter table public.agent_commissions enable row level security;
+-- Fonction manuelle prod référencée par
+-- 20260622000000_fix_function_search_path.sql (signature confirmée :
+-- get_agent_tier(total_cdf numeric)). Non utilisée par le code
+-- TypeScript — probablement appelée depuis SQL/dashboards.
+-- ⚠️ Corps DÉDUIT des seuils du code (gold ≥ 1M, diamond ≥ 5M CDF) et
+-- du type de retour supposé text. Vérifier en prod via
+-- pg_get_functiondef avant d'appliquer.
+create or replace function public.get_agent_tier(total_cdf numeric)
+returns text
+language plpgsql
+immutable
+security definer
+set search_path = public
+as $$
+begin
+  if coalesce(total_cdf, 0) >= 5000000 then return 'diamond';
+  elsif coalesce(total_cdf, 0) >= 1000000 then return 'gold';
+  else return 'standard';
+  end if;
+end;
+$$;
 
-revoke insert, update, delete on public.agents from anon, authenticated;
-revoke insert, update, delete on public.agent_commissions from anon, authenticated;
-revoke select on public.agents from anon, authenticated;
-revoke select on public.agent_commissions from anon, authenticated;
+revoke all on function public.get_agent_tier(numeric) from public, anon, authenticated;
+grant execute on function public.get_agent_tier(numeric) to service_role;
+
+-- RLS : couverte par 20260908_agents_rls.sql (enable row level security
+-- + revoke anon/authenticated sur les deux tables). Pas dupliquée ici.

@@ -3,6 +3,24 @@
 -- Ajoute : draw_number, slot_key, channel, location_id, agent_id, draw_at
 -- =============================================================
 
+-- Prérequis idempotent : cette migration trie avant
+-- 20260530_okapi_color_tables.sql (ordre alphabétique), qui crée
+-- okapi_color_tirages. En prod la table existait déjà. Sur une base
+-- vierge on la crée ici avec la MÊME définition — le IF NOT EXISTS
+-- rend ce bloc sans effet en prod et tables.sql ne le rejoue pas.
+create table if not exists public.okapi_color_tirages (
+  id            uuid        primary key default gen_random_uuid(),
+  numeros_rouges int[]      not null,
+  numeros_or     int[]      not null,
+  hash_pre       text       not null,
+  jackpot_paye   boolean    not null default false,
+  drawn_at       timestamptz not null default now(),
+  created_at     timestamptz not null default now(),
+
+  constraint chk_rouges_count   check (array_length(numeros_rouges, 1) = 6),
+  constraint chk_ors_count      check (array_length(numeros_or,     1) = 4)
+);
+
 -- Séquence auto-incrémentée pour numéroter les tirages
 create sequence if not exists public.okapi_color_draw_number_seq start 1;
 
