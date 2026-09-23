@@ -151,19 +151,34 @@ create index if not exists users_agent_ref_idx on public.users (agent_ref);
 -- Appelée par server/lib/agent.ts après chaque insert de commission.
 -- Corps déduit du seul usage observé : total_earned_cdf += delta.
 -- Signature imposée par l'appel nommé PostgREST : (agent_id, delta).
-create or replace function public.increment_agent_total(agent_id uuid, delta integer)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
+--
+-- ⚠️ CRÉATION CONDITIONNELLE — jamais CREATE OR REPLACE : en prod la
+-- fonction existe déjà (créée manuellement) et son corps réel est
+-- inconnu. La baseline ne doit PAS réécrire une fonction existante.
+-- to_regprocedure teste la signature (types uniquement) ; si la
+-- fonction existe avec une autre signature (ex. delta numeric),
+-- une surcharge est créée — comparer via pg_get_functiondef avant.
+do $$
 begin
-  update public.agents
-    set total_earned_cdf = coalesce(total_earned_cdf, 0) + delta
-    where id = agent_id;
-end;
-$$;
+  if to_regprocedure('public.increment_agent_total(uuid, integer)') is null then
+    execute $fn$
+      create function public.increment_agent_total(agent_id uuid, delta integer)
+      returns void
+      language plpgsql
+      security definer
+      set search_path = public
+      as $body$
+      begin
+        update public.agents
+          set total_earned_cdf = coalesce(total_earned_cdf, 0) + delta
+          where id = agent_id;
+      end;
+      $body$;
+    $fn$;
+  end if;
+end $$;
 
+-- Droits : revoke/grant sans effet destructeur (ne touchent pas le corps).
 revoke all on function public.increment_agent_total(uuid, integer) from public, anon, authenticated;
 grant execute on function public.increment_agent_total(uuid, integer) to service_role;
 
@@ -178,20 +193,28 @@ grant execute on function public.increment_agent_total(uuid, integer) to service
 -- ⚠️ Corps DÉDUIT des seuils du code (gold ≥ 1M, diamond ≥ 5M CDF) et
 -- du type de retour supposé text. Vérifier en prod via
 -- pg_get_functiondef avant d'appliquer.
-create or replace function public.get_agent_tier(total_cdf numeric)
-returns text
-language plpgsql
-immutable
-security definer
-set search_path = public
-as $$
+-- Même règle : création conditionnelle, jamais d'écrasement.
+do $$
 begin
-  if coalesce(total_cdf, 0) >= 5000000 then return 'diamond';
-  elsif coalesce(total_cdf, 0) >= 1000000 then return 'gold';
-  else return 'standard';
+  if to_regprocedure('public.get_agent_tier(numeric)') is null then
+    execute $fn$
+      create function public.get_agent_tier(total_cdf numeric)
+      returns text
+      language plpgsql
+      immutable
+      security definer
+      set search_path = public
+      as $body$
+      begin
+        if coalesce(total_cdf, 0) >= 5000000 then return 'diamond';
+        elsif coalesce(total_cdf, 0) >= 1000000 then return 'gold';
+        else return 'standard';
+        end if;
+      end;
+      $body$;
+    $fn$;
   end if;
-end;
-$$;
+end $$;
 
 revoke all on function public.get_agent_tier(numeric) from public, anon, authenticated;
 grant execute on function public.get_agent_tier(numeric) to service_role;
