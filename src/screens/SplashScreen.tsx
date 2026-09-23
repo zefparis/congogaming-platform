@@ -1,16 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getSession } from '../lib/auth';
+import { api } from '../lib/api';
 
-const GAMES = [
-  { name: 'Okapi Color', icon: '🔴', color: '#ef4444' },
-];
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.congogaming.com';
 
 /* ── Design tokens ─────────────────────────────────────────── */
 const BG = '#0f0a2e';
 const BG_2 = '#07051e';
-const ORANGE = '#FF6B00';
 const SANS = "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif";
 const BEBAS = "'Bebas Neue', Impact, sans-serif";
 
@@ -19,16 +17,96 @@ const fadeUp = (delay = 0) => ({
   animation: `aFadeUp 0.4s ease-out ${delay}s both`
 });
 
+const fmtCdf = (n: number) => n.toLocaleString('fr-FR');
+const fmtCountdown = (secs: number) => {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
 
 export default function SplashScreen() {
   const { t } = useTranslation();
   const nav = useNavigate();
+
+  const [pot, setPot] = useState<number | null>(null);
+  const [secsLeft, setSecsLeft] = useState<number | null>(null);
+  const drawAtMsRef = useRef<number | null>(null);
+  const offsetRef = useRef(0);
+  const refetchingRef = useRef(false);
 
   useEffect(() => {
     if (getSession()) {
       nav('/', { replace: true });
     }
   }, [nav]);
+
+  // Initial live state: jackpot pot + next draw time. Failure is silent:
+  // the live block simply stays in its neutral state (no fake numbers).
+  const fetchLive = () => {
+    api.okapiColorLive()
+      .then((r) => {
+        setPot(Number(r.jackpotCdf));
+        offsetRef.current = new Date(r.serverTime).getTime() - Date.now();
+        if (r.currentDraw?.drawAt) {
+          drawAtMsRef.current = new Date(r.currentDraw.drawAt).getTime();
+        }
+      })
+      .catch(() => {})
+      .finally(() => { refetchingRef.current = false; });
+  };
+
+  useEffect(() => {
+    refetchingRef.current = true;
+    fetchLive();
+  }, []);
+
+  // Real-time jackpot via the existing SSE stream (same pattern as
+  // OkapiColorScreen: reconnect with capped exponential backoff).
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = 1000;
+    let closed = false;
+
+    const connect = () => {
+      if (closed) return;
+      es = new EventSource(`${API_BASE}/api/okapi-color/jackpot/stream`);
+      es.onopen = () => { backoffMs = 1000; };
+      es.onmessage = (e) => {
+        try { const { pot_cdf } = JSON.parse(e.data); setPot(Number(pot_cdf)); } catch {}
+      };
+      es.onerror = () => {
+        es?.close();
+        if (closed) return;
+        reconnectTimer = setTimeout(() => {
+          backoffMs = Math.min(backoffMs * 2, 30_000);
+          connect();
+        }, backoffMs);
+      };
+    };
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      es?.close();
+    };
+  }, []);
+
+  // Local countdown, corrected by server time. When it hits zero the slot
+  // is over: refetch /live once to pick up the next draw boundary.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (drawAtMsRef.current == null) return;
+      const left = Math.round((drawAtMsRef.current - (Date.now() + offsetRef.current)) / 1000);
+      setSecsLeft(Math.max(0, left));
+      if (left <= 0 && !refetchingRef.current) {
+        refetchingRef.current = true;
+        fetchLive();
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div
@@ -90,175 +168,147 @@ export default function SplashScreen() {
           >
             Congo Gaming
           </span>
-
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              border: '1px solid rgba(255,215,0,0.22)',
-              background: 'rgba(255,215,0,0.035)',
-              borderRadius: 8,
-              padding: '4px 9px',
-              fontSize: 8.5,
-              fontWeight: 800,
-              letterSpacing: 0.6,
-              color: 'rgba(255,215,0,0.68)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {t('splash.badge')}
-          </span>
         </header>
 
         {/* ── HERO ───────────────────────────────────────────── */}
-        <main
-          className="flex flex-col md:flex-row md:items-start"
-          style={{
-            flex: 1,
-            padding: '8px 0 0 20px',
-            overflow: 'hidden',
-            minHeight: 260,
-          }}
-        >
-          {/* Left content */}
-          <section className="w-full md:w-[53%] md:flex-shrink-0" style={{ paddingTop: 8, ...fadeUp(0) }}>
-            <div
+        <section style={{ padding: '6px 20px 0', ...fadeUp(0) }}>
+          <div
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: 20,
+              border: '1px solid rgba(255,215,0,0.16)',
+              boxShadow: '0 10px 34px rgba(0,0,0,0.45)',
+            }}
+          >
+            <img
+              src="/images/okapiscreen.png"
+              alt="Okapi Color"
+              width={400}
+              height={300}
               style={{
-                fontFamily: BEBAS,
-                fontSize: 'clamp(42px, 12vw, 58px)',
-                fontWeight: 900,
-                lineHeight: 0.9,
-                letterSpacing: -0.5,
-                color: '#fff',
+                display: 'block',
+                width: '100%',
+                height: 210,
+                objectFit: 'cover',
+                objectPosition: '58% center',
+                filter: 'saturate(1.05) contrast(1.02) brightness(0.98)',
               }}
-            >
-              {t('splash.title')}
-            </div>
-
+            />
             <div
+              aria-hidden="true"
               style={{
-                fontFamily: BEBAS,
-                fontSize: 'clamp(42px, 12vw, 58px)',
-                fontWeight: 900,
-                lineHeight: 0.9,
-                letterSpacing: -0.5,
-                color: '#FFD700',
-                marginBottom: 10,
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'linear-gradient(to top, rgba(7,5,30,0.92) 0%, rgba(7,5,30,0.35) 45%, rgba(7,5,30,0) 70%)',
+                pointerEvents: 'none',
               }}
-            >
-              {t('splash.title2')}
-            </div>
-
-            <div
-              style={{
-                fontSize: 11.5,
-                fontWeight: 400,
-                color: 'rgba(255,255,255,0.6)',
-                marginTop: 11,
-                lineHeight: 1.65,
-                ...fadeUp(0.24)
-              }}
-            >
-              {t('splash.subtitle')}
-            </div>
-
-            <div style={{ marginTop: 17, ...fadeUp(0.34) }}>
-              <span
+            />
+            <div style={{ position: 'absolute', left: 18, bottom: 14 }}>
+              <div
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'rgba(255,215,0,0.05)',
-                  border: '1px solid rgba(255,215,0,0.18)',
-                  borderRadius: 7,
-                  padding: '5px 10px',
-                  fontSize: 8.5,
-                  fontWeight: 800,
-                  letterSpacing: 0.5,
-                  color: 'rgba(255,215,0,0.66)',
-                  whiteSpace: 'nowrap',
+                  fontFamily: BEBAS,
+                  fontSize: 'clamp(40px, 13vw, 56px)',
+                  fontWeight: 900,
+                  lineHeight: 0.9,
+                  letterSpacing: -0.5,
                 }}
               >
-                {t('splash.badge')}
-              </span>
+                <span style={{ color: '#fff' }}>OKAPI </span>
+                <span style={{ color: '#FFD700' }}>COLOR</span>
+              </div>
             </div>
-          </section>
+          </div>
 
-          {/* Games preview grid */}
-          <section
-            aria-label="Aperçu jeux"
-            className="w-full md:flex-1 mt-4 md:mt-0"
-            style={{ ...fadeUp(0.16), display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingRight: 16, paddingTop: 4 }}
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 400,
+              color: 'rgba(255,255,255,0.62)',
+              marginTop: 12,
+              lineHeight: 1.6,
+              ...fadeUp(0.2)
+            }}
           >
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #1a1040 0%, #0f0a2e 100%)',
-                border: '1px solid rgba(255,215,0,0.3)',
-                borderRadius: 16,
-                padding: '14px 12px',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
-              }}
-            >
-              <div style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,215,0,0.7)', letterSpacing: 1.5, textTransform: 'uppercase' as const, marginBottom: 10 }}>
-                {t('splash.games_preview')}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {GAMES.map((g) => (
-                  <div key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
-                    <span style={{ fontSize: 16 }}>{g.icon}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: g.color, letterSpacing: 0.5 }}>{g.name}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ textAlign: 'center', fontSize: 8.5, color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: 0.5, marginTop: 10 }}>
-                {t('splash.match_preview')}
-              </div>
-            </div>
-          </section>
-        </main>
+            {t('splash.hero_tag')}
+          </div>
+        </section>
 
-        {/* ── SEPARATOR ───────────────────────────────────────── */}
-        <div
-          style={{
-            height: 1,
-            background: 'rgba(255,255,255,0.06)',
-            margin: '14px 0 0',
-          }}
-        />
-
-        {/* ── CONGO GAMING BRANDING ────────────────────────────── */}
-        <section
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 11,
-            padding: '13px 20px 11px',
-          }}
-        >
-          <img src="/images/okapi.jpg" alt="Congo Gaming" className="w-10 h-10 rounded-full object-cover" />
-
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 800,
-                letterSpacing: 1.6,
-                textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.83)',
-              }}
-            >
-              Congo Gaming
+        {/* ── LIVE BLOCK ─────────────────────────────────────── */}
+        <section style={{ padding: '14px 20px 0', ...fadeUp(0.3) }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'stretch',
+              gap: 10,
+              background: 'linear-gradient(135deg, #1a1040 0%, #0f0a2e 100%)',
+              border: '1px solid rgba(255,215,0,0.3)',
+              borderRadius: 16,
+              padding: '14px 16px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 8.5,
+                  fontWeight: 800,
+                  color: 'rgba(255,215,0,0.7)',
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}
+              >
+                {t('splash.live_jackpot')}
+              </div>
+              <div
+                style={{
+                  fontFamily: BEBAS,
+                  fontSize: 30,
+                  fontWeight: 900,
+                  color: '#FFD700',
+                  lineHeight: 1,
+                }}
+              >
+                {pot != null ? `${fmtCdf(pot)} CDF` : '···'}
+              </div>
             </div>
 
             <div
-              style={{
-                fontSize: 10,
-                color: 'rgba(255,215,0,0.55)',
-                marginTop: 2,
-                fontWeight: 700,
-                letterSpacing: 1,
-              }}
-            >
-              {t('splash.promo_label')}
+              aria-hidden="true"
+              style={{ width: 1, background: 'rgba(255,255,255,0.08)' }}
+            />
+
+            <div style={{ flex: 1, textAlign: 'right' }}>
+              <div
+                style={{
+                  fontSize: 8.5,
+                  fontWeight: 800,
+                  color: 'rgba(255,255,255,0.5)',
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}
+              >
+                {t('splash.live_next')}
+              </div>
+              <div
+                style={{
+                  fontFamily: BEBAS,
+                  fontSize: 30,
+                  fontWeight: 900,
+                  color: '#fff',
+                  lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {secsLeft == null
+                  ? '···'
+                  : secsLeft === 0
+                    ? t('splash.live_now')
+                    : fmtCountdown(secsLeft)}
+              </div>
             </div>
           </div>
         </section>
@@ -266,7 +316,7 @@ export default function SplashScreen() {
         {/* ── CTA BUTTONS ────────────────────────────────────── */}
         <section
           style={{
-            padding: '2px 20px 10px',
+            padding: '14px 20px 4px',
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
@@ -274,7 +324,7 @@ export default function SplashScreen() {
         >
           <button
             type="button"
-            onClick={() => nav(getSession() ? '/' : '/register')}
+            onClick={() => nav(getSession() ? '/okapi-color' : '/register')}
             style={{
               width: '100%',
               padding: '16px 0',
@@ -312,136 +362,74 @@ export default function SplashScreen() {
           </button>
         </section>
 
-        {/* ── CONGO GAMING TEASER ────────────────────────────── */}
-        <section style={{ padding: '12px 20px 22px', ...fadeUp(0.7) }}>
+        {/* ── HOW TO PLAY ────────────────────────────────────── */}
+        <section style={{ padding: '14px 20px 6px', ...fadeUp(0.45) }}>
           <div
             style={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 24,
-              background: 'linear-gradient(135deg, #0B1426 0%, #070B15 100%)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.34)',
-              minHeight: 150,
-              display: 'flex',
-              alignItems: 'stretch',
+              fontSize: 8.5,
+              fontWeight: 800,
+              color: 'rgba(255,215,0,0.7)',
+              letterSpacing: 1.5,
+              textTransform: 'uppercase',
+              marginBottom: 10,
             }}
           >
-            {/* Image layer */}
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                bottom: 0,
-                width: '60%',
-                zIndex: 1,
-                overflow: 'hidden',
-              }}
-            >
-              <img
-                src="/images/okapiscreen.png"
-                alt=""
-                width={400}
-                height={300}
-                loading="lazy"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: '58% center',
-                  opacity: 1,
-                  filter: 'saturate(1.05) contrast(1.02) brightness(0.98)',
-                  transform: 'scale(1.06)',
-                }}
-              />
-            </div>
-
-            {/* Readability overlay */}
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                zIndex: 2,
-                background:
-                  'linear-gradient(to right, #0B1426 0%, rgba(11,20,38,0.96) 34%, rgba(11,20,38,0.58) 52%, rgba(11,20,38,0.16) 72%, rgba(11,20,38,0) 100%)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            {/* Content layer */}
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 3,
-                width: '56%',
-                padding: '22px 0 22px 22px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-              }}
-            >
+            {t('splash.how_title')}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[1, 2, 3].map((n) => (
               <div
+                key={n}
                 style={{
-                  fontSize: 15,
-                  fontWeight: 800,
-                  letterSpacing: 0.1,
-                  color: 'rgba(255,255,255,0.96)',
-                  marginBottom: 7,
-                  lineHeight: 1.25,
-                }}
-              >
-                {t('splash.discover')}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 11.5,
-                  color: 'rgba(255,255,255,0.54)',
-                  lineHeight: 1.45,
-                  marginBottom: 14,
-                }}
-              >
-                Okapi Color
-                <br />
-                {t('splash.teaser_sub')}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => nav('/login')}
-                style={{
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  alignSelf: 'flex-start',
-                  padding: '7px 10px',
-                  background: 'rgba(255,107,0,0.12)',
-                  border: '1px solid rgba(255,107,0,0.28)',
-                  borderRadius: 999,
-                  fontSize: 9,
-                  fontWeight: 800,
-                  color: 'rgba(255,255,255,0.78)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  cursor: 'pointer',
+                  gap: 10,
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 12,
+                  padding: '10px 12px',
                 }}
               >
-                Explorer
-                <span style={{ marginLeft: 5, color: ORANGE }}>→</span>
-              </button>
-            </div>
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: 'rgba(255,215,0,0.12)',
+                    border: '1px solid rgba(255,215,0,0.3)',
+                    color: '#FFD700',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {n}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: 'rgba(255,255,255,0.72)',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {t(`splash.step${n}`)}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
 
         {/* ── FOOTER ─────────────────────────────────────────── */}
         <footer
           style={{
+            marginTop: 'auto',
             textAlign: 'center',
             fontSize: 10,
             color: 'rgba(255,255,255,0.2)',
-            padding: '2px 20px 16px',
+            padding: '16px 20px 16px',
             lineHeight: 1.85,
           }}
         >
@@ -463,17 +451,6 @@ const KEYFRAMES = `
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes aPulse {
- 0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
- 50% {
-    opacity: 0.32;
-    transform: scale(0.64);
   }
 }
 `;
