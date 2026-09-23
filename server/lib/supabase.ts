@@ -16,7 +16,6 @@ export const supabaseAdmin = createClient(url || 'http://localhost', key || 'ano
 
 /**
  * Returns the configured Supabase admin client, or null if env vars are missing.
- * Used by the Okapi Climb engine for best-effort persistence.
  */
 export function getSupabase(): SupabaseClient | null {
   if (!url || !key) return null;

@@ -2,7 +2,6 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import websocket from '@fastify/websocket';
 import cookie from '@fastify/cookie';
 import authPlugin from './plugins/auth.js';
 import authRoutes from './modules/auth/routes.js';
@@ -12,20 +11,12 @@ import callbackRoutes from './routes/callback.js';
 import statusRoutes from './routes/status.js';
 import transactionsRoutes from './routes/transactions.js';
 import meRoutes from './routes/me.js';
-import lotoRoutes from './routes/loto.js';
-import flashRoutes from './routes/flash.js';
-import { okapiRoutes } from './routes/okapi.js';
-import okapiAutoRoutes from './routes/okapi-auto.js';
 import walletRoutes from './routes/wallet.js';
 import adminRoutes from './routes/admin.js';
 import agentsPublicRoutes from './routes/agents.js';
 import kycRoutes from './routes/kyc.js';
-import scratchRoutes from './routes/scratch.js';
-import freePlaysRoutes from './routes/free-plays.js';
 import okapiColorRoutes from './routes/okapi-color.js';
 import cgltRoutes from './routes/cglt.js';
-import farmingRoutes from './routes/farming.js';
-import { engine } from './lib/okapi-engine.js';
 import { startCrons } from './cron.js';
 import { env } from './env.js';
 
@@ -104,8 +95,6 @@ async function main() {
   });
   await app.register(authPlugin);
 
-  await app.register(websocket);
-
   app.addHook('onSend', async (_req, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
@@ -129,19 +118,12 @@ async function main() {
   await app.register(statusRoutes);
   await app.register(transactionsRoutes);
   await app.register(meRoutes);
-  await app.register(lotoRoutes);
-  await app.register(flashRoutes);
-  await app.register(okapiRoutes);
-  await app.register(okapiAutoRoutes);
   await app.register(walletRoutes);
   await app.register(agentsPublicRoutes);
   await app.register(adminRoutes);
   await app.register(kycRoutes);
-  await app.register(scratchRoutes);
-  await app.register(freePlaysRoutes);
   await app.register(okapiColorRoutes);
   await app.register(cgltRoutes);
-  await app.register(farmingRoutes);
 
   const port = env.PORT;
   const host = env.HOST;
@@ -150,8 +132,6 @@ async function main() {
   app.log.info(`API listening on http://${host}:${port}`);
   app.log.info('Registered routes:\n' + app.printRoutes());
   startCrons();
-  engine.start();
-  app.log.info('Okapi Climb engine started');
 
   const gracefulShutdown = async (signal: string) => {
     app.log.info(`${signal} received, starting graceful shutdown...`);

@@ -197,13 +197,12 @@ export const adminApi = {
     request<{
       total_balance_cdf: number;
       users_count: number;
-      okapi_rounds_today: number;
+      okapi_color_draws_today: number;
       kyc?: { approved: number; pending: number; denied: number; verify_age: number };
       active_players_today: number;
       total_deposits_today: number;
       total_withdrawals_today: number;
-      avg_crash_point: number;
-      loto_tickets_today: number;
+      okapi_color_tickets_today: number;
     }>('/api/admin/overview'),
 
   transactionsSummary: () =>
@@ -229,7 +228,7 @@ export const adminApi = {
     request<{
       events: Array<{
         id: string;
-        type: 'deposit' | 'withdrawal' | 'okapi_bet' | 'loto_ticket' | 'flash_ticket';
+        type: 'deposit' | 'withdrawal' | 'okapi_color_ticket';
         amount_cdf: number;
         phone: string;
         status?: string | number;
@@ -253,7 +252,7 @@ export const adminApi = {
         blocked: boolean;
         self_exclusion_until: string | null;
         pnl_cdf: number;
-        rounds_24h: number;
+        tickets_24h: number;
       }>;
       page: number;
       page_size: number;
@@ -283,8 +282,8 @@ export const adminApi = {
         status: number;
         created_at: string;
       }>;
-      okapi: {
-        rounds_played: number;
+      okapi_color: {
+        tickets_played: number;
         total_wagered_cdf: number;
         total_won_cdf: number;
         pnl_cdf: number;
@@ -415,41 +414,6 @@ export const adminApi = {
 
   denyKyc: (id: string) => denyKyc(id),
 
-  okapiRounds: (page = 1) =>
-    request<{
-      items: Array<{
-        id: string;
-        crash_point: number;
-        started_at: string;
-        ended_at: string | null;
-        total_bets: number;
-        total_cashouts: number;
-        house_profit: number;
-        players_count: number;
-        biggest_cashout: number;
-      }>;
-      page: number;
-      page_size: number;
-      total: number | null;
-    }>(`/api/admin/okapi/rounds?page=${page}`),
-
-  lotoTirages: (page = 1, type: 'all' | 'congo' | 'flash' = 'all') =>
-    request<{
-      items: Array<{
-        id: string;
-        type: 'congo' | 'flash';
-        drawn_at: string;
-        numeros: number[];
-        jackpot_cdf: number | null;
-        winners_count: number;
-        winners: number;
-        tickets_sold: number;
-        revenue_cdf: number;
-      }>;
-      page: number;
-      page_size: number;
-    }>(`/api/admin/loto/tirages?page=${page}&type=${type}`),
-
   transactions: (params: {
     page?: number;
     status?: string;
@@ -481,29 +445,6 @@ export const adminApi = {
       total: number | null;
     }>(`/api/admin/transactions?${qs.toString()}`);
   },
-
-  scratchTickets: (page = 1) =>
-    request<{
-      items: Array<{
-        id: string;
-        phone: string;
-        bet_amount_cdf: number;
-        win_amount_cdf: number;
-        status: 'pending' | 'revealed' | 'claimed';
-        created_at: string;
-      }>;
-      page: number;
-      page_size: number;
-      total: number | null;
-    }>(`/api/admin/scratch/tickets?page=${page}`),
-
-  scratchOverview: () =>
-    request<{
-      tickets_today: number;
-      bets_today: number;
-      wins_today: number;
-      revenue_today: number;
-    }>('/api/admin/scratch/overview'),
 
   agentsList: () =>
     request<{ agents: Agent[] }>('/api/admin/agents'),

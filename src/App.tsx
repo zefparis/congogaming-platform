@@ -9,14 +9,10 @@ import HomeScreen from './screens/HomeScreen';
 import DepositScreen from './screens/DepositScreen';
 import WithdrawScreen from './screens/WithdrawScreen';
 import AccountScreen from './screens/AccountScreen';
-import LotoScreen from './screens/LotoScreen';
 import OkapiColorScreen from './screens/OkapiColorScreen';
 import OkapiColorTVScreen from './screens/OkapiColorTVScreen';
 import AgentDashboard from './screens/AgentDashboard';
-import FlashScreen from './screens/FlashScreen';
-import ScratchScreen from './screens/ScratchScreen';
 import LegalScreen from './screens/LegalScreen';
-import OkapiGame from './screens/okapi/OkapiGame';
 import AdminScreen from './screens/AdminScreen';
 import KycScreen from './screens/KycScreen';
 import BottomNav from './components/BottomNav';
@@ -25,13 +21,7 @@ import { LanguageToggle } from './components/LanguageToggle';
 import { clearSession, getSession, refreshSession } from './lib/auth';
 import ErrorBoundary from './components/ErrorBoundary';
 
-function PageWrap({ children, fullscreen = false }: { children: React.ReactNode; fullscreen?: boolean }) {
-  if (fullscreen) {
-    // Game screens (Okapi Climb) own their own 100dvh layout and must not be
-    // wrapped in min-h-screen + a translateY animation: that creates a tall
-    // outer scroller and the dreaded "page slides up/down" effect.
-    return <>{children}</>
-  }
+function PageWrap({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -77,9 +67,7 @@ function KycRoute() {
 
 function AppRoutes() {
   const location = useLocation();
-  const showNav = ['/', '/flash', '/scratch', '/climb', '/okapi-color', '/compte'].includes(location.pathname);
-  // The farming progress bar is now a sticky mini-bar rendered inside each
-  // game screen (under its header) — no floating overlay here.
+  const showNav = ['/', '/okapi-color', '/compte'].includes(location.pathname);
   return (
     <>
       <AnimatePresence mode="wait">
@@ -92,10 +80,11 @@ function AppRoutes() {
           <Route path="/depot" element={<Protected><PageWrap><DepositScreen /></PageWrap></Protected>} />
           <Route path="/retrait" element={<Protected><PageWrap><WithdrawScreen /></PageWrap></Protected>} />
           <Route path="/compte" element={<Protected><PageWrap><AccountScreen /></PageWrap></Protected>} />
-          <Route path="/loto" element={<Protected><PageWrap><LotoScreen /></PageWrap></Protected>} />
-          <Route path="/flash" element={<Protected><PageWrap><FlashScreen /></PageWrap></Protected>} />
-          <Route path="/scratch" element={<Protected><PageWrap><ScratchScreen /></PageWrap></Protected>} />
-          <Route path="/climb" element={<Protected><PageWrap fullscreen><OkapiGame /></PageWrap></Protected>} />
+          {/* Removed games redirect to home (no 404). */}
+          <Route path="/loto" element={<Navigate to="/" replace />} />
+          <Route path="/flash" element={<Navigate to="/" replace />} />
+          <Route path="/scratch" element={<Navigate to="/" replace />} />
+          <Route path="/climb" element={<Navigate to="/" replace />} />
           <Route path="/okapi-color" element={<Protected><PageWrap><OkapiColorScreen /></PageWrap></Protected>} />
           <Route path="/legal" element={<Protected><PageWrap><LegalScreen /></PageWrap></Protected>} />
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />
@@ -110,10 +99,6 @@ function AppRoutes() {
 
 function AppShell() {
   const location = useLocation();
-  // /climb is a fullscreen game: it manages its own 100dvh layout and the
-  // BottomNav clearance internally. The default pb-20 + min-h-screen wrapper
-  // would create an outer scroller and break the lock-to-viewport layout.
-  const isFullscreen = location.pathname === '/climb';
   // /admin is a desktop-oriented dashboard: it must not be constrained to
   // the 430px mobile shell, and must not show the player BottomNav.
   const isAdmin = location.pathname.startsWith('/admin');
@@ -141,26 +126,17 @@ function AppShell() {
     );
   }
   return (
-    <div
-      className={
-        isFullscreen
-          ? 'mx-auto w-full max-w-app bg-bg relative'
-          : 'mx-auto w-full max-w-app min-h-screen bg-bg relative pb-20'
-      }
-      style={isFullscreen ? { height: '100dvh', overflow: 'hidden' } : undefined}
-    >
-      {!isFullscreen && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          padding: '4px 16px',
-          background: '#0f0f0f',
-          borderBottom: '1px solid #1e1e1e',
-        }}>
-          <LanguageToggle />
-        </div>
-      )}
+    <div className="mx-auto w-full max-w-app min-h-screen bg-bg relative pb-20">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        padding: '4px 16px',
+        background: '#0f0f0f',
+        borderBottom: '1px solid #1e1e1e',
+      }}>
+        <LanguageToggle />
+      </div>
       <AppRoutes />
     </div>
   );

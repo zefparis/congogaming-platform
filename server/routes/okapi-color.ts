@@ -163,7 +163,7 @@ export function buildJackpotResolveEventKey(ticketId: string): string {
 }
 
 // Admin secret cloisonné : Okapi Color utilise SON propre secret, jamais
-// celui du Loto. Helper pur pour pouvoir le tester sans booter le serveur.
+// celui des autres jeux. Helper pur pour pouvoir le tester sans booter le serveur.
 export function resolveOkapiColorAdminSecret(e: { OKAPI_COLOR_ADMIN_SECRET?: string } = env): string {
   return e.OKAPI_COLOR_ADMIN_SECRET ?? '';
 }

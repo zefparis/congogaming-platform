@@ -29,18 +29,13 @@ const ctaStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-type FlashLatest = Awaited<ReturnType<typeof api.flashLatest>>;
-
 export default function HomeScreen() {
   const nav = useNavigate();
   const { t } = useTranslation();
   const session = getSession();
   const [balance, setBalance] = useState<number>(session?.balance_cdf ?? 0);
   const { balanceCglt, refresh: refreshCglt } = useCGLTBalance(true);
-  const [flashPot, setFlashPot] = useState<number>(0);
-  const [flashData, setFlashData] = useState<FlashLatest | null>(null);
   const [okapiColorPot, setOkapiColorPot] = useState<number>(0);
-  const [countdown, setCountdown] = useState<string>('--:--');
 
   useEffect(() => {
     const doRefresh = () => {
@@ -52,13 +47,6 @@ export default function HomeScreen() {
     // Only fetch CGLT balance if a session is active (avoids 403 on anonymous load).
     if (getSession()) void refreshCglt();
     api.okapiColorLive().then((r) => setOkapiColorPot(Number(r.jackpotThresholdCdf || 250_000))).catch(() => {});
-    api
-      .flashLatest()
-      .then((r) => {
-        setFlashPot(Number(r.pot_cdf || 0));
-        setFlashData(r);
-      })
-      .catch(() => {});
 
     // Refresh immediately when the tab regains visibility (app focus / tab switch back).
     const onVisible = () => { if (document.visibilityState === 'visible') { doRefresh(); if (getSession()) void refreshCglt(); } };
@@ -72,42 +60,6 @@ export default function HomeScreen() {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
-
-  useEffect(() => {
-    if (!flashData?.tirage?.drawn_at) {
-      setCountdown('--:--');
-      return;
-    }
-    const lastDraw = new Date(flashData.tirage.drawn_at).getTime();
-    const interval = 30 * 60 * 1000;
-    let refetchScheduled = false;
-
-    const tick = () => {
-      const now = Date.now();
-      const nextDraw = lastDraw + Math.ceil((now - lastDraw) / interval) * interval;
-      const remaining = Math.max(0, Math.floor((nextDraw - now) / 1000));
-      const m = String(Math.floor(remaining / 60)).padStart(2, '0');
-      const s = String(remaining % 60).padStart(2, '0');
-      setCountdown(remaining > 0 ? `${m}:${s}` : t('home.draw_in_progress'));
-
-      if (remaining === 0 && !refetchScheduled) {
-        refetchScheduled = true;
-        setTimeout(() => {
-          api
-            .flashLatest()
-            .then((r) => {
-              setFlashPot(Number(r.pot_cdf || 0));
-              setFlashData(r);
-            })
-            .catch(() => {});
-        }, 5000);
-      }
-    };
-
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [flashData]);
 
   return (
     <div className="min-h-screen pb-24">
@@ -335,183 +287,6 @@ export default function HomeScreen() {
 
       <div className="p-4 space-y-4">
 
-        {/* OKAPI CLIMB card */}
-        <div
-          onClick={() => nav('/climb')}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 16,
-            minHeight: 220,
-            cursor: 'pointer',
-          }}
-        >
-          <img
-            src="/images/okapi/okapi-climb.png"
-            alt="Okapi Climb"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center center',
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 55%)',
-            }}
-          />
-
-          {/* Okapi character */}
-          <img
-            src="/images/okapi/okapi-tip.png"
-            alt="Okapi"
-            style={{
-              position: 'absolute',
-              right: '0',
-              bottom: '0',
-              height: '35%',
-              width: 'auto',
-              objectFit: 'contain',
-              zIndex: 2,
-              filter: 'drop-shadow(0 0 12px rgba(255,165,0,0.5))',
-            }}
-          />
-          <div style={{ position: 'relative', maxWidth: '58%', zIndex: 3, padding: '20px 16px' }}>
-            <div style={{ fontSize: 10, color: '#FFD700', letterSpacing: 3, marginBottom: 4 }}>
-              {t('home.crash_label')}
-            </div>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#FFD700', lineHeight: 1 }}>
-              OKAPI CLIMB
-            </div>
-            <div style={{ fontSize: 13, color: 'white', marginTop: 4, marginBottom: 16, opacity: 0.85 }}>
-              {t('home.crash_sub')}
-            </div>
-            <motion.button
-              whileHover={{ filter: 'brightness(1.1)' }}
-              whileTap={{ scale: 0.98, filter: 'brightness(1.1)' }}
-              onClick={(e) => { e.stopPropagation(); nav('/climb'); }}
-              style={ctaStyle}
-            >
-              {t('home.crash_btn')}
-            </motion.button>
-          </div>
-        </div>
-
-        {/* LOTO EXPRESS — electric dark card with green accent */}
-        <div
-          onClick={() => nav('/flash')}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 16,
-            minHeight: 200,
-            cursor: 'pointer',
-            background: '#0a0a1a',
-            border: '1px solid rgba(0,168,107,0.4)',
-          }}
-        >
-          {/* Scattered lightning bolts background */}
-          {[
-            { top: '8%', left: '6%', size: 64, rotate: -15 },
-            { top: '18%', right: '12%', size: 96, rotate: 20 },
-            { top: '55%', left: '20%', size: 80, rotate: 10 },
-            { bottom: '10%', right: '8%', size: 72, rotate: -25 },
-            { bottom: '30%', right: '32%', size: 56, rotate: 35 },
-            { top: '45%', right: '4%', size: 48, rotate: -10 },
-          ].map((b, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                top: b.top,
-                bottom: b.bottom,
-                left: b.left,
-                right: b.right,
-                fontSize: b.size,
-                opacity: 0.08,
-                transform: `rotate(${b.rotate}deg)`,
-                color: '#00A86B',
-                pointerEvents: 'none',
-                lineHeight: 1,
-              }}
-            >
-              ⚡
-            </div>
-          ))}
-
-          {/* Sticker image */}
-          <img
-            src="/images/okapi/bloto-ball.png"
-            alt=""
-            className="float-y"
-            style={{
-              position: 'absolute',
-              right: '0px',
-              bottom: '0',
-              height: '85%',
-              width: 'auto',
-              objectFit: 'contain',
-              zIndex: 2,
-              filter: 'drop-shadow(0 0 10px rgba(0,168,107,0.5))',
-            }}
-          />
-
-          <div style={{ position: 'relative', zIndex: 3, maxWidth: '60%', padding: '20px 16px' }}>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 44, color: '#00A86B', lineHeight: 1, letterSpacing: 2 }}>
-              ⚡ LOTO EXPRESS
-            </div>
-            <div style={{ color: '#FFFFFF', fontSize: 14, marginTop: 12, fontWeight: 600 }}>
-              {t('home.next_draw')}
-            </div>
-            <div
-              style={{
-                fontFamily: 'Bebas Neue',
-                fontSize: 32,
-                color: '#00A86B',
-                lineHeight: 1,
-                letterSpacing: 2,
-                marginTop: 4,
-                textShadow: '0 0 12px rgba(0,168,107,0.6)',
-              }}
-            >
-              {countdown}
-            </div>
-            {flashPot >= 250_000 ? (
-              <div
-                className="animate-flicker"
-                style={{ color: '#00A86B', fontWeight: 700, fontSize: 15, marginTop: 4 }}
-              >
-                {t('home.jackpot_available')}
-              </div>
-            ) : (
-              <div style={{ color: '#FFFFFF', fontSize: 15, marginTop: 4, fontWeight: 600 }}>
-                {t('home.pot', { amount: flashPot.toLocaleString('fr-FR') })}
-              </div>
-            )}
-            <div style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4, marginBottom: 16 }}>
-              {t('home.ticket_price_1000')}
-            </div>
-            <motion.button
-              whileHover={{ filter: 'brightness(1.1)' }}
-              whileTap={{ scale: 0.98, filter: 'brightness(1.1)' }}
-              onClick={(e) => { e.stopPropagation(); nav('/flash'); }}
-              style={{
-                ...ctaStyle,
-                background: '#00A86B',
-                border: '1px solid rgba(0,168,107,0.7)',
-              }}
-            >
-              {t('home.play_now')}
-            </motion.button>
-          </div>
-        </div>
-
         {/* OKAPI COLOR card */}
         <div
           onClick={() => nav('/okapi-color')}
@@ -573,119 +348,6 @@ export default function HomeScreen() {
                 {t('home.play_now')}
               </motion.button>
             </div>
-        </div>
-
-        {/* SCRATCH CARD promo */}
-        <div
-          onClick={() => nav('/scratch')}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 16,
-            minHeight: 220,
-            cursor: 'pointer',
-            border: '1px solid rgba(255,215,0,0.35)',
-          }}
-        >
-          {/* Background image — MUST stay first child so it sits behind the
-              dark overlay and content. File: public/images/scratch.jpg */}
-          <img
-            src="/images/scratch.jpg"
-            alt=""
-            aria-hidden
-            onError={(e) => {
-              // Surface a clear console signal if the asset path ever breaks.
-              // eslint-disable-next-line no-console
-              console.error('[HomeScreen] scratch.jpg failed to load', e.currentTarget.src);
-            }}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'left center',
-              zIndex: 0,
-            }}
-          />
-          {/* Dark gradient overlay for legibility */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'linear-gradient(to right, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.38) 50%, rgba(0,0,0,0.05) 100%)',
-            }}
-          />
-
-          {/* Sparkle pattern */}
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              background:
-                'radial-gradient(2px 2px at 20% 30%, rgba(255,215,0,0.9), transparent 60%),' +
-                'radial-gradient(2px 2px at 60% 60%, rgba(255,255,255,0.7), transparent 60%),' +
-                'radial-gradient(1.5px 1.5px at 80% 20%, rgba(255,215,0,0.7), transparent 60%),' +
-                'radial-gradient(1.5px 1.5px at 40% 80%, rgba(255,255,255,0.6), transparent 60%),' +
-                'radial-gradient(1.5px 1.5px at 12% 70%, rgba(255,215,0,0.7), transparent 60%),' +
-                'radial-gradient(1.5px 1.5px at 90% 85%, rgba(255,255,255,0.5), transparent 60%)',
-              animation: 'flicker 3s ease-in-out infinite',
-            }}
-          />
-
-          <div
-            style={{ position: 'relative', zIndex: 3, padding: '20px 16px', maxWidth: '70%' }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                color: '#FFFFFF',
-                letterSpacing: 3,
-                marginBottom: 4,
-                textShadow: '0 1px 4px rgba(0,0,0,1)',
-              }}
-            >
-              🎫 INSTANT WIN
-            </div>
-            <div
-              style={{
-                fontFamily: 'Bebas Neue',
-                fontSize: 48,
-                color: '#FFD700',
-                lineHeight: 1,
-                letterSpacing: 2,
-                textShadow: '0 2px 8px rgba(0,0,0,1), 0 0 30px rgba(0,0,0,0.9)',
-              }}
-            >
-              SCRATCH CARD
-            </div>
-            <div
-              style={{
-                color: '#FFFFFF',
-                fontSize: 13,
-                marginTop: 8,
-                marginBottom: 16,
-                textShadow: '0 1px 6px rgba(0,0,0,1)',
-              }}
-            >
-              {t('home.scratch_sub')}
-            </div>
-            <motion.button
-              whileHover={{ filter: 'brightness(1.1)' }}
-              whileTap={{ scale: 0.98, filter: 'brightness(1.1)' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                nav('/scratch');
-              }}
-              style={ctaStyle}
-            >
-              {t('home.scratch_btn')}
-            </motion.button>
-          </div>
         </div>
 
 

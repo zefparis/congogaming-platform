@@ -242,26 +242,24 @@ export default async function adminRoutes(app: FastifyInstance) {
       const [
         usersAgg,
         usersCount,
-        roundsToday,
+        drawsToday,
         kycCounts,
-        okapiBetsToday,
+        ticketsTodayUsers,
         txToday,
-        roundsTodayCrash,
-        lotoTicketsToday,
-        flashTicketsToday,
+        ticketsToday,
       ] = await Promise.all([
         supabaseAdmin.from('users').select('balance_cdf'),
         supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
         supabaseAdmin
-          .from('okapi_rounds')
+          .from('okapi_color_tirages')
           .select('*', { count: 'exact', head: true })
-          .gte('started_at', todayIso),
+          .gte('drawn_at', todayIso),
         // Per-status user counts. We query the column directly and aggregate
         // in JS — cheaper than 4 separate count(*) round-trips.
         supabaseAdmin.from('users').select('kyc_status'),
-        // Active players today: distinct user_id from okapi_bets since today
+        // Active players today: distinct user_id from okapi_color_tickets
         supabaseAdmin
-          .from('okapi_bets')
+          .from('okapi_color_tickets')
           .select('user_id')
           .gte('created_at', todayIso),
         // Today's transactions (deposits/withdrawals, success only)
@@ -269,17 +267,8 @@ export default async function adminRoutes(app: FastifyInstance) {
           .from('transactions')
           .select('type, amount, status')
           .gte('created_at', todayIso),
-        // Crash points for today's rounds (avg)
         supabaseAdmin
-          .from('okapi_rounds')
-          .select('crash_point')
-          .gte('started_at', todayIso),
-        supabaseAdmin
-          .from('loto_tickets')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', todayIso),
-        supabaseAdmin
-          .from('flash_tickets')
+          .from('okapi_color_tickets')
           .select('*', { count: 'exact', head: true })
           .gte('created_at', todayIso),
       ]);
@@ -296,7 +285,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       }
 
       const activeUserSet = new Set<string>();
-      for (const b of okapiBetsToday.data || []) {
+      for (const b of ticketsTodayUsers.data || []) {
         activeUserSet.add(String((b as any).user_id));
       }
 
@@ -309,27 +298,16 @@ export default async function adminRoutes(app: FastifyInstance) {
         else if ((t as any).type === 'withdrawal') total_withdrawals_today += amount;
       }
 
-      const crashPoints = (roundsTodayCrash.data || []).map((r: any) =>
-        Number(r.crash_point || 0),
-      );
-      const avg_crash_point = crashPoints.length
-        ? crashPoints.reduce((s, v) => s + v, 0) / crashPoints.length
-        : 0;
-
-      const loto_tickets_today =
-        (lotoTicketsToday.count ?? 0) + (flashTicketsToday.count ?? 0);
-
       return reply.send({
         total_balance_cdf,
         users_count: usersCount.count ?? 0,
-        okapi_rounds_today: roundsToday.count ?? 0,
+        okapi_color_draws_today: drawsToday.count ?? 0,
         kyc,
         // New KPIs
         active_players_today: activeUserSet.size,
         total_deposits_today,
         total_withdrawals_today,
-        avg_crash_point,
-        loto_tickets_today,
+        okapi_color_tickets_today: ticketsToday.count ?? 0,
       });
     } catch (e: any) {
       return reply.code(500).send({ error: e.message || 'overview failed' });
@@ -391,12 +369,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     const days = Math.min(90, Math.max(1, Number(req.query.days || 7)));
     const since = daysAgoIso(days);
 
-    // Pull all rounds in window with their bets aggregated.
-    // House profit = sum(amount of lost bets) - sum(win - amount) for won bets.
-    // i.e. for each bet: lost → +amount, won → -(win - amount) = amount - win.
-    const { data: bets, error } = await supabaseAdmin
-      .from('okapi_bets')
-      .select('amount_cdf, win_amount_cdf, status, created_at')
+    // House profit per day = tickets sold - winnings paid (Okapi Color).
+    // Cancelled tickets are refunded and count for nothing.
+    const { data: tickets, error } = await supabaseAdmin
+      .from('okapi_color_tickets')
+      .select('prix_cdf, gains_cdf, status, created_at')
+      .neq('status', 'cancelled')
       .gte('created_at', since);
     if (error) return reply.code(500).send({ error: error.message });
 
@@ -408,15 +386,10 @@ export default async function adminRoutes(app: FastifyInstance) {
       buckets.set(d.toISOString().slice(0, 10), 0);
     }
 
-    for (const b of bets || []) {
-      const day = String(b.created_at).slice(0, 10);
+    for (const t of tickets || []) {
+      const day = String(t.created_at).slice(0, 10);
       if (!buckets.has(day)) continue;
-      const amount = Number(b.amount_cdf || 0);
-      const win = Number(b.win_amount_cdf || 0);
-      const status = String(b.status || '');
-      let profit = 0;
-      if (status === 'lost') profit = amount;
-      else if (status === 'won') profit = amount - win;
+      const profit = Number(t.prix_cdf || 0) - Number(t.gains_cdf || 0);
       buckets.set(day, (buckets.get(day) || 0) + profit);
     }
 
@@ -432,31 +405,21 @@ export default async function adminRoutes(app: FastifyInstance) {
     // each source, then merge + sort by created_at desc and trim to limit.
     const fetchN = limit * 2;
 
-    const [txs, okBets, lotoT, flashT] = await Promise.all([
+    const [txs, ocTickets] = await Promise.all([
       supabaseAdmin
         .from('transactions')
         .select('id, user_id, type, amount, status, created_at')
         .order('created_at', { ascending: false })
         .limit(fetchN),
       supabaseAdmin
-        .from('okapi_bets')
-        .select('id, user_id, amount_cdf, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(fetchN),
-      supabaseAdmin
-        .from('loto_tickets')
-        .select('id, user_id, prix_cdf, created_at')
-        .order('created_at', { ascending: false })
-        .limit(fetchN),
-      supabaseAdmin
-        .from('flash_tickets')
-        .select('id, user_id, prix_cdf, created_at')
+        .from('okapi_color_tickets')
+        .select('id, user_id, prix_cdf, status, created_at')
         .order('created_at', { ascending: false })
         .limit(fetchN),
     ]);
 
     const userIds = new Set<string>();
-    for (const arr of [txs.data, okBets.data, lotoT.data, flashT.data]) {
+    for (const arr of [txs.data, ocTickets.data]) {
       for (const r of arr || []) userIds.add(String((r as any).user_id));
     }
     const phoneById = new Map<string, string>();
@@ -470,7 +433,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
     type Event = {
       id: string;
-      type: 'deposit' | 'withdrawal' | 'okapi_bet' | 'loto_ticket' | 'flash_ticket';
+      type: 'deposit' | 'withdrawal' | 'okapi_color_ticket';
       amount_cdf: number;
       phone: string;
       status?: string | number;
@@ -489,31 +452,13 @@ export default async function adminRoutes(app: FastifyInstance) {
         created_at: String(t.created_at),
       });
     }
-    for (const b of okBets.data || []) {
-      events.push({
-        id: String(b.id),
-        type: 'okapi_bet',
-        amount_cdf: Number(b.amount_cdf || 0),
-        phone: maskPhone(phoneById.get(String(b.user_id))),
-        status: b.status,
-        created_at: String(b.created_at),
-      });
-    }
-    for (const t of lotoT.data || []) {
+    for (const t of ocTickets.data || []) {
       events.push({
         id: String(t.id),
-        type: 'loto_ticket',
+        type: 'okapi_color_ticket',
         amount_cdf: Number(t.prix_cdf || 0),
         phone: maskPhone(phoneById.get(String(t.user_id))),
-        created_at: String(t.created_at),
-      });
-    }
-    for (const t of flashT.data || []) {
-      events.push({
-        id: String(t.id),
-        type: 'flash_ticket',
-        amount_cdf: Number(t.prix_cdf || 0),
-        phone: maskPhone(phoneById.get(String(t.user_id))),
+        status: t.status,
         created_at: String(t.created_at),
       });
     }
@@ -542,35 +487,30 @@ export default async function adminRoutes(app: FastifyInstance) {
       const { data, error, count } = await q.range(from, to);
       if (error) return reply.code(500).send({ error: error.message });
 
-      // Last activity per user (best-effort): latest of transactions, okapi_bets, loto_tickets
+      // Last activity per user (best-effort): latest of transactions, okapi_color_tickets
       const ids = (data || []).map((u: any) => u.id);
       const lastActivity = new Map<string, string>();
-      // Aggregate okapi P&L (all-time) and rounds_played in last 24h to flag at-risk players.
+      // Aggregate Okapi Color P&L (all-time) and tickets in last 24h to flag at-risk players.
       const pnlByUser = new Map<string, number>();
-      const rounds24hByUser = new Map<string, number>();
+      const tickets24hByUser = new Map<string, number>();
       const exclusionByUser = new Map<string, string>();
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
       if (ids.length > 0) {
-        const [tx, ob, lt, betsAll, limitsRows] = await Promise.all([
+        const [tx, oc, ticketsAll, limitsRows] = await Promise.all([
           supabaseAdmin
             .from('transactions')
             .select('user_id, created_at')
             .in('user_id', ids)
             .order('created_at', { ascending: false }),
           supabaseAdmin
-            .from('okapi_bets')
+            .from('okapi_color_tickets')
             .select('user_id, created_at')
             .in('user_id', ids)
             .order('created_at', { ascending: false }),
           supabaseAdmin
-            .from('loto_tickets')
-            .select('user_id, created_at')
-            .in('user_id', ids)
-            .order('created_at', { ascending: false }),
-          supabaseAdmin
-            .from('okapi_bets')
-            .select('user_id, amount_cdf, win_amount_cdf, status, created_at')
+            .from('okapi_color_tickets')
+            .select('user_id, prix_cdf, gains_cdf, status, created_at')
             .in('user_id', ids),
           supabaseAdmin
             .from('user_limits')
@@ -590,19 +530,21 @@ export default async function adminRoutes(app: FastifyInstance) {
           }
         };
         accumulate(tx.data);
-        accumulate(ob.data);
-        accumulate(lt.data);
+        accumulate(oc.data);
 
-        for (const b of betsAll.data || []) {
-          const uid = String((b as any).user_id);
-          const amount = Number((b as any).amount_cdf || 0);
-          const win = Number((b as any).win_amount_cdf || 0);
-          const status = String((b as any).status || '');
-          // Player P&L = won - wagered. Approximated from final-state bets.
-          if (status === 'won') pnlByUser.set(uid, (pnlByUser.get(uid) || 0) + (win - amount));
-          else if (status === 'lost') pnlByUser.set(uid, (pnlByUser.get(uid) || 0) - amount);
-          if (String((b as any).created_at) >= since24h) {
-            rounds24hByUser.set(uid, (rounds24hByUser.get(uid) || 0) + 1);
+        for (const t of ticketsAll.data || []) {
+          const uid = String((t as any).user_id);
+          const prix = Number((t as any).prix_cdf || 0);
+          const gains = Number((t as any).gains_cdf || 0);
+          const status = String((t as any).status || '');
+          // Player P&L = won - wagered, on settled tickets.
+          if (status === 'gagnant' || status === 'jackpot_attente') {
+            pnlByUser.set(uid, (pnlByUser.get(uid) || 0) + (gains - prix));
+          } else if (status === 'perdant') {
+            pnlByUser.set(uid, (pnlByUser.get(uid) || 0) - prix);
+          }
+          if (String((t as any).created_at) >= since24h) {
+            tickets24hByUser.set(uid, (tickets24hByUser.get(uid) || 0) + 1);
           }
         }
       }
@@ -620,7 +562,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           blocked: !!u.blocked,
           self_exclusion_until: exclusionByUser.get(u.id) || null,
           pnl_cdf: pnlByUser.get(u.id) || 0,
-          rounds_24h: rounds24hByUser.get(u.id) || 0,
+          tickets_24h: tickets24hByUser.get(u.id) || 0,
         })),
         page,
         page_size: pageSize,
@@ -639,7 +581,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (error) return reply.code(500).send({ error: error.message });
     if (!user) return reply.code(404).send({ error: 'Not found' });
 
-    const [tx, bets, limitsRes, refereeCountRes, referrerRes, rewardsRes] = await Promise.all([
+    const [tx, tickets, limitsRes, refereeCountRes, referrerRes, rewardsRes] = await Promise.all([
       supabaseAdmin
         .from('transactions')
         .select('id, order_id, type, amount, provider_id, status, created_at')
@@ -647,8 +589,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         .order('created_at', { ascending: false })
         .limit(20),
       supabaseAdmin
-        .from('okapi_bets')
-        .select('amount_cdf, win_amount_cdf, status')
+        .from('okapi_color_tickets')
+        .select('prix_cdf, gains_cdf, status')
         .eq('user_id', id),
       supabaseAdmin
         .from('user_limits')
@@ -674,13 +616,14 @@ export default async function adminRoutes(app: FastifyInstance) {
         .limit(20),
     ]);
 
-    let rounds_played = 0;
+    let tickets_played = 0;
     let total_wagered = 0;
     let total_won = 0;
-    for (const b of bets.data || []) {
-      rounds_played += 1;
-      total_wagered += Number(b.amount_cdf || 0);
-      total_won += Number(b.win_amount_cdf || 0);
+    for (const t of tickets.data || []) {
+      if (t.status === 'cancelled') continue;
+      tickets_played += 1;
+      total_wagered += Number(t.prix_cdf || 0);
+      total_won += Number(t.gains_cdf || 0);
     }
 
     // Last 5 KYC checks for this user (audit trail).
@@ -694,8 +637,8 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({
       user,
       transactions: tx.data || [],
-      okapi: {
-        rounds_played,
+      okapi_color: {
+        tickets_played,
         total_wagered_cdf: total_wagered,
         total_won_cdf: total_won,
         pnl_cdf: total_won - total_wagered,
@@ -1067,199 +1010,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     },
   );
 
-  // ---- JEUX ----
-
-  app.get<{ Querystring: { page?: string; page_size?: string } }>(
-    '/api/admin/okapi/rounds',
-    async (req, reply) => {
-      const page = Math.max(1, Number(req.query.page || 1));
-      const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size || 25)));
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data: rounds, error, count } = await supabaseAdmin
-        .from('okapi_rounds')
-        .select('id, crash_point, started_at, ended_at', { count: 'exact' })
-        .order('started_at', { ascending: false })
-        .range(from, to);
-      if (error) return reply.code(500).send({ error: error.message });
-
-      const ids = (rounds || []).map((r: any) => String(r.id));
-      type RoundAgg = {
-        total_bets: number;
-        total_cashouts: number;
-        house_profit: number;
-        players_count: number;
-        biggest_cashout: number;
-        _users: Set<string>;
-      };
-      const agg = new Map<string, RoundAgg>();
-      if (ids.length > 0) {
-        const { data: bets } = await supabaseAdmin
-          .from('okapi_bets')
-          .select('round_id, user_id, amount_cdf, win_amount_cdf, status')
-          .in('round_id', ids);
-        for (const b of bets || []) {
-          const k = String((b as any).round_id);
-          const cur =
-            agg.get(k) || {
-              total_bets: 0,
-              total_cashouts: 0,
-              house_profit: 0,
-              players_count: 0,
-              biggest_cashout: 0,
-              _users: new Set<string>(),
-            };
-          const amount = Number((b as any).amount_cdf || 0);
-          const win = Number((b as any).win_amount_cdf || 0);
-          cur.total_bets += amount;
-          cur.total_cashouts += win;
-          if ((b as any).status === 'lost') cur.house_profit += amount;
-          else if ((b as any).status === 'won') cur.house_profit += amount - win;
-          cur._users.add(String((b as any).user_id));
-          if (win > cur.biggest_cashout) cur.biggest_cashout = win;
-          agg.set(k, cur);
-        }
-        for (const v of agg.values()) v.players_count = v._users.size;
-      }
-
-      return reply.send({
-        items: (rounds || []).map((r: any) => {
-          const a =
-            agg.get(String(r.id)) ||
-            ({
-              total_bets: 0,
-              total_cashouts: 0,
-              house_profit: 0,
-              players_count: 0,
-              biggest_cashout: 0,
-            } as RoundAgg);
-          return {
-            id: r.id,
-            crash_point: Number(r.crash_point || 0),
-            started_at: r.started_at,
-            ended_at: r.ended_at,
-            total_bets: a.total_bets,
-            total_cashouts: a.total_cashouts,
-            house_profit: a.house_profit,
-            players_count: a.players_count,
-            biggest_cashout: a.biggest_cashout,
-          };
-        }),
-        page,
-        page_size: pageSize,
-        total: count ?? null,
-      });
-    },
-  );
-
-  app.get<{ Querystring: { page?: string; page_size?: string; type?: string } }>(
-    '/api/admin/loto/tirages',
-    async (req, reply) => {
-      const page = Math.max(1, Number(req.query.page || 1));
-      const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size || 25)));
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      const type = (req.query.type || 'all').toLowerCase();
-
-      type Tirage = {
-        id: string;
-        type: 'congo' | 'flash';
-        drawn_at: string;
-        numeros: number[];
-        jackpot_cdf: number | null;
-        winners_count: number;
-        winners: number;
-        tickets_sold: number;
-        revenue_cdf: number;
-      };
-
-      const result: Tirage[] = [];
-
-      const aggregateTickets = async (
-        table: 'loto_tickets' | 'flash_tickets',
-        ids: string[],
-      ) => {
-        const winners = new Map<string, number>();
-        const sold = new Map<string, number>();
-        const revenue = new Map<string, number>();
-        if (ids.length === 0) return { winners, sold, revenue };
-        const { data: tickets } = await supabaseAdmin
-          .from(table)
-          .select('tirage_id, status, prix_cdf')
-          .in('tirage_id', ids);
-        for (const row of tickets || []) {
-          const k = String((row as any).tirage_id);
-          sold.set(k, (sold.get(k) || 0) + 1);
-          revenue.set(k, (revenue.get(k) || 0) + Number((row as any).prix_cdf || 0));
-          if ((row as any).status === 'gagnant') {
-            winners.set(k, (winners.get(k) || 0) + 1);
-          }
-        }
-        return { winners, sold, revenue };
-      };
-
-      if (type === 'all' || type === 'congo') {
-        const { data: tirages, error } = await supabaseAdmin
-          .from('loto_tirages')
-          .select('id, numeros, complementaire, jackpot, drawn_at')
-          .order('drawn_at', { ascending: false })
-          .range(from, to);
-        if (error) return reply.code(500).send({ error: error.message });
-        const ids = (tirages || []).map((t: any) => String(t.id));
-        const { winners, sold, revenue } = await aggregateTickets('loto_tickets', ids);
-        for (const t of tirages || []) {
-          const id = String(t.id);
-          const w = winners.get(id) || 0;
-          result.push({
-            id,
-            type: 'congo',
-            drawn_at: String(t.drawn_at),
-            numeros: [...(t.numeros || []), Number(t.complementaire)],
-            jackpot_cdf: t.jackpot != null ? Number(t.jackpot) : null,
-            winners_count: w,
-            winners: w,
-            tickets_sold: sold.get(id) || 0,
-            revenue_cdf: revenue.get(id) || 0,
-          });
-        }
-      }
-
-      if (type === 'all' || type === 'flash') {
-        const { data: tirages, error } = await supabaseAdmin
-          .from('flash_tirages')
-          .select('id, numeros, drawn_at')
-          .order('drawn_at', { ascending: false })
-          .range(from, to);
-        if (error) return reply.code(500).send({ error: error.message });
-        const ids = (tirages || []).map((t: any) => String(t.id));
-        const { winners, sold, revenue } = await aggregateTickets('flash_tickets', ids);
-        for (const t of tirages || []) {
-          const id = String(t.id);
-          const w = winners.get(id) || 0;
-          result.push({
-            id,
-            type: 'flash',
-            drawn_at: String(t.drawn_at),
-            numeros: t.numeros || [],
-            jackpot_cdf: null,
-            winners_count: w,
-            winners: w,
-            tickets_sold: sold.get(id) || 0,
-            revenue_cdf: revenue.get(id) || 0,
-          });
-        }
-      }
-
-      result.sort((a, b) => (a.drawn_at < b.drawn_at ? 1 : -1));
-      return reply.send({
-        items: result.slice(0, pageSize),
-        page,
-        page_size: pageSize,
-      });
-    },
-  );
-
   // ---- TRANSACTIONS ----
 
   function buildTxQuery(query: any) {
@@ -1322,76 +1072,6 @@ export default async function adminRoutes(app: FastifyInstance) {
       page,
       page_size: pageSize,
       total: count ?? null,
-    });
-  });
-
-  // ---- SCRATCH (admin) ----
-
-  app.get<{ Querystring: { page?: string; page_size?: string } }>(
-    '/api/admin/scratch/tickets',
-    async (req, reply) => {
-      const page = Math.max(1, Number(req.query.page || 1));
-      const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size || 25)));
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, error, count } = await supabaseAdmin
-        .from('scratch_tickets')
-        .select('id, user_id, bet_amount_cdf, win_amount_cdf, status, created_at', {
-          count: 'exact',
-        })
-        .order('created_at', { ascending: false })
-        .range(from, to);
-      if (error) return reply.code(500).send({ error: error.message });
-
-      const ids = Array.from(new Set((data || []).map((t: any) => String(t.user_id))));
-      const phoneById = new Map<string, string>();
-      if (ids.length > 0) {
-        const { data: users } = await supabaseAdmin
-          .from('users')
-          .select('id, phone')
-          .in('id', ids);
-        for (const u of users || []) phoneById.set(String(u.id), String(u.phone || ''));
-      }
-
-      return reply.send({
-        items: (data || []).map((t: any) => ({
-          id: t.id,
-          phone: maskPhone(phoneById.get(String(t.user_id))),
-          bet_amount_cdf: Number(t.bet_amount_cdf || 0),
-          win_amount_cdf: Number(t.win_amount_cdf || 0),
-          status: t.status,
-          created_at: t.created_at,
-        })),
-        page,
-        page_size: pageSize,
-        total: count ?? null,
-      });
-    },
-  );
-
-  app.get('/api/admin/scratch/overview', async (_req, reply) => {
-    const todayIso = startOfTodayIso();
-    const { data, error } = await supabaseAdmin
-      .from('scratch_tickets')
-      .select('bet_amount_cdf, win_amount_cdf, status, created_at')
-      .gte('created_at', todayIso);
-    if (error) return reply.code(500).send({ error: error.message });
-
-    let bets_today = 0;
-    let wins_today = 0;
-    let tickets_today = 0;
-    for (const r of data || []) {
-      tickets_today++;
-      bets_today += Number((r as any).bet_amount_cdf || 0);
-      wins_today += Number((r as any).win_amount_cdf || 0);
-    }
-    return reply.send({
-      tickets_today,
-      bets_today,
-      wins_today,
-      // Realised house revenue = bets - wins paid (only on claimed tickets).
-      revenue_today: bets_today - wins_today,
     });
   });
 

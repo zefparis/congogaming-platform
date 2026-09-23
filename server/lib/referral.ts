@@ -50,10 +50,10 @@ export async function onDepositSucceeded(
   }
 }
 
-export type WagerSource = 'loto' | 'flash' | 'scratch' | 'okapi' | 'okapi_color';
+export type WagerSource = 'okapi_color';
 
 /**
- * Called after a successful bet (loto, flash, okapi, scratch, …).
+ * Called after a successful ticket purchase.
  *
  * Idempotent per wager: the SQL function inserts into
  * `referral_wager_events (wager_source, wager_id)` BEFORE incrementing the

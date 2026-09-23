@@ -27,21 +27,6 @@ export const WithdrawBodySchema = z.object({
   phone: PhoneSchema,
 });
 
-export const OkapiBetBodySchema = z
-  .object({
-    amount_cdf: z.number().int().min(1).max(50_000),
-    auto_session_id: z.string().uuid().nullable().optional(),
-    currency: z.enum(['CDF', 'CGLT']).default('CDF'),
-  })
-  .refine((d) => (d.currency === 'CGLT' ? d.amount_cdf >= 1 : d.amount_cdf >= 100), {
-    message: 'Mise minimale: 100 CDF (1 CGLT)',
-    path: ['amount_cdf'],
-  });
-
-export const OkapiCashoutBodySchema = z.object({
-  bet_id: z.string().uuid(),
-});
-
 export const KycScanBodySchema = z.object({
   selfie_b64: z
     .string()
@@ -51,42 +36,6 @@ export const KycScanBodySchema = z.object({
       (v) => /^[A-Za-z0-9+/]+=*$/.test(v),
       'selfie_b64 must be valid base64',
     ),
-});
-
-export const OkapiAutoStartBodySchema = z.object({
-  bet_amount_cdf: z.number().int().min(100),
-  target_multiplier: z.number().min(1.01),
-  max_rounds: z.number().int().positive().nullable().optional(),
-  stop_on_profit_cdf: z.number().int().positive().nullable().optional(),
-  stop_on_loss_cdf: z.number().int().positive().nullable().optional(),
-});
-
-export const OkapiAutoProgressBodySchema = z.object({
-  session_id: z.string().uuid(),
-  delta_cdf: z.number().int(),
-  expected_rounds_played: z.number().int().nonnegative().optional(),
-});
-
-export const OkapiAutoStopBodySchema = z.object({
-  session_id: z.string().uuid(),
-  reason: z.enum(['completed', 'stopped', 'aborted']).optional(),
-});
-
-export const LotoTicketBodySchema = z.object({
-  numeros: z.array(z.number().int().min(1).max(49)).length(6),
-});
-
-export const FlashTicketBodySchema = z.object({
-  numeros: z.array(z.number().int().min(1).max(20)).length(5),
-});
-
-export const ScratchBuyBodySchema = z.object({
-  bet_amount_cdf: z.number().int(),
-  is_free_play: z.boolean().optional().default(false),
-});
-
-export const ScratchClaimBodySchema = z.object({
-  ticket_id: z.string().min(1),
 });
 
 export const OkapiColorTicketBodySchema = z.object({

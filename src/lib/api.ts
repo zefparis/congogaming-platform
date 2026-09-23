@@ -90,26 +90,6 @@ export const api = {
         welcome_bonus_credited_at: string | null;
       };
     }>('/api/me/referral'),
-  lotoTicket: (_user_id: string, numeros: number[]) =>
-    req<{ ticket_id: string; new_balance: number }>('/api/loto/ticket', { method: 'POST', body: JSON.stringify({ numeros }) }),
-  lotoLatest: () =>
-    req<{ tirage: null | { id: string; numeros: number[]; complementaire: number; jackpot: number; hash_pre: string; drawn_at: string }; pot_cdf: number }>('/api/loto/tirage/latest'),
-  lotoMesTickets: (_user_id?: string) =>
-    req<{ tickets: Array<{ id: string; numeros: number[]; prix_cdf: number; gains_cdf: number; nb_bons: number; status: 'pending' | 'gagnant' | 'perdant' | 'jackpot_attente'; jackpot_en_attente: boolean; tirage_id: string | null; created_at: string }> }>('/api/loto/mes-tickets'),
-  flashTicket: (_user_id: string, numeros: number[]) =>
-    req<{ ticket_id: string; new_balance: number }>('/api/flash/ticket', { method: 'POST', body: JSON.stringify({ numeros }) }),
-  flashLatest: () =>
-    req<{ tirage: null | { id: string; numeros: number[]; hash_pre: string; jackpot_paye: boolean; drawn_at: string }; pot_cdf: number }>('/api/flash/tirage/latest'),
-  flashMesTickets: (_user_id?: string) =>
-    req<{ tickets: Array<{ id: string; numeros: number[]; prix_cdf: number; gains_cdf: number; nb_bons: number; status: 'pending' | 'gagnant' | 'perdant' | 'jackpot_attente'; jackpot_en_attente: boolean; tirage_id: string | null; created_at: string }> }>('/api/flash/mes-tickets'),
-  freePlaysBalance: () =>
-    req<{ plays_remaining: number }>('/api/free-plays/balance'),
-  freePlaysCredit: (source = 'cognitive_test') =>
-    req<{ plays_remaining: number; credited: boolean }>('/api/free-plays/credit', { method: 'POST', body: JSON.stringify({ source }) }),
-  scratchBuy: (_user_id: string, bet_amount_cdf: number, is_free_play = false) =>
-    req<{ ticket_id: string; grid_hidden: true; bet_amount_cdf: number; grid: string[] }>('/api/scratch/buy', { method: 'POST', body: JSON.stringify({ bet_amount_cdf, is_free_play }) }),
-  scratchClaim: (_user_id: string, ticket_id: string) =>
-    req<{ win_amount_cdf: number; new_balance: number; grid: string[] }>('/api/scratch/claim', { method: 'POST', body: JSON.stringify({ ticket_id }) }),
   kycScan: (_user_id: string, selfie_b64: string) =>
     req<{ verdict: 'APPROVED' | 'DENIED' | 'VERIFY_AGE'; kyc_status: 'approved' | 'denied' | 'verify_age'; estimated_age: number; age_low: number; age_high: number; is_minor: boolean; scan_id: string; blocked: boolean }>('/api/kyc/scan', { method: 'POST', body: JSON.stringify({ selfie_b64 }) }),
   okapiColorLive: () =>
@@ -192,17 +172,4 @@ export const api = {
       new_cglt_balance: number;
       amount_cglt: number;
     }>('/api/cglt/withdraw', { method: 'POST', body: JSON.stringify({ amount_cglt, phone }) }),
-  farmingStatus: () =>
-    req<{
-      phone: string;
-      total_xp: number;
-      total_cglt_earned: number;
-      current_tier: { name: string; label: string; cglt_reward: number };
-      next_tier: { name: string; label: string; cglt_reward: number; xp_needed: number } | null;
-      progress_percent: number;
-      recent_rewards: Array<{ tier: string; cglt_amount: number; xp_at_reward: number; status: string; created_at: string }>;
-      tiers: Array<{ name: string; xp_min: number; xp_max: number | null; cglt_reward: number; label: string }>;
-    }>('/api/farming/status'),
 };
-
-export type FarmingStatus = Awaited<ReturnType<typeof api.farmingStatus>>;

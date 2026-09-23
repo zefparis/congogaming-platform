@@ -41,7 +41,10 @@ const TIERS = {
   diamond:  { label: 'DIAMOND',  color: '#00BFFF', next: null,   perks: '50 FC / ticket + 3% sur gains + paiement prioritaire' },
 } as const;
 
+// Historical commission types remain possible on past rows; okapi_color
+// is the only type still being written.
 const TYPE_LABEL: Record<string, string> = {
+  okapi_color: 'Okapi Color',
   flash:       'Flash',
   scratch:     'Grattage',
   okapi:       'Okapi Climb',
@@ -462,7 +465,7 @@ export default function AgentDashboard() {
               padding: '12px 16px', lineHeight: 1.6, marginTop: 8,
             }}>
               Vous gagnez 50 CDF sur chaque ticket joué par vos clients sur<br />
-              Flash Loto et Scratch.<br />
+              Okapi Color.<br />
               Les commissions sont actives tant que vos clients jouent sur Congo Gaming.<br />
               Congo Gaming se réserve le droit de modifier les conditions avec préavis de 30 jours.
             </div>

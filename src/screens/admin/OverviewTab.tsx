@@ -82,17 +82,13 @@ function Kpi({
 const ACTIVITY_ICON: Record<Activity['type'], React.ReactNode> = {
   deposit: <ArrowDownRight size={16} className="text-emerald-400" />,
   withdrawal: <ArrowUpRight size={16} className="text-amber-400" />,
-  okapi_bet: <Gamepad2 size={16} className="text-purple-400" />,
-  loto_ticket: <Ticket size={16} className="text-gold" />,
-  flash_ticket: <Ticket size={16} className="text-pink-400" />,
+  okapi_color_ticket: <Ticket size={16} className="text-gold" />,
 };
 
 const ACTIVITY_LABEL: Record<Activity['type'], string> = {
   deposit: 'Dépôt',
   withdrawal: 'Retrait',
-  okapi_bet: 'Okapi',
-  loto_ticket: 'Loto',
-  flash_ticket: 'Flash',
+  okapi_color_ticket: 'Okapi Color',
 };
 
 export default function OverviewTab() {
@@ -181,9 +177,9 @@ export default function OverviewTab() {
         />
         <Kpi
           icon={<Gamepad2 size={20} />}
-          label="Rounds générés aujourd'hui"
-          value={fmtInt(overview?.okapi_rounds_today ?? 0)}
-          hint="Parties générées par le moteur de jeu"
+          label="Tirages aujourd'hui"
+          value={fmtInt(overview?.okapi_color_draws_today ?? 0)}
+          hint="Tirages Okapi Color"
         />
       </div>
 
@@ -192,7 +188,7 @@ export default function OverviewTab() {
           icon={<ActivityIcon size={20} />}
           label="Joueurs actifs aujourd'hui"
           value={fmtInt(overview?.active_players_today ?? 0)}
-          hint="Distinct user_id sur okapi_bets"
+          hint="Distinct user_id sur okapi_color_tickets"
         />
         <Kpi
           icon={<ArrowDownRight size={20} />}
@@ -214,16 +210,10 @@ export default function OverviewTab() {
           accent={overview?.kyc?.verify_age ? '#fbbf24' : undefined}
         />
         <Kpi
-          icon={<TrendingUp size={20} />}
-          label="Crash point moyen (jour)"
-          value={`${(overview?.avg_crash_point ?? 0).toFixed(2)}×`}
-          hint="Moyenne crash_point"
-        />
-        <Kpi
           icon={<Ticket size={20} />}
-          label="Tickets Loto (jour)"
-          value={fmtInt(overview?.loto_tickets_today ?? 0)}
-          hint="Loto Congo + Flash"
+          label="Tickets vendus (jour)"
+          value={fmtInt(overview?.okapi_color_tickets_today ?? 0)}
+          hint="Okapi Color"
         />
       </div>
 
@@ -272,7 +262,7 @@ export default function OverviewTab() {
       <div className="rounded-2xl border border-white/5 bg-black/30 p-5">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-xl tracking-wider text-gold">Revenus — 7 derniers jours</h3>
-          <span className="text-xs text-white/40">House profit Okapi Climb (CDF)</span>
+          <span className="text-xs text-white/40">House profit Okapi Color (CDF)</span>
         </div>
         <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">

@@ -20,18 +20,12 @@ const envSchema = z.object({
   PG_PROXY_URL: z.string().url('PG_PROXY_URL must be a valid URL').optional(),
   ALLOWED_ORIGINS: z.string().optional(),
   LOTO_ADMIN_SECRET: z.string().optional(),
-  LOTO_JACKPOT_CDF: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).optional(),
-  LOTO_MIN_TICKETS: z.string().transform((val) => Number(val)).pipe(z.number().int().nonnegative()).optional(),
-  FLASH_ADMIN_SECRET: z.string().optional(),
-  FLASH_JACKPOT_CDF: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).optional(),
-  FLASH_MIN_TICKETS: z.string().transform((val) => Number(val)).pipe(z.number().int().nonnegative()).optional(),
   AUTH_MAX_FAILURES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('5'),
   AUTH_LOCKOUT_MINUTES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('15'),
   // Mobile gaming app: default to 15 min; override via env var for longer sessions.
   // Never raise above 86400 (24h) without a token revocation mechanism.
   ACCESS_TOKEN_TTL_SECONDS: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('900'),
   VITE_API_URL: z.string().optional(),
-  VITE_WS_URL: z.string().optional(),
   // UniPay CGLT gaming integration (server-to-server; key must NOT be bundled)
   UNIPAY_API_URL: z.string().url().optional(),
   // Trust boundary 1 sender: CongoGaming → UniPay API (new dedicated key)
@@ -40,10 +34,6 @@ const envSchema = z.object({
   GAMING_API_KEY: z.string().min(8).optional(),
   // Feature flags. Defaults preserve the production behaviour; set the
   // env var explicitly per environment to flip the flag.
-  CONGO_LOTO_ENABLED: z
-    .string()
-    .transform((val) => val.toLowerCase() === 'true')
-    .default('true'),
   OKAPI_COLOR_ENABLED: z
     .string()
     .transform((val) => val.toLowerCase() === 'true')

@@ -5,7 +5,7 @@ import { getSession } from '../lib/auth';
 /**
  * Reads the player's CGLT balance from the UniPay wallet via our backend
  * proxy (`GET /api/cglt/balance`, session-authenticated). The shared
- * GAMING_API_KEY never reaches the browser. Used by the header, Okapi Climb
+ * GAMING_API_KEY never reaches the browser. Used by the home wallet card
  * and the CDF→CGLT swap modal.
  *
  * IMPORTANT: This hook checks for an active session before making any API

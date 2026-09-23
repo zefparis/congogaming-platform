@@ -365,7 +365,7 @@ describe('Secret admin - cloisonnement Okapi Color', () => {
     assert.equal(resolveOkapiColorAdminSecret({ OKAPI_COLOR_ADMIN_SECRET: 'oc-secret' }), 'oc-secret');
   });
 
-  it('retourne une chaîne vide si non configuré (jamais de fallback LOTO)', () => {
+  it('retourne une chaîne vide si non configuré (jamais de fallback)', () => {
     assert.equal(resolveOkapiColorAdminSecret({}), '');
   });
 });

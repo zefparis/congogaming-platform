@@ -17,7 +17,7 @@ import { env } from '../env.js';
 // live entirely in localStorage on the client. We therefore validate that the
 // supplied user_id corresponds to an existing, non-blocked user, but cannot
 // cryptographically prove it's the legitimate owner. This is consistent with
-// the rest of the app (loto/flash/withdraw all do the same). Tightening this
+// the rest of the app (ticket purchase, withdraw all do the same). Tightening this
 // is a follow-up across all routes, not specific to KYC.
 
 const PG_PROXY_URL = env.PG_PROXY_URL || 'https://playguard.vercel.app/api/proxy';

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import SwapCGLTModal from '../components/SwapCGLTModal';
+import WithdrawCGLTModal from '../components/WithdrawCGLTModal';
 import { AlertTriangle, BadgeCheck, Check, Copy, Gift, Globe, KeyRound, LogOut, Pause, Pencil, Phone, ShieldAlert, ShieldCheck, Share2, ShieldOff, TrendingDown, TrendingUp, Trophy, User, Users, Wallet, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import TransactionItem, { type TransactionType } from '../components/TransactionItem';
@@ -73,8 +74,9 @@ export default function AccountScreen() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
 
-  // CDF→CGLT swap modal (also auto-opened from games).
+  // CDF→CGLT swap modal and CGLT→Mobile Money withdrawal modal.
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showCgltWithdrawModal, setShowCgltWithdrawModal] = useState(false);
 
   useEffect(() => {
     refreshSession().then((u) => {
@@ -361,18 +363,32 @@ export default function AccountScreen() {
           <div className="text-xs text-zinc-500 uppercase tracking-widest">{t('account.balance_label')}</div>
           <div className="font-display text-3xl text-gold">{balance.toLocaleString('fr-FR')} <span className="text-xs text-zinc-400">CDF</span></div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowSwapModal(true)}
-          className="shrink-0 h-10 px-4 rounded-xl font-bold text-sm text-black"
-          style={{ background: 'linear-gradient(90deg, #FFD700, #38BDF8)' }}
-        >
-          Obtenir CGLT 💎
-        </button>
+        <div className="shrink-0 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSwapModal(true)}
+            className="h-10 px-4 rounded-xl font-bold text-sm text-black"
+            style={{ background: 'linear-gradient(90deg, #FFD700, #38BDF8)' }}
+          >
+            Obtenir CGLT 💎
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCgltWithdrawModal(true)}
+            className="h-10 px-4 rounded-xl font-bold text-sm border"
+            style={{ borderColor: 'rgba(56,189,248,0.5)', color: '#38BDF8', background: 'rgba(56,189,248,0.08)' }}
+          >
+            Retirer CGLT
+          </button>
+        </div>
       </div>
 
       {showSwapModal && (
         <SwapCGLTModal onClose={() => setShowSwapModal(false)} />
+      )}
+
+      {showCgltWithdrawModal && (
+        <WithdrawCGLTModal onClose={() => setShowCgltWithdrawModal(false)} />
       )}
 
       {/* KYC Status */}

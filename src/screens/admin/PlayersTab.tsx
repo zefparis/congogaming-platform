@@ -287,24 +287,24 @@ function Drawer({
 
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-                <div className="text-[11px] uppercase tracking-wider text-white/40">Rounds Okapi</div>
-                <div className="mt-1 text-white">{data.okapi.rounds_played}</div>
+                <div className="text-[11px] uppercase tracking-wider text-white/40">Tickets Okapi Color</div>
+                <div className="mt-1 text-white">{data.okapi_color.tickets_played}</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
                 <div className="text-[11px] uppercase tracking-wider text-white/40">Misé</div>
-                <div className="mt-1 text-white">{fmtCdf(data.okapi.total_wagered_cdf)}</div>
+                <div className="mt-1 text-white">{fmtCdf(data.okapi_color.total_wagered_cdf)}</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
                 <div className="text-[11px] uppercase tracking-wider text-white/40">Gagné</div>
-                <div className="mt-1 text-white">{fmtCdf(data.okapi.total_won_cdf)}</div>
+                <div className="mt-1 text-white">{fmtCdf(data.okapi_color.total_won_cdf)}</div>
               </div>
               <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
                 <div className="text-[11px] uppercase tracking-wider text-white/40">P&L joueur</div>
                 <div
                   className="mt-1 font-semibold"
-                  style={{ color: data.okapi.pnl_cdf >= 0 ? '#34d399' : '#f87171' }}
+                  style={{ color: data.okapi_color.pnl_cdf >= 0 ? '#34d399' : '#f87171' }}
                 >
-                  {fmtCdf(data.okapi.pnl_cdf)}
+                  {fmtCdf(data.okapi_color.pnl_cdf)}
                 </div>
               </div>
             </div>
@@ -735,12 +735,12 @@ export default function PlayersTab() {
             )}
             {rows.map((u) => {
               const bigLoser = (u.pnl_cdf ?? 0) < -50_000;
-              const excessivePlay = (u.rounds_24h ?? 0) > 100;
+              const excessivePlay = (u.tickets_24h ?? 0) > 100;
               const selfExcluded = u.self_exclusion_until && new Date(u.self_exclusion_until).getTime() > Date.now();
               const atRisk = bigLoser || excessivePlay;
               const reasons: string[] = [];
               if (bigLoser) reasons.push(`P&L ${fmtCdf(u.pnl_cdf)}`);
-              if (excessivePlay) reasons.push(`${u.rounds_24h} rounds/24h`);
+              if (excessivePlay) reasons.push(`${u.tickets_24h} tickets/24h`);
               return (
                 <tr
                   key={u.id}

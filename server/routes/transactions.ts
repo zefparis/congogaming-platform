@@ -22,22 +22,14 @@ export default async function transactionsRoutes(app: FastifyInstance) {
     const userId = req.user.id;
 
     try {
-      const [txRes, lotoRes, flashRes, okapiRes] = await Promise.all([
+      const [txRes, ocRes] = await Promise.all([
         supabaseAdmin
           .from('transactions')
           .select('type, amount, status')
           .eq('user_id', userId),
         supabaseAdmin
-          .from('loto_tickets')
+          .from('okapi_color_tickets')
           .select('prix_cdf, gains_cdf, status')
-          .eq('user_id', userId),
-        supabaseAdmin
-          .from('flash_tickets')
-          .select('prix_cdf, gains_cdf, status')
-          .eq('user_id', userId),
-        supabaseAdmin
-          .from('okapi_bets')
-          .select('amount_cdf, win_amount_cdf, status')
           .eq('user_id', userId),
       ]);
 
@@ -62,29 +54,11 @@ export default async function transactionsRoutes(app: FastifyInstance) {
       let totalWin = 0;
       let winsCount = 0;
 
-      for (const r of lotoRes.data || []) {
+      for (const r of ocRes.data || []) {
+        if (r.status === 'pending' || r.status === 'cancelled') continue;
         betsCount += 1;
         totalBet += Number(r.prix_cdf || 0);
         const g = Number(r.gains_cdf || 0);
-        if (g > 0) {
-          totalWin += g;
-          winsCount += 1;
-        }
-      }
-      for (const r of flashRes.data || []) {
-        betsCount += 1;
-        totalBet += Number(r.prix_cdf || 0);
-        const g = Number(r.gains_cdf || 0);
-        if (g > 0) {
-          totalWin += g;
-          winsCount += 1;
-        }
-      }
-      for (const r of okapiRes.data || []) {
-        if (r.status === 'pending') continue;
-        betsCount += 1;
-        totalBet += Number(r.amount_cdf || 0);
-        const g = Number(r.win_amount_cdf || 0);
         if (g > 0) {
           totalWin += g;
           winsCount += 1;
