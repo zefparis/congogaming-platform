@@ -73,6 +73,13 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.toLowerCase() !== 'false')
     .default('true'),
+  // Kill switch for agent commissions (ticket + win). When 'false',
+  // recordAgentCommission / recordAgentWinCommission become no-ops —
+  // everything else (agent dashboard, payout requests, admin) keeps working.
+  AGENT_COMMISSIONS_ENABLED: z
+    .string()
+    .transform((val) => val.toLowerCase() !== 'false')
+    .default('true'),
 });
 
 export type Env = z.infer<typeof envSchema>;

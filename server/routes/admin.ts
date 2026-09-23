@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { getMerchantBalance } from '../lib/unipesa.js';
 import { getUnipesaCircuitInfo } from '../lib/unipesa-resilience.js';
 import { tryNormalizeDrcPhone } from '../lib/phone.js';
+import { computeEligibleCommissions, validatePayoutAmount } from '../lib/agentPayout.js';
 import { recordLedgerEntry } from '../lib/ledger.js';
 import { acquireJobLock } from '../lib/jobLock.js';
 import { env } from '../env.js';
@@ -1136,7 +1137,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     display_name: z.string().trim().min(1, 'display_name requis'),
     zone: z.string().trim().optional(),
     commission_rate: z.number().min(0).max(0.20, 'commission_rate must be between 0 and 0.20').optional(),
-    phone: z.string().trim().min(1, 'phone requis'),
+    // Stored canonical (0XXXXXXXXX) so the self-commission phone check is reliable.
+    phone: z.string().trim().min(1, 'phone requis').transform((v, ctx) => {
+      const n = tryNormalizeDrcPhone(v);
+      if (!n) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Téléphone RDC invalide' }); return z.NEVER; }
+      return n;
+    }),
     operator: z.enum(AGENT_OPERATORS, { errorMap: () => ({ message: 'operator invalide' }) }),
     notes: z.string().trim().optional(),
     pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits').optional(),
@@ -1192,7 +1198,12 @@ export default async function adminRoutes(app: FastifyInstance) {
     status: z.enum(['active', 'suspended']).optional(),
     zone: z.string().trim().optional(),
     commission_rate: z.number().min(0).max(0.20, 'commission_rate must be between 0 and 0.20').optional(),
-    phone: z.string().trim().optional(),
+    phone: z.string().trim().optional().transform((v, ctx) => {
+      if (v === undefined) return undefined;
+      const n = tryNormalizeDrcPhone(v);
+      if (!n) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Téléphone RDC invalide' }); return z.NEVER; }
+      return n;
+    }),
     operator: z.enum(AGENT_OPERATORS, { errorMap: () => ({ message: 'operator invalide' }) }).optional(),
     notes: z.string().trim().optional(),
     pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4-6 digits').optional(),
@@ -1252,34 +1263,98 @@ export default async function adminRoutes(app: FastifyInstance) {
     },
   );
 
-  // POST /api/admin/agents/:id/pay — mark all pending commissions as paid
+  // POST /api/admin/agents/:id/pay — record a traceable agent payout.
+  //
+  // Body: { amount_cdf, operator, reference } — the amount actually sent via
+  // mobile money, the operator used, and the provider transaction reference.
+  //
+  // Only pending commissions created BEFORE the agent's payout request
+  // (payout_requested_at) are settled; later commissions stay pending for
+  // the next cycle. The entered amount must equal the eligible total —
+  // partial payment and overpayment are refused with the expected amount.
+  //
+  // The atomic RPC pay_agent_commissions_atomic (SELECT FOR UPDATE on the
+  // agent row) is the authority; the pre-validation below exists only to
+  // return precise error codes without entering the RPC.
+  const PayAgentSchema = z.object({
+    amount_cdf: z.number().int().positive('amount_cdf doit être un entier > 0'),
+    operator: z.enum(AGENT_OPERATORS, { errorMap: () => ({ message: 'operator invalide' }) }),
+    reference: z.string().trim().min(3, 'Référence de transaction requise (min 3 caractères)').max(64),
+  });
+
   app.post<{ Params: { id: string } }>(
     '/api/admin/agents/:id/pay',
     { preHandler: requireSuperAdmin },
     async (req, reply) => {
       const { id } = req.params;
+      const parsed = PayAgentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message || 'Invalid body' });
+      }
+      const { amount_cdf, operator, reference } = parsed.data;
 
-      const { data: pendingRows } = await supabaseAdmin
-        .from('agent_commissions')
-        .select('commission_cdf')
-        .eq('agent_id', id)
-        .eq('status', 'pending');
-      const paid_cdf = (pendingRows || []).reduce((s, c) => s + Number(c.commission_cdf), 0);
-
-      const { error: payErr } = await supabaseAdmin
-        .from('agent_commissions')
-        .update({ status: 'paid' })
-        .eq('agent_id', id)
-        .eq('status', 'pending');
-      if (payErr) return reply.code(500).send({ error: payErr.message });
-
-      await supabaseAdmin
+      const { data: agent, error: agentErr } = await supabaseAdmin
         .from('agents')
-        .update({ payout_requested_at: null, payout_requested_amount_cdf: null })
-        .eq('id', id);
+        .select('id, payout_requested_at')
+        .eq('id', id)
+        .maybeSingle();
+      if (agentErr) return reply.code(500).send({ error: agentErr.message });
+      if (!agent) return reply.code(404).send({ error: 'Agent introuvable' });
+      if (!agent.payout_requested_at) {
+        return reply.code(400).send({ code: 'NO_PAYOUT_REQUEST', error: 'Aucune demande de paiement active pour cet agent' });
+      }
 
-      await audit(req, 'agent_payout', null, null, null, { agent_id: id, paid_cdf });
-      return reply.send({ ok: true, paid_cdf });
+      // Pre-validation (UX): compute the eligible set the RPC will settle.
+      const { data: pendingRows, error: pendErr } = await supabaseAdmin
+        .from('agent_commissions')
+        .select('id, commission_cdf, created_at')
+        .eq('agent_id', id)
+        .eq('status', 'pending');
+      if (pendErr) return reply.code(500).send({ error: pendErr.message });
+
+      const { total } = computeEligibleCommissions(
+        (pendingRows || []) as { id: string; commission_cdf: number; created_at: string }[],
+        agent.payout_requested_at,
+      );
+      if (total <= 0) {
+        return reply.code(400).send({ code: 'NOTHING_TO_PAY', error: 'Aucune commission éligible à ce paiement' });
+      }
+      const amountCheck = validatePayoutAmount(amount_cdf, total);
+      if (!amountCheck.ok) {
+        return reply.code(400).send({
+          code: 'AMOUNT_MISMATCH',
+          error: `Le montant saisi (${amount_cdf} CDF) ne correspond pas au total des commissions éligibles (${total} CDF)`,
+          expected: total,
+        });
+      }
+
+      const { data: rpcRows, error: rpcErr } = await supabaseAdmin
+        .rpc('pay_agent_commissions_atomic', {
+          p_agent_id:      id,
+          p_amount_cdf:    amount_cdf,
+          p_operator:      operator,
+          p_reference:     reference,
+          p_admin_user_id: req.admin?.userId ?? null,
+        });
+      if (rpcErr) return reply.code(500).send({ error: rpcErr.message });
+
+      const row = (rpcRows || [])[0] as
+        | { ok: boolean; code: string | null; payout_id: string | null; expected: number; paid_count: number }
+        | undefined;
+      if (!row) return reply.code(500).send({ error: 'payout_rpc_no_result' });
+
+      if (!row.ok) {
+        if (row.code === 'AGENT_NOT_FOUND')    return reply.code(404).send({ error: 'Agent introuvable' });
+        if (row.code === 'NO_PAYOUT_REQUEST')  return reply.code(400).send({ code: 'NO_PAYOUT_REQUEST', error: 'Aucune demande de paiement active pour cet agent' });
+        if (row.code === 'NOTHING_TO_PAY')     return reply.code(400).send({ code: 'NOTHING_TO_PAY', error: 'Aucune commission éligible à ce paiement' });
+        if (row.code === 'AMOUNT_MISMATCH')    return reply.code(400).send({ code: 'AMOUNT_MISMATCH', error: `Montant attendu : ${row.expected} CDF`, expected: row.expected });
+        return reply.code(500).send({ error: row.code || 'payout_failed' });
+      }
+
+      await audit(req, 'agent_payout', null, row.expected, reference, {
+        agent_id: id, payout_id: row.payout_id, operator, paid_count: row.paid_count,
+      });
+      return reply.send({ ok: true, paid_cdf: row.expected, payout_id: row.payout_id, paid_count: row.paid_count });
     },
   );
 

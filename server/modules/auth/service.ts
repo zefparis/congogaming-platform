@@ -4,6 +4,7 @@ import type { AuthUser } from './types.js';
 
 import { env } from '../../env.js';
 import { toUnipayPhone } from '../../lib/unipay-cglt.js';
+import { phonesMatchCanonical } from '../../lib/phone.js';
 
 const MAX_LOGIN_FAILURES = env.AUTH_MAX_FAILURES;
 const LOCKOUT_MINUTES = env.AUTH_LOCKOUT_MINUTES;
@@ -95,11 +96,17 @@ export async function registerUser(input: { phone: string; pin: string; referral
   if (agentCode) {
     const { data: agentRow } = await supabaseAdmin
       .from('agents')
-      .select('id')
+      .select('id, phone')
       .eq('qr_code', agentCode)
       .eq('status', 'active')
       .maybeSingle();
-    if (agentRow?.id) agentRefId = String(agentRow.id);
+    // Anti self-commission: never attach the agent's own phone number as a
+    // referred player, regardless of which AG- code was used. input.phone is
+    // already canonical (CongoPhoneSchema); agent.phone is normalized on the
+    // fly to cover legacy free-form values.
+    if (agentRow?.id && !phonesMatchCanonical(input.phone, agentRow.phone)) {
+      agentRefId = String(agentRow.id);
+    }
   }
 
   // Generate a unique referral code for this new user (RPC handles uniqueness).

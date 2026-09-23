@@ -116,7 +116,7 @@ export default async function agentsPublicRoutes(app: FastifyInstance) {
       // Look up agent first (needed to verify token belongs to this agent)
       const { data: agent, error } = await supabaseAdmin
         .from('agents')
-        .select('id, display_name, zone, status, total_earned_cdf, commission_rate, phone, operator, notes, min_payout_cdf, payout_requested_at, payout_requested_amount_cdf')
+        .select('id, display_name, zone, status, total_earned_cdf, commission_rate, phone, operator, min_payout_cdf, payout_requested_at, payout_requested_amount_cdf')
         .eq('qr_code', qrCode.toUpperCase())
         .eq('status', 'active')
         .maybeSingle();

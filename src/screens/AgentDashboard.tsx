@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import QrImage from '../components/QrImage';
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.congogaming.com';
 const PLAY_URL = (import.meta.env.VITE_PLAY_URL as string | undefined) || 'https://www.congogaming.com';
@@ -58,7 +59,6 @@ interface AgentData {
     total_earned_cdf: number;
     phone: string | null;
     operator: string | null;
-    notes: string | null;
     min_payout_cdf: number;
     payout_requested_at: string | null;
     payout_requested_amount_cdf: number | null;
@@ -191,7 +191,6 @@ export default function AgentDashboard() {
   }, [qrCode]);
 
   const regUrl = `${PLAY_URL}/register?ref=${qrCode?.toUpperCase()}`;
-  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(regUrl)}`;
 
   if (loading) {
     return (
@@ -287,7 +286,7 @@ export default function AgentDashboard() {
 
       {/* QR code */}
       <div style={{ background: '#fff', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <img src={qrImgUrl} alt="QR Code" width={200} height={200} style={{ borderRadius: 8 }} />
+        <QrImage value={regUrl} size={200} alt="QR Code" className="rounded-lg" />
         <p style={{ color: '#04080f', fontWeight: 700, letterSpacing: 3, fontFamily: 'monospace', fontSize: 18 }}>{qrCode?.toUpperCase()}</p>
         <p style={{ color: '#04080f80', fontSize: 11, textAlign: 'center', wordBreak: 'break-all' }}>{regUrl}</p>
       </div>

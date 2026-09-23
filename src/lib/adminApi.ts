@@ -181,6 +181,7 @@ export interface AgentCommission {
   commission_cdf: number;
   commission_type: string;
   status: 'pending' | 'paid';
+  payout_id?: string | null;
   created_at: string;
 }
 
@@ -458,8 +459,11 @@ export const adminApi = {
   agentCommissions: (id: string) =>
     request<{ commissions: AgentCommission[] }>(`/api/admin/agents/${id}/commissions`),
 
-  agentPay: (id: string) =>
-    request<{ ok: boolean }>(`/api/admin/agents/${id}/pay`, { method: 'POST' }),
+  agentPay: (id: string, body: { amount_cdf: number; operator: string; reference: string }) =>
+    request<{ ok: boolean; paid_cdf: number; payout_id: string; paid_count: number }>(
+      `/api/admin/agents/${id}/pay`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   exportTransactionsUrl: (params: Record<string, string | undefined>) => {
     const qs = new URLSearchParams();

@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react';
 import { adminApi, Agent, AgentCommission } from '../../lib/adminApi';
 import { fmtCdf, fmtDateTime } from './format';
+import QrImage, { useQrDataUrl } from '../../components/QrImage';
 
 const PLAY_URL = (import.meta.env.VITE_PLAY_URL as string | undefined) || 'https://www.congogaming.com';
 
-function qrImgUrl(qrCode: string, size = 140): string {
-  const target = `${PLAY_URL}/register?ref=${qrCode}`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(target)}`;
+function regUrlFor(qrCode: string): string {
+  return `${PLAY_URL}/register?ref=${qrCode}`;
+}
+
+function QrDownload({ qrCode }: { qrCode: string }) {
+  const url = useQrDataUrl(regUrlFor(qrCode), 400);
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      download={`qr-${qrCode}.png`}
+      className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
+    >
+      ↓ QR
+    </a>
+  );
 }
 
 function getTierColor(total: number): string {
@@ -30,11 +44,27 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function CommissionsDrawer({ agentId, onClose }: { agentId: string; onClose: () => void }) {
+function CommissionsDrawer({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const [rows, setRows] = useState<AgentCommission[]>([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [msg, setMsg] = useState('');
+  const [payError, setPayError] = useState('');
+
+  const agentId = agent.id;
+  const requestedAt = agent.payout_requested_at ? new Date(agent.payout_requested_at).getTime() : null;
+
+  // Seules les commissions pending créées AVANT la demande de payout sont
+  // éligibles — les suivantes restent pending pour le cycle suivant.
+  const eligibleRows = rows.filter(c =>
+    c.status === 'pending' && requestedAt !== null && new Date(c.created_at).getTime() < requestedAt,
+  );
+  const eligibleTotal = eligibleRows.reduce((s, c) => s + Number(c.commission_cdf), 0);
+  const eligibleIds = new Set(eligibleRows.map(c => c.id));
+
+  const [payAmount, setPayAmount] = useState('');
+  const [payOperator, setPayOperator] = useState(agent.operator ?? '');
+  const [payReference, setPayReference] = useState('');
 
   useEffect(() => {
     adminApi.agentCommissions(agentId)
@@ -43,15 +73,33 @@ function CommissionsDrawer({ agentId, onClose }: { agentId: string; onClose: () 
       .finally(() => setLoading(false));
   }, [agentId]);
 
-  async function handlePay() {
-    if (!confirm('Marquer toutes les commissions en attente comme payées ?')) return;
+  useEffect(() => {
+    if (eligibleTotal > 0 && !payAmount) setPayAmount(String(eligibleTotal));
+  }, [eligibleTotal, payAmount]);
+
+  async function handlePay(e: React.FormEvent) {
+    e.preventDefault();
+    if (paying) return;
+    setPayError('');
+    const amount = Number(payAmount);
+    if (!Number.isInteger(amount) || amount <= 0) { setPayError('Montant invalide'); return; }
+    if (!payOperator) { setPayError('Opérateur requis'); return; }
+    if (payReference.trim().length < 3) { setPayError('Référence de transaction requise (min 3 caractères)'); return; }
     try {
       setPaying(true);
-      await adminApi.agentPay(agentId);
-      setRows(prev => prev.map(c => ({ ...c, status: 'paid' as const })));
-      setMsg('✓ Commissions marquées comme payées');
+      const res = await adminApi.agentPay(agentId, {
+        amount_cdf: amount,
+        operator: payOperator,
+        reference: payReference.trim(),
+      });
+      setRows(prev => prev.map(c =>
+        eligibleIds.has(c.id) ? { ...c, status: 'paid' as const, payout_id: res.payout_id } : c,
+      ));
+      setMsg(`✓ Paiement enregistré — ${fmtCdf(res.paid_cdf)} (${res.paid_count} commissions)`);
+      setPayAmount('');
+      setPayReference('');
     } catch (e: any) {
-      setMsg(`Erreur: ${e?.message}`);
+      setPayError(e?.message || 'Erreur');
     } finally {
       setPaying(false);
     }
@@ -66,20 +114,65 @@ function CommissionsDrawer({ agentId, onClose }: { agentId: string; onClose: () 
         onClick={e => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Commissions</h3>
-          <div className="flex items-center gap-3">
-            {pending > 0 && (
-              <button
-                onClick={handlePay}
-                disabled={paying}
-                className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {paying ? '...' : `Payer ${fmtCdf(pending)}`}
-              </button>
-            )}
-            <button onClick={onClose} className="text-white/40 hover:text-white/80">✕</button>
-          </div>
+          <h3 className="text-lg font-semibold text-white">Commissions — {agent.display_name}</h3>
+          <button onClick={onClose} className="text-white/40 hover:text-white/80">✕</button>
         </div>
+
+        {/* Payout form — requires an active payout request from the agent.
+            Only commissions created BEFORE payout_requested_at are eligible. */}
+        {requestedAt === null ? (
+          <p className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/50">
+            Aucune demande de paiement active de la part de cet agent.
+          </p>
+        ) : (
+          <form onSubmit={handlePay} className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <p className="mb-2 text-xs text-amber-300">
+              Paiement demandé le {fmtDateTime(agent.payout_requested_at!)} — éligible : <b>{fmtCdf(eligibleTotal)}</b>
+              {pending > eligibleTotal && (
+                <span className="text-white/40"> ({fmtCdf(pending - eligibleTotal)} postérieur à la demande restera en attente)</span>
+              )}
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-white/40">Montant (CDF)</span>
+                <input
+                  value={payAmount}
+                  onChange={e => setPayAmount(e.target.value.replace(/\D/g, ''))}
+                  inputMode="numeric"
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white outline-none focus:border-white/30"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-white/40">Opérateur</span>
+                <select
+                  value={payOperator}
+                  onChange={e => setPayOperator(e.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-[#0f0f16] px-2 py-1.5 text-sm text-white outline-none focus:border-white/30"
+                >
+                  <option value="">—</option>
+                  {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-white/40">Référence transaction</span>
+                <input
+                  value={payReference}
+                  onChange={e => setPayReference(e.target.value)}
+                  placeholder="Ex: MP240923..."
+                  className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white outline-none focus:border-white/30"
+                />
+              </label>
+            </div>
+            {payError && <p className="mt-2 text-xs text-red-400">{payError}</p>}
+            <button
+              type="submit"
+              disabled={paying || eligibleTotal <= 0}
+              className="mt-3 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {paying ? '...' : `Confirmer le paiement (${fmtCdf(eligibleTotal)})`}
+            </button>
+          </form>
+        )}
         {msg && <p className="mb-3 text-sm text-emerald-400">{msg}</p>}
         {loading ? (
           <p className="text-sm text-white/40">Chargement…</p>
@@ -92,6 +185,7 @@ function CommissionsDrawer({ agentId, onClose }: { agentId: string; onClose: () 
                 <tr className="border-b border-white/10 text-white/40 text-xs">
                   <th className="py-2 text-left">Date</th>
                   <th className="py-2 text-left">Jeu</th>
+                  <th className="py-2 text-center">Cycle</th>
                   <th className="py-2 text-right">Ticket</th>
                   <th className="py-2 text-right">Commission</th>
                   <th className="py-2 text-center">Statut</th>
@@ -102,6 +196,15 @@ function CommissionsDrawer({ agentId, onClose }: { agentId: string; onClose: () 
                   <tr key={c.id} className="border-b border-white/5 text-white/80">
                     <td className="py-1.5">{fmtDateTime(c.created_at)}</td>
                     <td className="py-1.5 capitalize">{c.ticket_type.replace('_', ' ')}</td>
+                    <td className="py-1.5 text-center text-[10px]">
+                      {c.status === 'paid' ? (
+                        <span className="text-white/30">—</span>
+                      ) : eligibleIds.has(c.id) ? (
+                        <span className="text-emerald-400">éligible</span>
+                      ) : (
+                        <span className="text-white/30">prochain cycle</span>
+                      )}
+                    </td>
                     <td className="py-1.5 text-right">{fmtCdf(c.ticket_amount_cdf)}</td>
                     <td className="py-1.5 text-right text-emerald-400 font-semibold">{fmtCdf(c.commission_cdf)}</td>
                     <td className="py-1.5 text-center">
@@ -404,7 +507,7 @@ export default function AgentsTab() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [drawerAgentId, setDrawerAgentId] = useState<string | null>(null);
+  const [drawerAgent, setDrawerAgent] = useState<Agent | null>(null);
   const [editAgent, setEditAgent] = useState<Agent | null>(null);
 
   useEffect(() => {
@@ -435,7 +538,7 @@ export default function AgentsTab() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {agents.map(agent => {
-            const regUrl = `${PLAY_URL}/register?ref=${agent.qr_code}`;
+            const regUrl = regUrlFor(agent.qr_code);
             return (
               <div
                 key={agent.id}
@@ -468,12 +571,11 @@ export default function AgentsTab() {
                 )}
 
                 <div className="flex items-center gap-3">
-                  <img
-                    src={qrImgUrl(agent.qr_code, 80)}
+                  <QrImage
+                    value={regUrl}
+                    size={80}
                     alt={`QR ${agent.qr_code}`}
                     className="rounded-lg border border-white/10"
-                    width={80}
-                    height={80}
                   />
                   <div className="min-w-0 flex-1 text-xs">
                     <p className="font-mono text-gold tracking-wider">{agent.qr_code}</p>
@@ -494,20 +596,12 @@ export default function AgentsTab() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setDrawerAgentId(agent.id)}
+                    onClick={() => setDrawerAgent(agent)}
                     className="flex-1 rounded-lg border border-white/10 py-1.5 text-xs text-white/70 hover:bg-white/5"
                   >
                     Commissions
                   </button>
-                  <a
-                    href={qrImgUrl(agent.qr_code, 400)}
-                    download={`qr-${agent.qr_code}.png`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
-                  >
-                    ↓ QR
-                  </a>
+                  <QrDownload qrCode={agent.qr_code} />
                   <button
                     onClick={() => setEditAgent(agent)}
                     className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:bg-white/5"
@@ -534,8 +628,8 @@ export default function AgentsTab() {
           onClose={() => setEditAgent(null)}
         />
       )}
-      {drawerAgentId && (
-        <CommissionsDrawer agentId={drawerAgentId} onClose={() => setDrawerAgentId(null)} />
+      {drawerAgent && (
+        <CommissionsDrawer agent={drawerAgent} onClose={() => setDrawerAgent(null)} />
       )}
     </div>
   );

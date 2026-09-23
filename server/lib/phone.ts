@@ -51,6 +51,28 @@ export function tryNormalizeDrcPhone(input: string): string | null {
 }
 
 /**
+ * Returns true when both inputs normalize to the SAME canonical DRC
+ * mobile number. Either side may be in any accepted input format
+ * (`0XXXXXXXXX`, `+243XXXXXXXXX`, `243XXXXXXXXX`, `9XXXXXXXX`, …) — both
+ * are normalized through `tryNormalizeDrcPhone` before comparison, so
+ * `+243997174837` and `0997174837` match.
+ *
+ * Fail-open: returns false when either side is missing or not a valid
+ * DRC mobile number (we cannot prove they are the same person, so we
+ * do not block). Callers that need a strict guarantee must ensure the
+ * agent phone is validated at write time.
+ */
+export function phonesMatchCanonical(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  if (!a || !b) return false;
+  const na = tryNormalizeDrcPhone(a);
+  const nb = tryNormalizeDrcPhone(b);
+  return na !== null && na === nb;
+}
+
+/**
  * Format a canonical DRC phone for the format expected by Unipesa / AvadaPay,
  * per provider. The input MUST already be canonical (`0XXXXXXXXX`).
  *

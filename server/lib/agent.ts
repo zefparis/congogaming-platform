@@ -1,4 +1,6 @@
 import { supabaseAdmin } from './supabase.js';
+import { phonesMatchCanonical } from './phone.js';
+import { env } from '../env.js';
 
 export async function recordAgentCommission(
   userId: string,
@@ -7,9 +9,11 @@ export async function recordAgentCommission(
   amountCdf: number,
 ): Promise<void> {
   try {
+    if (!env.AGENT_COMMISSIONS_ENABLED) return;
+
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('agent_ref')
+      .select('agent_ref, phone')
       .eq('id', userId)
       .single();
 
@@ -17,11 +21,19 @@ export async function recordAgentCommission(
 
     const { data: agent } = await supabaseAdmin
       .from('agents')
-      .select('id, commission_rate, status')
+      .select('id, commission_rate, status, phone')
       .eq('id', user.agent_ref)
       .single();
 
     if (!agent || agent.status !== 'active') return;
+
+    // Anti self-commission: an agent playing under their own code must not
+    // earn commission on their own tickets. Both numbers are normalized to
+    // canonical DRC form before comparison.
+    if (phonesMatchCanonical(user.phone, agent.phone)) {
+      console.warn(`[agent-commission] self-commission blocked: user ${userId} / agent ${agent.id}`);
+      return;
+    }
 
     const commissionCdf = Math.floor(amountCdf * Number(agent.commission_rate));
     if (commissionCdf <= 0) return;
@@ -80,16 +92,24 @@ export async function recordAgentWinCommission(
   gainCdf: number,
 ): Promise<void> {
   try {
+    if (!env.AGENT_COMMISSIONS_ENABLED) return;
+
     const { data: user } = await supabaseAdmin
-      .from('users').select('agent_ref').eq('id', userId).single();
+      .from('users').select('agent_ref, phone').eq('id', userId).single();
     if (!user?.agent_ref) return;
 
     const { data: agent } = await supabaseAdmin
       .from('agents')
-      .select('id, status, total_earned_cdf')
+      .select('id, status, total_earned_cdf, phone')
       .eq('id', user.agent_ref)
       .single();
     if (!agent || agent.status !== 'active') return;
+
+    // Same self-commission guard as recordAgentCommission.
+    if (phonesMatchCanonical(user.phone, agent.phone)) {
+      console.warn(`[agent-win-commission] self-commission blocked: user ${userId} / agent ${agent.id}`);
+      return;
+    }
 
     const total = Number(agent.total_earned_cdf);
     if (total < 1000000) return;
