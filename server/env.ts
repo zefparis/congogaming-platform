@@ -25,7 +25,9 @@ const envSchema = z.object({
   // Unipesa calls skip the Fixie proxy requirement. MUST NOT be set in
   // production — a [WARN] is logged at boot and at each bypassed call.
   UNIPESA_SKIP_FIXIE_CHECK: z.string().optional(),
-  PG_API_KEY: z.string().min(1, 'PG_API_KEY is required'),
+  // DEPRECATED — the PlayGuard integration has been removed (KYC is now a
+  // manual admin review). Kept optional so stale env vars don't break boot.
+  PG_API_KEY: z.string().optional(),
   PG_PROXY_URL: z.string().url('PG_PROXY_URL must be a valid URL').optional(),
   ALLOWED_ORIGINS: z.string().optional(),
   LOTO_ADMIN_SECRET: z.string().optional(),

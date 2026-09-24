@@ -27,6 +27,8 @@ type Overview = Awaited<ReturnType<typeof adminApi.overview>>;
 
 type Activity = Awaited<ReturnType<typeof adminApi.activity>>['events'][number];
 
+type PinResetReq = Awaited<ReturnType<typeof adminApi.pinResets>>['requests'][number];
+
 interface FetchError {
   __error: string;
   __isAuthError: boolean;
@@ -98,10 +100,20 @@ export default function OverviewTab() {
   );
   const [revenue, setRevenue] = useState<Array<{ day: string; profit_cdf: number }>>([]);
   const [events, setEvents] = useState<Activity[]>([]);
+  const [pinResets, setPinResets] = useState<PinResetReq[]>([]);
+  const [pinBusy, setPinBusy] = useState<string | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [isSuper] = useState(() => {
+    try {
+      return sessionStorage.getItem('cg_admin_role') === 'super_admin';
+    } catch {
+      return false;
+    }
+  });
 
   async function loadAll() {
-    const [ov, ap, rev] = await Promise.all([
+    const [ov, ap, rev, pr] = await Promise.all([
       adminApi.overview().catch((e) => catchFetch<Overview>(null as unknown as Overview, e)),
       adminApi.avadapayBalance().catch((e) => {
         const authErr = isAuthError(e);
@@ -109,12 +121,35 @@ export default function OverviewTab() {
         return { balance_cdf: null as number | null, error: e instanceof Error ? e.message : String(e) };
       }),
       adminApi.revenue(7).catch((e) => catchFetch<{ series: Array<{ day: string; profit_cdf: number }> }>({ series: [] }, e)),
+      adminApi.pinResets().catch((e) => catchFetch<{ requests: PinResetReq[] }>({ requests: [] }, e)),
     ]);
     if ((ov as Partial<FetchError>).__isAuthError) setAuthError(true);
     if ((rev as Partial<FetchError>).__isAuthError) setAuthError(true);
+    if ((pr as Partial<FetchError>).__isAuthError) setAuthError(true);
     if (ov && !(ov as Partial<FetchError>).__error) setOverview(ov);
     setAvadapay(ap as any);
     setRevenue(rev.series || []);
+    setPinResets(pr.requests || []);
+  }
+
+  async function handlePinReset(id: string, action: 'approve' | 'reject') {
+    if (pinBusy) return;
+    const msg =
+      action === 'approve'
+        ? 'Approuver cette demande ? Le nouveau code PIN sera appliqué immédiatement au compte du joueur.'
+        : 'Rejeter cette demande de réinitialisation ?';
+    if (!confirm(msg)) return;
+    setPinBusy(id);
+    setPinError(null);
+    try {
+      if (action === 'approve') await adminApi.approvePinReset(id);
+      else await adminApi.rejectPinReset(id);
+      setPinResets((prev) => prev.filter((r) => r.id !== id));
+    } catch (e: any) {
+      setPinError(e?.message || 'Erreur');
+    } finally {
+      setPinBusy(null);
+    }
   }
 
   async function loadActivity() {
@@ -205,9 +240,9 @@ export default function OverviewTab() {
         <Kpi
           icon={<ShieldCheck size={20} />}
           label="KYC à vérifier"
-          value={fmtInt(overview?.kyc?.verify_age ?? 0)}
-          hint="Joueurs en attente de vérification manuelle"
-          accent={overview?.kyc?.verify_age ? '#fbbf24' : undefined}
+          value={fmtInt(overview?.kyc_pending_submissions ?? 0)}
+          hint="Soumissions en attente de revue manuelle"
+          accent={overview?.kyc_pending_submissions ? '#fbbf24' : undefined}
         />
         <Kpi
           icon={<Ticket size={20} />}
@@ -223,7 +258,7 @@ export default function OverviewTab() {
             <div className="flex items-center gap-2">
               <ShieldCheck size={18} className="text-gold" />
               <h3 className="font-display text-xl tracking-wider text-gold">
-                KYC — Vérification d'âge PlayGuard
+                KYC — Revue manuelle
               </h3>
             </div>
           </div>
@@ -244,7 +279,7 @@ export default function OverviewTab() {
             <span className="text-white/30">/</span>
             <div>
               <span className="font-display text-2xl text-amber-400">
-                {fmtInt(overview.kyc.verify_age)}
+                {fmtInt(overview.kyc_pending_submissions ?? 0)}
               </span>{' '}
               à vérifier
             </div>
@@ -255,6 +290,93 @@ export default function OverviewTab() {
               </span>{' '}
               refusés
             </div>
+          </div>
+        </div>
+      )}
+
+      {pinResets.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] p-5 shadow-lg">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-display text-xl tracking-wider text-amber-400">
+              Réinitialisations PIN en attente ({pinResets.length})
+            </h3>
+            <span className="text-xs text-white/40">Revue manuelle — comparez le selfie au document KYC</span>
+          </div>
+          {pinError && (
+            <div className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+              {pinError}
+            </div>
+          )}
+          <div className="space-y-4">
+            {pinResets.map((r) => (
+              <div key={r.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-mono text-white">{r.phone}</span>
+                  {r.users?.display_name && (
+                    <span className="text-sm text-white/70">{r.users.display_name}</span>
+                  )}
+                  <span className="text-xs text-white/40">{fmtRelative(r.created_at)}</span>
+                  {r.users?.kyc_status && (
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                      KYC : {r.users.kyc_status}
+                    </span>
+                  )}
+                  {r.users?.blocked && (
+                    <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] text-red-300">
+                      bloqué
+                    </span>
+                  )}
+                </div>
+                <div className="mb-3 flex items-start gap-4">
+                  <div>
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">
+                      Selfie de la demande
+                    </div>
+                    <img
+                      src={`data:image/jpeg;base64,${r.selfie_b64}`}
+                      alt="Selfie de la demande"
+                      className="h-28 w-28 rounded-lg border border-white/10 object-cover"
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">
+                      Document KYC de référence
+                    </div>
+                    {r.kyc_selfie_b64 ? (
+                      <img
+                        src={`data:image/jpeg;base64,${r.kyc_selfie_b64}`}
+                        alt="Document KYC"
+                        className="h-28 w-28 rounded-lg border border-white/10 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-28 w-28 items-center justify-center rounded-lg border border-dashed border-white/15 text-center text-[11px] text-white/40">
+                        Aucun document KYC
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {isSuper ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handlePinReset(r.id, 'approve')}
+                      disabled={pinBusy === r.id}
+                      className="flex-1 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+                    >
+                      ✓ Approuver
+                    </button>
+                    <button
+                      onClick={() => handlePinReset(r.id, 'reject')}
+                      disabled={pinBusy === r.id}
+                      className="flex-1 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                      ✗ Rejeter
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-white/40">Approbation réservée au super-admin.</p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

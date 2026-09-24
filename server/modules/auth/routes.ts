@@ -1,12 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { CongoPhoneSchema, LoginSchema, PinSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
-import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, getUserByPhone, loginUser, registerUser, resetPin, updateDisplayName } from './service.js';
-import { env } from '../../env.js';
+import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, getUserByPhone, hashPin, loginUser, registerUser, updateDisplayName } from './service.js';
+import { supabaseAdmin } from '../../lib/supabase.js';
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
-
-const PG_PROXY_URL = env.PG_PROXY_URL || 'https://playguard.vercel.app/api/proxy';
-const PG_PROXY_TIMEOUT_MS = 45_000;
 
 const ResetPinSchema = z.object({
   phone: CongoPhoneSchema,
@@ -121,96 +118,41 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     }
     if (!user) return reply.code(400).send({ error: 'INVALID_REQUEST', code: 'INVALID_REQUEST' });
 
-    // c. PlayGuard verify/check — wraps request with timeout consistent with KYC
-    const pgApiKey = env.PG_API_KEY;
-    const verifyUrl = `${PG_PROXY_URL}/playguard/verify/check`;
-    let pgRes: Response;
-    try {
-      pgRes = await fetch(verifyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': pgApiKey,
-          'x-playguard-key': pgApiKey,
-        },
-        body: JSON.stringify({ image: selfie_b64, externalId: user.id }),
-        signal: AbortSignal.timeout(PG_PROXY_TIMEOUT_MS),
-      });
-    } catch (e: any) {
-      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'UPSTREAM_TIMEOUT' }, 'reset-pin: PlayGuard verify/check unreachable');
-      return reply.code(502).send({
-        error: 'VERIFICATION_UNAVAILABLE',
-        code: 'VERIFICATION_UNAVAILABLE',
-        message: 'Service de vérification indisponible, réessayez dans quelques minutes ou contactez le support.',
-      });
-    }
+    // c. Queue a PIN reset request for manual admin review.
+    //    The previous biometric check (PlayGuard → Hybrid Vector) has been
+    //    decommissioned: the requested PIN is Argon2id-hashed now and stored
+    //    on pin_reset_requests; an operator compares the selfie against the
+    //    player's KYC document and approves (hash applied) or rejects.
+    const pinHash = await hashPin(newPin);
+    const requestPayload = {
+      user_id: user.id,
+      phone: user.phone,
+      selfie_b64,
+      pin_hash: pinHash,
+    };
 
-    // d. Non-OK upstream
-    if (!pgRes.ok) {
-      req.log.warn({ phone: `***${phone.slice(-4)}`, status: pgRes.status, outcome: 'UPSTREAM_ERROR' }, 'reset-pin: PlayGuard verify/check error');
-      return reply.code(502).send({
-        error: 'VERIFICATION_UNAVAILABLE',
-        code: 'VERIFICATION_UNAVAILABLE',
-        message: 'Service de vérification indisponible, réessayez dans quelques minutes ou contactez le support.',
-      });
-    }
+    // One pending request per user — a re-submission replaces the pending
+    // request (fresh selfie + fresh PIN).
+    const { data: existing } = await supabaseAdmin
+      .from('pin_reset_requests')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .maybeSingle();
 
-    const pgJson = (await pgRes.json().catch(() => null)) as {
-      success?: boolean;
-      enrolled?: boolean | null;
-      match?: boolean;
-    } | null;
-    if (!pgJson) {
-      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'MALFORMED_RESPONSE' }, 'reset-pin: malformed PlayGuard response');
-      return reply.code(502).send({
-        error: 'VERIFICATION_UNAVAILABLE',
-        code: 'VERIFICATION_UNAVAILABLE',
-        message: 'Service de vérification indisponible, réessayez dans quelques minutes ou contactez le support.',
-      });
-    }
+    const { error: reqErr } = existing
+      ? await supabaseAdmin
+          .from('pin_reset_requests')
+          .update({ ...requestPayload, status: 'pending', created_at: new Date().toISOString() })
+          .eq('id', existing.id)
+      : await supabaseAdmin.from('pin_reset_requests').insert(requestPayload);
 
-    const { enrolled, match } = pgJson;
-
-    // e. Authoritative enrolled/match mapping
-    if (enrolled === false) {
-      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'NOT_ENROLLED' }, 'reset-pin: user not enrolled');
-      return reply.code(403).send({
-        error: 'NOT_ENROLLED',
-        code: 'NOT_ENROLLED',
-        message: 'Vérification faciale non disponible pour ce compte. Contactez le support pour réinitialiser votre code.',
-      });
-    }
-
-    if (enrolled === true && match === false) {
-      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'FACE_MISMATCH' }, 'reset-pin: face mismatch');
-      return reply.code(403).send({
-        error: 'FACE_MISMATCH',
-        code: 'FACE_MISMATCH',
-        message: 'Vérification échouée. Réessayez avec plus de lumière et en cadrant bien votre visage. Après plusieurs tentatives, contactez le support.',
-      });
-    }
-
-    if (enrolled === null && match === false) {
-      req.log.warn({ phone: `***${phone.slice(-4)}`, outcome: 'DEGRADED_MISMATCH' }, 'reset-pin: degraded — enrolled unknown, no Rekognition match');
-      return reply.code(502).send({
-        error: 'VERIFICATION_UNAVAILABLE',
-        code: 'VERIFICATION_UNAVAILABLE',
-        message: 'Vérification temporairement indisponible, réessayez dans quelques minutes.',
-      });
-    }
-
-    // enrolled true+match true  → success
-    // enrolled null+match true  → Rekognition matched independently despite degraded registry; treat as success
-
-    // f. Reset PIN using the shared Argon2id helper
-    try {
-      await resetPin(user.id, newPin);
-    } catch (e: any) {
-      req.log.error({ err: e?.message, userId: user.id }, 'reset-pin: resetPin failed');
+    if (reqErr) {
+      req.log.error({ err: reqErr, userId: user.id }, 'reset-pin: request persist failed');
       return reply.code(500).send({ error: 'RESET_PIN_FAILED', code: 'RESET_PIN_FAILED' });
     }
 
-    return reply.send({ success: true });
+    return reply.send({ success: true, pending: true });
   });
 
   app.post('/api/auth/logout', async (_req, reply) => {

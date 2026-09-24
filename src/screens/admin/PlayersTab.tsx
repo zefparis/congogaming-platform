@@ -534,10 +534,10 @@ function Drawer({
                 {data.user.kyc_status === 'denied' && (
                   <>
                     <p className="mb-3 text-sm text-amber-400/80">
-                      Ce joueur a été refusé par PlayGuard. Approuver manuellement override le verdict automatique.
+                      Ce joueur a été refusé. Approuver manuellement override la décision.
                     </p>
                     <button
-                      onClick={() => approveKyc("Approuver manuellement ce joueur ? Cela override le verdict PlayGuard automatique.")}
+                      onClick={() => approveKyc('Approuver manuellement ce joueur ? Cela override le refus précédent.')}
                       disabled={busy}
                       className="w-full rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
                     >
@@ -550,13 +550,31 @@ function Drawer({
                   <>
                     {data.user.kyc_status === 'verify_age' && (
                       <p className="mb-3 text-sm text-amber-400/80">
-                        ⚠️ Vérification manuelle requise — Âge estimé : 19-25 ans. Confirmez l'identité de ce joueur.
+                        ⚠️ Vérification manuelle requise. Confirmez l'identité de ce joueur.
                       </p>
                     )}
                     {data.user.kyc_status === 'pending' && (
-                      <p className="mb-3 text-sm text-white/60">
-                        Ce joueur n'a pas encore soumis de vérification KYC.
-                      </p>
+                      (() => {
+                        const pendingCheck = data.kyc_checks?.find(
+                          (k) => k.verdict === 'PENDING' && k.selfie_b64,
+                        );
+                        return pendingCheck?.selfie_b64 ? (
+                          <div className="mb-3">
+                            <p className="mb-2 text-sm text-amber-400/80">
+                              Document soumis le {fmtDateTime(pendingCheck.created_at)} — en attente de revue.
+                            </p>
+                            <img
+                              src={`data:image/jpeg;base64,${pendingCheck.selfie_b64}`}
+                              alt="Document KYC soumis"
+                              className="w-32 h-32 rounded-xl border border-white/10 object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <p className="mb-3 text-sm text-white/60">
+                            Ce joueur n'a pas encore soumis de vérification KYC.
+                          </p>
+                        );
+                      })()
                     )}
                     <div className="flex gap-2">
                       <button

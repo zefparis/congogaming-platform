@@ -248,6 +248,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         ticketsTodayUsers,
         txToday,
         ticketsToday,
+        pendingKycSubmissions,
+        pendingPinResets,
       ] = await Promise.all([
         supabaseAdmin.from('users').select('balance_cdf'),
         supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
@@ -272,6 +274,16 @@ export default async function adminRoutes(app: FastifyInstance) {
           .from('okapi_color_tickets')
           .select('*', { count: 'exact', head: true })
           .gte('created_at', todayIso),
+        // Manual-review queues: KYC submissions + PIN reset requests
+        // awaiting an operator decision.
+        supabaseAdmin
+          .from('kyc_checks')
+          .select('*', { count: 'exact', head: true })
+          .eq('verdict', 'PENDING'),
+        supabaseAdmin
+          .from('pin_reset_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending'),
       ]);
 
       const total_balance_cdf = (usersAgg.data || []).reduce(
@@ -305,6 +317,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         okapi_color_draws_today: drawsToday.count ?? 0,
         kyc,
         // New KPIs
+        kyc_pending_submissions: pendingKycSubmissions.count ?? 0,
+        pin_resets_pending: pendingPinResets.count ?? 0,
         active_players_today: activeUserSet.size,
         total_deposits_today,
         total_withdrawals_today,
@@ -630,7 +644,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     // Last 5 KYC checks for this user (audit trail).
     const { data: kycChecks } = await supabaseAdmin
       .from('kyc_checks')
-      .select('id, verdict, estimated_age, age_low, age_high, is_minor, confidence, scan_id, created_at')
+      .select('id, verdict, estimated_age, age_low, age_high, is_minor, confidence, scan_id, selfie_b64, created_at')
       .eq('user_id', id)
       .order('created_at', { ascending: false })
       .limit(5);
@@ -991,6 +1005,13 @@ export default async function adminRoutes(app: FastifyInstance) {
         .update({ kyc_status: 'approved' })
         .eq('id', id);
       if (error) return reply.code(400).send({ error: error.message });
+      // Resolve any queued manual-review submissions so the pending-review
+      // counters drop the player.
+      await supabaseAdmin
+        .from('kyc_checks')
+        .update({ verdict: 'APPROVED' })
+        .eq('user_id', id)
+        .eq('verdict', 'PENDING');
       await audit(req, 'kyc_approve', id, null, null);
       return reply.send({ ok: true, kyc_status: 'approved' });
     },
@@ -1006,8 +1027,114 @@ export default async function adminRoutes(app: FastifyInstance) {
         .update({ kyc_status: 'denied', blocked: true })
         .eq('id', id);
       if (error) return reply.code(400).send({ error: error.message });
+      await supabaseAdmin
+        .from('kyc_checks')
+        .update({ verdict: 'DENIED' })
+        .eq('user_id', id)
+        .eq('verdict', 'PENDING');
       await audit(req, 'kyc_deny', id, null, null);
       return reply.send({ ok: true, kyc_status: 'denied', blocked: true });
+    },
+  );
+
+  // ---- PIN RESET REQUESTS (manual review) ----
+  //
+  // Players submit a new PIN (Argon2id-hashed at request time) plus a selfie.
+  // A super-admin compares the selfie against the player's KYC document and
+  // approves or rejects. Approving applies the stored hash to users.pin_hash.
+
+  app.get('/api/admin/pin-resets', async (req, reply) => {
+    const { data, error } = await supabaseAdmin
+      .from('pin_reset_requests')
+      .select('id, user_id, phone, selfie_b64, status, created_at, users(display_name, kyc_status, blocked)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(50);
+    if (error) return reply.code(500).send({ error: error.message });
+
+    // Attach the player's latest KYC selfie so the reviewer can compare.
+    const userIds = [...new Set((data || []).map((r: any) => String(r.user_id)))];
+    const kycSelfieByUser: Record<string, string> = {};
+    if (userIds.length) {
+      const { data: checks } = await supabaseAdmin
+        .from('kyc_checks')
+        .select('user_id, selfie_b64')
+        .in('user_id', userIds)
+        .not('selfie_b64', 'is', null)
+        .order('created_at', { ascending: false });
+      for (const c of checks || []) {
+        if (!kycSelfieByUser[String(c.user_id)]) {
+          kycSelfieByUser[String(c.user_id)] = String(c.selfie_b64);
+        }
+      }
+    }
+
+    return reply.send({
+      requests: (data || []).map((r: any) => ({
+        ...r,
+        kyc_selfie_b64: kycSelfieByUser[String(r.user_id)] ?? null,
+      })),
+    });
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/api/admin/pin-resets/:id/approve',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const id = req.params.id;
+      const { data: request, error } = await supabaseAdmin
+        .from('pin_reset_requests')
+        .select('id, user_id, pin_hash, status')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) return reply.code(500).send({ error: error.message });
+      if (!request) return reply.code(404).send({ error: 'Request not found' });
+      if (request.status !== 'pending') {
+        return reply.code(409).send({ error: 'Request already reviewed' });
+      }
+
+      const { error: userErr } = await supabaseAdmin
+        .from('users')
+        .update({
+          pin_hash: request.pin_hash,
+          pin_must_reset: false,
+          auth_failed_count: 0,
+          auth_locked_until: null,
+        })
+        .eq('id', request.user_id);
+      if (userErr) return reply.code(500).send({ error: userErr.message });
+
+      await supabaseAdmin
+        .from('pin_reset_requests')
+        .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+        .eq('id', id);
+      await audit(req, 'pin_reset_approve', request.user_id, null, null);
+      return reply.send({ ok: true });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/api/admin/pin-resets/:id/reject',
+    { preHandler: requireSuperAdmin },
+    async (req, reply) => {
+      const id = req.params.id;
+      const { data: request, error } = await supabaseAdmin
+        .from('pin_reset_requests')
+        .select('id, user_id, status')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) return reply.code(500).send({ error: error.message });
+      if (!request) return reply.code(404).send({ error: 'Request not found' });
+      if (request.status !== 'pending') {
+        return reply.code(409).send({ error: 'Request already reviewed' });
+      }
+
+      await supabaseAdmin
+        .from('pin_reset_requests')
+        .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+        .eq('id', id);
+      await audit(req, 'pin_reset_reject', request.user_id, null, null);
+      return reply.send({ ok: true });
     },
   );
 

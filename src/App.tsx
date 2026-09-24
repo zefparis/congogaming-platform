@@ -38,7 +38,7 @@ function PageWrap({ children }: { children: React.ReactNode }) {
 function Protected({ children }: { children: React.ReactNode }) {
   const session = getSession();
   if (!session) return <Navigate to="/splash" replace />;
-  // Hard-block denied accounts (PlayGuard verdict DENIED → minor or banned).
+  // Hard-block denied accounts (KYC refused by an admin, or blocked user).
   // We can't proceed: drop the session and return to splash.
   if (session.blocked || session.kyc_status === 'denied') {
     clearSession();

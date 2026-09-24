@@ -27,6 +27,20 @@ export class InvalidCredentialsError extends Error {
   }
 }
 
+/**
+ * Hash a PIN with Argon2id using the shared parameters. Used by
+ * registerUser/resetPin and by the admin-reviewed PIN reset flow, which
+ * stores the hash on pin_reset_requests until an operator approves it.
+ */
+export async function hashPin(pin: string): Promise<string> {
+  return argon2.hash(pin, {
+    type: argon2.argon2id,
+    memoryCost: 19_456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+}
+
 function sanitizeUser(row: Record<string, unknown>): AuthUser {
   return {
     id: String(row.id),
@@ -71,12 +85,7 @@ export async function updateDisplayName(userId: string, raw: string | null): Pro
 }
 
 export async function registerUser(input: { phone: string; pin: string; referralCode?: string | null; agentRef?: string | null }): Promise<AuthUser> {
-  const pinHash = await argon2.hash(input.pin, {
-    type: argon2.argon2id,
-    memoryCost: 19_456,
-    timeCost: 2,
-    parallelism: 1,
-  });
+  const pinHash = await hashPin(input.pin);
 
   let referredBy: string | null = null;
   const code = input.referralCode?.trim().toUpperCase();
@@ -267,12 +276,7 @@ export async function resetPinByPhone(input: { phone: string; newPin: string }):
  * Throws if the user does not exist.
  */
 export async function resetPin(userId: string, newPin: string): Promise<void> {
-  const pinHash = await argon2.hash(newPin, {
-    type: argon2.argon2id,
-    memoryCost: 19_456,
-    timeCost: 2,
-    parallelism: 1,
-  });
+  const pinHash = await hashPin(newPin);
 
   const { data, error } = await supabaseAdmin
     .from('users')

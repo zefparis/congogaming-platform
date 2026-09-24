@@ -200,6 +200,8 @@ export const adminApi = {
       users_count: number;
       okapi_color_draws_today: number;
       kyc?: { approved: number; pending: number; denied: number; verify_age: number };
+      kyc_pending_submissions?: number;
+      pin_resets_pending?: number;
       active_players_today: number;
       total_deposits_today: number;
       total_withdrawals_today: number;
@@ -291,13 +293,14 @@ export const adminApi = {
       };
       kyc_checks?: Array<{
         id: string;
-        verdict: 'APPROVED' | 'DENIED' | 'VERIFY_AGE';
+        verdict: 'APPROVED' | 'DENIED' | 'VERIFY_AGE' | 'PENDING';
         estimated_age: number | null;
         age_low: number | null;
         age_high: number | null;
         is_minor: boolean;
         confidence: number | null;
         scan_id: string | null;
+        selfie_b64?: string | null;
         created_at: string;
       }>;
       limits: null | {
@@ -414,6 +417,35 @@ export const adminApi = {
   approveKyc: (id: string) => approveKyc(id),
 
   denyKyc: (id: string) => denyKyc(id),
+
+  // Pending PIN reset requests (manual review queue).
+  pinResets: () =>
+    request<{
+      requests: Array<{
+        id: string;
+        user_id: string;
+        phone: string;
+        selfie_b64: string;
+        status: string;
+        created_at: string;
+        kyc_selfie_b64: string | null;
+        users?: { display_name: string | null; kyc_status: string; blocked: boolean } | null;
+      }>;
+    }>('/api/admin/pin-resets'),
+
+  // Fastify rejects an empty body when Content-Type: application/json is
+  // set — send '{}' like the other POST actions.
+  approvePinReset: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/pin-resets/${id}/approve`, {
+      method: 'POST',
+      body: '{}',
+    }),
+
+  rejectPinReset: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/pin-resets/${id}/reject`, {
+      method: 'POST',
+      body: '{}',
+    }),
 
   transactions: (params: {
     page?: number;

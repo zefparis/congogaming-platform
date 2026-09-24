@@ -32,7 +32,7 @@ Open http://localhost:5173 on a phone-sized window (≤ 430px wide).
 ### Key Features
 - **Wallet balance display**: Live balance shown in Flash and Loto screens, updates after each ticket.
 - **Deposit/Withdraw quick access**: Buttons in HomeScreen header for instant navigation.
-- **KYC integration**: Identity verification via PlayGuard for age verification and account gating.
+- **KYC integration**: Identity verification via manual admin review (selfie submissions queued in `kyc_checks`) for account gating.
 - **Admin dashboard**: Desktop-oriented admin panel with Overview, Players, Games, and Transactions tabs.
 - **Real-time features**: WebSocket feed for Okapi game live updates.
 - **Automated draws**: Cron jobs for Loto, Flash, and Scratch draws.
@@ -143,8 +143,7 @@ Required env vars (server-side only):
 ```
 PORT, HOST,
 UNIPESA_PUBLIC_ID, UNIPESA_MERCHANT_ID, UNIPESA_SECRET_KEY, UNIPESA_CALLBACK_URL,
-SUPABASE_URL, SUPABASE_SERVICE_KEY,
-PLAYGUARD_API_KEY, PLAYGUARD_VERIFICATION_ID
+SUPABASE_URL, SUPABASE_SERVICE_KEY
 ```
 
 Set `UNIPESA_CALLBACK_URL` to `https://<your-api>/api/callback`.
@@ -176,5 +175,5 @@ congo-gaming/
 - The phone-based "anon" Supabase RLS policies are permissive on purpose (so the unauthenticated app can register/login). You can move auth fully behind a server endpoint and lock RLS down to `service_role` only.
 - Bebas Neue + Barlow Condensed (italic + weights) are loaded from Google Fonts in `index.html`.
 - The container is capped at `max-w-app` (430px) — use a mobile viewport.
-- PlayGuard integration handles age verification and account blocking. Configure `PLAYGUARD_API_KEY` and `PLAYGUARD_VERIFICATION_ID` in server env vars.
+- KYC age verification and PIN resets are manual admin reviews (admin dashboard → Players / Overview). The `pin_reset_requests` table requires `supabase/migrations/20260925_manual_kyc_pin_reset.sql`.
 - Cron jobs run automatically for game draws. Ensure server timezone is set correctly (Africa/Kinshasa recommended).

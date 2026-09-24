@@ -2,16 +2,10 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Lock, Headphones } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import NumPad from '../components/NumPad';
 import { SelfieCaptureWidget } from '../components/SelfieCaptureWidget';
 import { AuthApiError, resetPinByPhone } from '../lib/auth';
-
-// WhatsApp support link — built from VITE_SUPPORT_PHONE (set in Vercel env vars).
-// Digits-only: the env var may be stored with or without the leading +.
-// If unset, supportHref is null and the link is replaced with plain text.
-const rawSupportPhone = import.meta.env.VITE_SUPPORT_PHONE || '243997174834';
-const supportHref = `https://wa.me/${rawSupportPhone.replace(/\D/g, '')}`;
 
 // ─── ResetPinScreen ──────────────────────────────────────────────────────────
 //
@@ -20,20 +14,13 @@ const supportHref = `https://wa.me/${rawSupportPhone.replace(/\D/g, '')}`;
 //   1. selfie   → SelfieCaptureWidget (camera → preview → confirm)
 //   2. pin      → enter new 6-digit PIN
 //   3. confirm  → re-enter to confirm, then POST { phone, selfie_b64, newPin }
-//   4. done     → success
+//   4. done     → request queued for admin review
 //
-// PlayGuard error mapping:
-//   NOT_ENROLLED         → redirect to support contact (show message + button)
-//   FACE_MISMATCH        → retry selfie with lighting tip
-//   VERIFICATION_UNAVAILABLE → retry later
+// The biometric check has been decommissioned: the request lands in the
+// admin PIN-reset queue and a super-admin compares the selfie against the
+// player's KYC document before approving.
 
 type Step = 'selfie' | 'pin' | 'confirm' | 'done';
-
-type SelfieError =
-  | { kind: 'NOT_ENROLLED' }
-  | { kind: 'FACE_MISMATCH'; message: string }
-  | { kind: 'VERIFICATION_UNAVAILABLE'; message: string }
-  | { kind: 'generic'; message: string };
 
 export default function ResetPinScreen() {
   const nav = useNavigate();
@@ -43,7 +30,7 @@ export default function ResetPinScreen() {
 
   const [step, setStep] = useState<Step>('selfie');
   const [selfieB64, setSelfieB64] = useState<string | null>(null);
-  const [selfieError, setSelfieError] = useState<SelfieError | null>(null);
+  const [selfieError, setSelfieError] = useState<string | null>(null);
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinErr, setPinErr] = useState<string | null>(null);
@@ -92,29 +79,11 @@ export default function ResetPinScreen() {
       await resetPinByPhone(phone, selfieB64, newPin);
       setStep('done');
     } catch (e) {
-      if (e instanceof AuthApiError) {
-        if (e.code === 'NOT_ENROLLED') {
-          setSelfieError({ kind: 'NOT_ENROLLED' });
-          setStep('selfie');
-          setSelfieB64(null);
-        } else if (e.code === 'FACE_MISMATCH') {
-          setSelfieError({ kind: 'FACE_MISMATCH', message: t('reset_pin.error_face_mismatch') });
-          setStep('selfie');
-          setSelfieB64(null);
-        } else if (e.code === 'VERIFICATION_UNAVAILABLE') {
-          setSelfieError({ kind: 'VERIFICATION_UNAVAILABLE', message: t('reset_pin.error_unavailable') });
-          setStep('selfie');
-          setSelfieB64(null);
-        } else if (e.code === 'INVALID_PIN_FORMAT') {
-          setPinErr(t('reset_pin.error_invalid'));
-          setStep('pin');
-        } else {
-          setSelfieError({ kind: 'generic', message: e.message || t('reset_pin.error_network') });
-          setStep('selfie');
-          setSelfieB64(null);
-        }
+      if (e instanceof AuthApiError && e.code === 'INVALID_PIN_FORMAT') {
+        setPinErr(t('reset_pin.error_invalid'));
+        setStep('pin');
       } else {
-        setSelfieError({ kind: 'generic', message: t('reset_pin.error_network') });
+        setSelfieError(e instanceof AuthApiError && e.message ? e.message : t('reset_pin.error_network'));
         setStep('selfie');
         setSelfieB64(null);
       }
@@ -157,25 +126,9 @@ export default function ResetPinScreen() {
           <div className="text-amber-100/80 text-sm">{t('reset_pin.selfie_body')}</div>
         </div>
 
-        {selfieError?.kind === 'NOT_ENROLLED' && (
-          <div className="mb-4 rounded-2xl border border-orange-500/40 bg-orange-500/10 p-4">
-            <div className="text-orange-300 font-display text-base mb-2">{t('reset_pin.error_not_enrolled_title')}</div>
-            <div className="text-orange-200/80 text-sm mb-3">{t('reset_pin.error_not_enrolled')}</div>
-            <a
-              href={supportHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-orange-300 underline"
-            >
-              <Headphones size={15} />
-              {t('reset_pin.contact_support')}
-            </a>
-          </div>
-        )}
-
-        {selfieError && selfieError.kind !== 'NOT_ENROLLED' && (
+        {selfieError && (
           <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
-            {selfieError.message}
+            {selfieError}
           </div>
         )}
 

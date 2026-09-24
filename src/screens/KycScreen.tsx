@@ -1,34 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { X, AlertTriangle, Loader2 } from 'lucide-react';
+import { Clock, Loader2 } from 'lucide-react';
 import { Check } from 'lucide-react';
 import { api } from '../lib/api';
-import { clearSession, getSession, refreshKycStatus } from '../lib/auth';
+import { getSession, refreshKycStatus } from '../lib/auth';
 import { useTranslation } from 'react-i18next';
 import { SelfieCaptureWidget } from '../components/SelfieCaptureWidget';
 
-// ─── PlayGuard KYC capture flow ─────────────────────────────────────────────
+// ─── KYC manual-review capture flow ─────────────────────────────────────────
 //
 // 3 stages:
 //   1. selfie   → SelfieCaptureWidget (camera feed → preview → confirm)
-//   2. loading  → POST to /api/kyc/scan (PlayGuard via server-side proxy)
-//   3. result   → APPROVED / DENIED / VERIFY_AGE branch
+//   2. loading  → POST to /api/kyc/scan (stored for manual admin review)
+//   3. result   → PENDING (queued for review) / APPROVED (already verified)
 //
-// DENIED is terminal: the user is logged out and cannot proceed regardless of
-// what they tap. VERIFY_AGE allows access but flags the account for manual
-// review (the admin dashboard surfaces this).
+// The external verification provider has been decommissioned — submissions
+// are reviewed by an operator in the admin dashboard. The user may keep using
+// the app while the review is pending; a denial blocks the account.
 
 type Stage = 'selfie' | 'loading' | 'result';
 
-type KycVerdict = 'APPROVED' | 'DENIED' | 'VERIFY_AGE';
+type KycVerdict = 'PENDING' | 'APPROVED';
 
 interface KycResult {
   verdict: KycVerdict;
-  estimated_age: number;
-  age_low: number;
-  age_high: number;
-  is_minor: boolean;
 }
 
 export default function KycScreen() {
@@ -55,13 +51,7 @@ export default function KycScreen() {
     setError(null);
     try {
       const res = await api.kycScan(session.id, rawB64);
-      setResult({
-        verdict: res.verdict,
-        estimated_age: res.estimated_age,
-        age_low: res.age_low,
-        age_high: res.age_high,
-        is_minor: res.is_minor,
-      });
+      setResult({ verdict: res.verdict });
       // Sync the cached session so /splash and route guards see the new status
       // immediately without an extra round-trip.
       await refreshKycStatus(session.id);
@@ -72,9 +62,10 @@ export default function KycScreen() {
     }
   }
 
-  // After a successful (APPROVED or VERIFY_AGE) scan, bounce the user to
-  // wherever they were trying to go before being intercepted by the KYC
-  // gate. We default to home if no intended destination was recorded.
+  // After a submission (PENDING) or an already-verified account (APPROVED),
+  // bounce the user to wherever they were trying to go before being
+  // intercepted by the KYC gate. We default to home if no intended
+  // destination was recorded.
   function consumeKycRedirect(): string {
     try {
       const dest = localStorage.getItem('kyc_redirect');
@@ -88,21 +79,7 @@ export default function KycScreen() {
     return '/';
   }
 
-  function onApprovedContinue() {
-    nav(consumeKycRedirect(), { replace: true });
-  }
-
-  function onDeniedAcknowledge() {
-    try {
-      localStorage.removeItem('kyc_redirect');
-    } catch {
-      /* ignore */
-    }
-    clearSession();
-    nav('/splash', { replace: true });
-  }
-
-  function onVerifyAgeContinue() {
+  function onContinue() {
     nav(consumeKycRedirect(), { replace: true });
   }
 
@@ -136,12 +113,7 @@ export default function KycScreen() {
       {stage === 'loading' && <LoadingStage />}
 
       {stage === 'result' && result && (
-        <ResultStage
-          result={result}
-          onApprovedContinue={onApprovedContinue}
-          onDeniedAcknowledge={onDeniedAcknowledge}
-          onVerifyAgeContinue={onVerifyAgeContinue}
-        />
+        <ResultStage result={result} onContinue={onContinue} />
       )}
     </div>
   );
@@ -168,14 +140,10 @@ function LoadingStage() {
 
 function ResultStage({
   result,
-  onApprovedContinue,
-  onDeniedAcknowledge,
-  onVerifyAgeContinue,
+  onContinue,
 }: {
   result: KycResult;
-  onApprovedContinue: () => void;
-  onDeniedAcknowledge: () => void;
-  onVerifyAgeContinue: () => void;
+  onContinue: () => void;
 }) {
   const { t } = useTranslation();
   if (result.verdict === 'APPROVED') {
@@ -191,13 +159,10 @@ function ResultStage({
           <div className="mt-2 text-sm text-zinc-400">
             {t('kyc.welcome')}
           </div>
-          <div className="mt-1 text-xs text-zinc-500">
-            {t('kyc.age_estimate', { age: result.estimated_age })}
-          </div>
         </div>
         <motion.button
           whileTap={{ scale: 0.97 }}
-          onClick={onApprovedContinue}
+          onClick={onContinue}
           className="w-full h-14 rounded-2xl bg-gold text-black font-display text-xl tracking-wider"
         >
           {t('kyc.continue')}
@@ -206,54 +171,23 @@ function ResultStage({
     );
   }
 
-  if (result.verdict === 'DENIED') {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-6">
-        <div className="rounded-full bg-red-500/20 border-4 border-red-500 p-6">
-          <X className="text-red-400" size={64} strokeWidth={3} />
-        </div>
-        <div className="text-center">
-          <div className="font-display text-3xl text-red-400 tracking-wider">
-            {t('kyc.denied')}
-          </div>
-          <div className="mt-3 text-sm text-zinc-300 max-w-xs">
-            {t('kyc.denied_msg')}
-          </div>
-          <div className="mt-2 text-xs text-zinc-500">
-            {t('kyc.age_range', { low: result.age_low, high: result.age_high })}
-          </div>
-        </div>
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onDeniedAcknowledge}
-          className="w-full h-14 rounded-2xl bg-red-500 text-white font-display text-xl tracking-wider"
-        >
-          {t('kyc.understood')}
-        </motion.button>
-      </div>
-    );
-  }
-
-  // VERIFY_AGE
+  // PENDING — queued for manual review.
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6">
       <div className="rounded-full bg-amber-500/20 border-4 border-amber-500 p-6">
-        <AlertTriangle className="text-amber-400" size={64} strokeWidth={3} />
+        <Clock className="text-amber-400" size={64} strokeWidth={3} />
       </div>
       <div className="text-center">
         <div className="font-display text-2xl text-amber-400 tracking-wider">
-          {t('kyc.age_uncertain')}
+          {t('kyc.pending_title')}
         </div>
         <div className="mt-3 text-sm text-zinc-300 max-w-xs">
-          {t('kyc.age_uncertain_msg')}
-        </div>
-        <div className="mt-2 text-xs text-zinc-500">
-          {t('kyc.age_range', { low: result.age_low, high: result.age_high })}
+          {t('kyc.pending_body')}
         </div>
       </div>
       <motion.button
         whileTap={{ scale: 0.97 }}
-        onClick={onVerifyAgeContinue}
+        onClick={onContinue}
         className="w-full h-14 rounded-2xl bg-amber-500 text-black font-display text-xl tracking-wider"
       >
         {t('kyc.continue')}
