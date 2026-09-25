@@ -12,7 +12,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
  */
 const CDF_TO_CGLT_RATE = 1;
 
-// Internal (non-Unipesa) transaction sentinel, mirroring the loto/flash routes.
+// Internal (non-Unipesa) transaction sentinel, mirroring the game routes.
 const CGLT_SWAP_PROVIDER_ID = 0;
 
 // CGLT withdrawal (player → any UniPay wallet) constraints.

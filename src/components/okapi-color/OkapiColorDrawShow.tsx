@@ -70,7 +70,7 @@ export default function OkapiColorDrawShow({
 }: OkapiColorDrawShowProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const ballLayerRef = useRef<HTMLDivElement | null>(null);
-  const flashRef = useRef<HTMLDivElement | null>(null);
+  const glowRef = useRef<HTMLDivElement | null>(null);
   const cellRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
   const animatedSignatureRef = useRef('');
@@ -351,9 +351,9 @@ export default function OkapiColorDrawShow({
               },
             );
 
-            if (flashRef.current) {
+            if (glowRef.current) {
               gsap.fromTo(
-                flashRef.current,
+                glowRef.current,
                 { opacity: 0 },
                 {
                   opacity: isTv ? 0.34 : 0.18,
@@ -423,7 +423,7 @@ export default function OkapiColorDrawShow({
           opacity: 0.9;
         }
 
-        .okapi-draw-flash {
+        .okapi-draw-glow {
           position: absolute;
           inset: 0;
           pointer-events: none;
@@ -780,7 +780,7 @@ export default function OkapiColorDrawShow({
       )}
 
       <div className="okapi-draw-stage-glow" />
-      <div ref={flashRef} className="okapi-draw-flash" />
+      <div ref={glowRef} className="okapi-draw-glow" />
       <div ref={ballLayerRef} className="okapi-draw-ball-layer" />
 
       <div className="okapi-draw-content">

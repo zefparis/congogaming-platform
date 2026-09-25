@@ -46,9 +46,6 @@ const TIERS = {
 // is the only type still being written.
 const TYPE_LABEL: Record<string, string> = {
   okapi_color: 'Okapi Color',
-  flash:       'Flash',
-  scratch:     'Grattage',
-  okapi:       'Okapi Climb',
 };
 
 interface AgentData {

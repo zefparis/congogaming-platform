@@ -15,7 +15,7 @@ import { executerTirageOkapiColor, OKAPI_COLOR_CONFIG, computeOkapiColorState } 
 // ---- Token / auth ----
 //
 // Tokens are stateless: HMAC(secret, "admin|<issued_at_ms>") signed with the
-// LOTO_ADMIN_SECRET. This keeps things simple (no DB table) and ensures that
+// ADMIN_SECRET. This keeps things simple (no DB table) and ensures that
 // rotating the secret invalidates outstanding tokens.
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -29,8 +29,8 @@ interface AdminTokenPayload {
 }
 
 function adminSecret(): string {
-  const s = env.LOTO_ADMIN_SECRET || '';
-  if (!s) throw new Error('LOTO_ADMIN_SECRET not configured');
+  const s = env.ADMIN_SECRET || env.LOTO_ADMIN_SECRET || '';
+  if (!s) throw new Error('ADMIN_SECRET not configured');
   return s;
 }
 
@@ -180,7 +180,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       }
       const { secret: provided, phone: phoneRaw } = parsed.data;
 
-      const expected = process.env.LOTO_ADMIN_SECRET || '';
+      const expected = env.ADMIN_SECRET || env.LOTO_ADMIN_SECRET || '';
       if (!expected) return reply.code(500).send({ error: 'Admin not configured' });
       if (!constantTimeStringEqual(provided, expected)) {
         return reply.code(401).send({ error: 'Invalid secret' });

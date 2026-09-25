@@ -80,11 +80,6 @@ function AppRoutes() {
           <Route path="/depot" element={<Protected><PageWrap><DepositScreen /></PageWrap></Protected>} />
           <Route path="/retrait" element={<Protected><PageWrap><WithdrawScreen /></PageWrap></Protected>} />
           <Route path="/compte" element={<Protected><PageWrap><AccountScreen /></PageWrap></Protected>} />
-          {/* Removed games redirect to home (no 404). */}
-          <Route path="/loto" element={<Navigate to="/" replace />} />
-          <Route path="/flash" element={<Navigate to="/" replace />} />
-          <Route path="/scratch" element={<Navigate to="/" replace />} />
-          <Route path="/climb" element={<Navigate to="/" replace />} />
           <Route path="/okapi-color" element={<Protected><PageWrap><OkapiColorScreen /></PageWrap></Protected>} />
           <Route path="/legal" element={<Protected><PageWrap><LegalScreen /></PageWrap></Protected>} />
           <Route path="/kyc" element={<PageWrap><KycRoute /></PageWrap>} />

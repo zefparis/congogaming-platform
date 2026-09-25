@@ -34,6 +34,9 @@ const envSchema = z.object({
   // the cookie is shared with api.congogaming.com (same-site, SameSite=Lax).
   // Leave unset for local dev (host-only cookie on localhost).
   COOKIE_DOMAIN: z.string().optional(),
+  // Admin token signing secret. LOTO_ADMIN_SECRET is the deprecated name
+  // (the Loto game was removed) — still accepted for existing deployments.
+  ADMIN_SECRET: z.string().optional(),
   LOTO_ADMIN_SECRET: z.string().optional(),
   AUTH_MAX_FAILURES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('5'),
   AUTH_LOCKOUT_MINUTES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('15'),

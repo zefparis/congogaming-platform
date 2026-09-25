@@ -135,7 +135,7 @@ export async function refreshSession(): Promise<SessionUser | null> {
   } catch (e) {
     // Only invalidate the session on a definitive 401 (expired / invalid token).
     // Network errors, 5xx, timeouts, etc. keep the last known session alive so
-    // the UI never flashes to 0 CDF or silently breaks the polling loop.
+    // the UI never drops to 0 CDF or silently breaks the polling loop.
     if (e instanceof AuthApiError && e.status === 401) {
       currentUser = null;
     }
@@ -151,6 +151,6 @@ export async function refreshKycStatus(_userId?: string): Promise<KycStatus> {
 export async function refreshBalance(_userId?: string): Promise<number> {
   const user = await refreshSession();
   // On a transient failure refreshSession returns null but keeps currentUser.
-  // Fall back to the cached balance so the UI never flashes to 0 CDF.
+  // Fall back to the cached balance so the UI never drops to 0 CDF.
   return Number(user?.balance_cdf ?? currentUser?.balance_cdf ?? 0);
 }

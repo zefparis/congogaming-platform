@@ -19,8 +19,8 @@ const STATUS_LABEL: Record<number, { label: string; color: string; icon: any }> 
 const TYPE_META: Record<TransactionType, { label: string; icon: any; isCredit: boolean; tone: string }> = {
   deposit:     { label: 'Dépôt',          icon: ArrowDownToLine, isCredit: true,  tone: 'congogreen' },
   withdrawal:  { label: 'Retrait',        icon: ArrowUpFromLine, isCredit: false, tone: 'gold' },
-  loto_ticket: { label: 'Ticket Loto',    icon: Ticket,          isCredit: false, tone: 'gold' },
-  loto_payout: { label: 'Gain Loto',      icon: Trophy,          isCredit: true,  tone: 'congogreen' },
+  loto_ticket: { label: 'Ticket',         icon: Ticket,          isCredit: false, tone: 'gold' },
+  loto_payout: { label: 'Gain',           icon: Trophy,          isCredit: true,  tone: 'congogreen' },
 };
 
 export default function TransactionItem({ type, amount, status, date }: Props) {
