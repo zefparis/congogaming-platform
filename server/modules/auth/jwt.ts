@@ -61,7 +61,12 @@ export function authCookieOptions() {
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    // The API now lives on api.congogaming.com while the SPA stays on
+    // (secure.)congogaming.com — same-site requests, so SameSite=Lax suffices
+    // and 'none' is no longer needed. COOKIE_DOMAIN (.congogaming.com) makes
+    // the cookie available across both subdomains.
+    sameSite: 'lax' as const,
+    domain: env.COOKIE_DOMAIN || undefined,
     path: '/',
     maxAge: ACCESS_TOKEN_TTL_SECONDS,
   };

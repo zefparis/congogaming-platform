@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CongoPhoneSchema, LoginSchema, PinSchema, RegisterSchema, type LoginInput, type RegisterInput } from './schemas.js';
 import { AuthLockedError, InvalidCredentialsError, changePin, getUserById, getUserByPhone, hashPin, loginUser, registerUser, updateDisplayName } from './service.js';
 import { supabaseAdmin } from '../../lib/supabase.js';
+import { env } from '../../env.js';
 import { authCookieName, authCookieOptions, signAccessToken } from './jwt.js';
 
 const ResetPinSchema = z.object({
@@ -156,7 +157,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/api/auth/logout', async (_req, reply) => {
-    reply.clearCookie(authCookieName, { path: '/' });
+    reply.clearCookie(authCookieName, { path: '/', domain: env.COOKIE_DOMAIN || undefined });
     return reply.send({ ok: true });
   });
 

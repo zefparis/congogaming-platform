@@ -30,6 +30,10 @@ const envSchema = z.object({
   PG_API_KEY: z.string().optional(),
   PG_PROXY_URL: z.string().url('PG_PROXY_URL must be a valid URL').optional(),
   ALLOWED_ORIGINS: z.string().optional(),
+  // Cookie domain for the auth JWT. Set to '.congogaming.com' in production so
+  // the cookie is shared with api.congogaming.com (same-site, SameSite=Lax).
+  // Leave unset for local dev (host-only cookie on localhost).
+  COOKIE_DOMAIN: z.string().optional(),
   LOTO_ADMIN_SECRET: z.string().optional(),
   AUTH_MAX_FAILURES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('5'),
   AUTH_LOCKOUT_MINUTES: z.string().transform((val) => Number(val)).pipe(z.number().int().positive()).default('15'),
