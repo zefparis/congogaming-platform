@@ -12,7 +12,7 @@ import { supabaseAdmin } from './supabase.js';
  * Uses CONGOGAMING_UNIPAY_API_KEY (new) with legacy GAMING_API_KEY fallback.
  */
 
-const UNIPAY_API = env.UNIPAY_API_URL ?? 'https://unipay-api.onrender.com';
+const UNIPAY_API = env.UNIPAY_API_URL ?? 'https://api.unipaycongo.com';
 
 /**
  * Resolve the API key for UniPay calls.

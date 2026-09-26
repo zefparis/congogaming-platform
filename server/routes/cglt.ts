@@ -20,7 +20,7 @@ const MIN_CGLT_WITHDRAW = 10;
 const WITHDRAW_RATE_LIMIT = 3; // max successful withdrawals…
 const WITHDRAW_RATE_WINDOW_MS = 60 * 60 * 1000; // …per rolling hour, per user.
 
-const UNIPAY_API = env.UNIPAY_API_URL ?? 'https://unipay-api.onrender.com';
+const UNIPAY_API = env.UNIPAY_API_URL ?? 'https://api.unipaycongo.com';
 
 // ---- Zod schemas (coherent with the rest of the codebase) ----
 
